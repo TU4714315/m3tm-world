@@ -1,19 +1,18 @@
 <div align="center">
 
-# ⬡ OSIRIS
+# M3TM.WORLD
 
-### Open Source Intelligence & Reconnaissance Integrated System
+### Arabic-first global intelligence & OSINT map
 
-[![Live Demo](https://img.shields.io/badge/osirisai.live-00E5FF?style=for-the-badge&logo=vercel&logoColor=white)](https://osirislive.app)
-[![Support OSIRIS](https://img.shields.io/badge/Support_Project-Patreon-FF424D?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/posts/159077425)
+[![Production](https://img.shields.io/badge/Production-m3tm--world.vercel.app-D4AF37?style=for-the-badge&logo=vercel&logoColor=white)](https://m3tm-world.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
 [![License](https://img.shields.io/badge/License-MIT-D4AF37?style=for-the-badge)](LICENSE)
 
-**A real-time global intelligence dashboard that aggregates live flight tracking, CCTV networks, earthquake monitoring, conflict zone mapping, and 24/7 news feeds into a single GPU-accelerated interface.**
+**M3TM.WORLD combines geospatial intelligence layers, tracking feeds, OSINT tooling, media sources, and operational map controls in one GPU-accelerated interface.**
 
-[Live Demo](https://osirisai.live) · [Report Bug](https://github.com/simplifaisoul/osiris/issues) · [Request Feature](https://github.com/simplifaisoul/osiris/issues) · [Join Discord](https://discord.gg/umBykEpb98)
+[Production](https://m3tm-world.vercel.app) · [Source](https://github.com/TU4714315/m3tm-world) · [Upstream OSIRIS](https://github.com/simplifaisoul/osiris)
 
 </div>
 
@@ -21,7 +20,11 @@
 
 ## Overview
 
-Osiris is a production-grade OSINT platform that provides situational awareness across multiple intelligence domains. Built with Next.js 16 and MapLibre GL, every data point is rendered via WebGL for 60fps performance even with thousands of concurrent entities on-screen.
+M3TM.WORLD is a customized distribution of the OSIRIS intelligence platform, built with Next.js 16 and MapLibre GL. The M3TM.WORLD branch adds its own product identity, Arabic operator experience, deployment surface, media-source labeling, and project-specific integrations while retaining the upstream intelligence-map foundation.
+
+### Upstream & license
+
+M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaisoul/osiris) and remains distributed under the upstream MIT license. Upstream attribution is intentionally preserved in the repository history and LICENSE.
 
 ### Key Capabilities
 
@@ -47,7 +50,7 @@ Osiris is a production-grade OSINT platform that provides situational awareness 
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                  OSIRIS CLIENT                   │
+│                M3TM.WORLD CLIENT                 │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────┐ │
 │  │ MapLibre  │  │  HUD     │  │  RECON Toolkit│ │
 │  │  GL (GPU) │  │ Panels   │  │  Port Scan    │ │
