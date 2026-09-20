@@ -15,15 +15,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden domain' }, { status: 403 });
     }
 
-    const response = await fetch(targetUrl.toString(), { signal: AbortSignal.timeout(15000),
+    const response = await fetch(targetUrl.toString(), {
+      signal: AbortSignal.timeout(15000),
       headers: {
         'Accept': '*/*',
         'User-Agent': 'Osiris-Tile-Proxy/1.0',
       },
-      // Using Next.js fetch cache options to heavily cache tiles locally
-      next: {
-        revalidate: 31536000, // Cache for 1 year
-      }
+      // No Next fetch-cache: a stalled upstream once stored EMPTY bodies in the
+      // persistent cache, so every tile came back 200 with zero bytes and the
+      // basemap stayed black. The browser cache below is enough; upstream is
+      // re-read only on browser cache miss.
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -31,7 +33,12 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.arrayBuffer();
-    
+
+    // A 200 with an empty body is a failed fetch, not a valid tile.
+    if (data.byteLength === 0) {
+      return NextResponse.json({ error: 'Empty tile response' }, { status: 502 });
+    }
+
     // Forward the content-type from the upstream response
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
 
@@ -39,7 +46,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': 'public, max-age=86400, immutable',
         'Access-Control-Allow-Origin': '*',
       },
     });

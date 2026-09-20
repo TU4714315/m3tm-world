@@ -12,10 +12,10 @@
   /* ── Core Palette ── */
   --bg-void: #04040A;
   --bg-primary: #06060C;
-  --bg-secondary: #0C0E1A;
+  --bg-secondary: #11141F;
   --bg-tertiary: #121628;
-  --bg-panel: rgba(8, 10, 20, 0.88);
-  --bg-panel-solid: #0C0E1A;
+  --bg-panel: rgba(22, 26, 44, 0.94);
+  --bg-panel-solid: #161A2C;
 
   /* ── Gold Accent (Eye of Horus) ── */
   --gold-primary: #D4AF37;
@@ -55,15 +55,15 @@
   --map-flight-unknown: #546e7a;
 
   /* ── Borders ── */
-  --border-primary: rgba(var(--gold-rgb), 0.15);
+  --border-primary: rgba(var(--gold-rgb), 0.25);
   --border-secondary: rgba(var(--gold-rgb), 0.08);
   --border-active: rgba(var(--gold-rgb), 0.4);
   --border-cyan: rgba(var(--cyan-rgb), 0.2);
 
   /* ── Text ── */
-  --text-primary: #E8E6E0;
-  --text-secondary: #9B978E;
-  --text-muted: #5C5A54;
+  --text-primary: #F2F0EA;
+  --text-secondary: #B4B0A6;
+  --text-muted: #8A867C;
   --text-heading: #F5F0E0;
   --text-gold: #D4AF37;
   --text-cyan: #00E5FF;
@@ -76,7 +76,8 @@
   --hover-accent: rgba(var(--gold-rgb), 0.08);
 
   /* ── Fonts ── */
-  --font-hud: 'JetBrains Mono', 'Courier New', monospace;
+  /* JetBrains Mono covers Latin; use a joining Arabic font before Courier. */
+  --font-hud: 'JetBrains Mono', 'Segoe UI', Tahoma, 'Courier New', monospace;
   --font-body: 'Inter', -apple-system, sans-serif;
 
   /* ── Spacing (responsive) ── */
@@ -209,13 +210,19 @@ html:has(.docs-root) body {
   border-radius: 14px;
   box-shadow:
     0 4px 30px rgba(0, 0, 0, 0.5),
-    0 1px 0 rgba(var(--gold-rgb), 0.06) inset,
+    0 1px 0 rgba(var(--gold-rgb), 0.14) inset,
     0 -1px 0 rgba(0, 0, 0, 0.3) inset;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .glass-panel:hover {
   border-color: rgba(var(--gold-rgb), 0.22);
+}
+
+/* OsintPanel (recon) — near-opaque dark surface so labels stay legible
+   over detailed map imagery. Complements .glass-panel (border/shadow kept). */
+.osint-panel {
+  background: rgba(13, 15, 20, 0.97);
 }
 
 .glass-panel-sm {
@@ -251,10 +258,10 @@ html:has(.docs-root) body {
 
 .hud-label {
   font-family: var(--font-hud);
-  font-size: 7px;
+  font-size: 8px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .hud-value {
@@ -358,7 +365,7 @@ html:has(.docs-root) body {
 
 /* ── Vignette ── */
 .vignette {
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(4,4,10,0.6) 80%, rgba(4,4,10,0.95) 100%);
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(4,4,10,0.45) 80%, rgba(4,4,10,0.75) 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -408,7 +415,7 @@ html:has(.docs-root) body {
 .mobile-nav-btn {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 5px 6px; border-radius: 8px;
-  font-family: var(--font-hud); font-size: 6px; letter-spacing: 0.08em;
+  font-family: var(--font-hud); font-size: 10px; letter-spacing: 0;
   color: var(--text-muted); background: transparent;
   border: none; cursor: pointer; transition: all 0.2s ease;
   text-transform: uppercase;
@@ -467,7 +474,7 @@ html:has(.docs-root) body {
 /* Small phones */
 @media (max-width: 390px) {
   :root { --edge-pad: 4px; }
-  .mobile-nav-btn { padding: 4px 3px; font-size: 5px; }
+  .mobile-nav-btn { padding: 4px 3px; font-size: 9px; }
   .mobile-nav-btn svg { width: 14px; height: 14px; }
 }
 
@@ -555,7 +562,7 @@ html:has(.docs-root) body {
   border-radius: 14px;
   box-shadow:
     0 4px 30px rgba(0, 0, 0, 0.5),
-    0 1px 0 rgba(var(--gold-rgb), 0.06) inset,
+    0 1px 0 rgba(var(--gold-rgb), 0.14) inset,
     0 -1px 0 rgba(0, 0, 0, 0.3) inset;
   transition:
     transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -2488,4 +2495,28 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid rgba(var(--gold-rgb), 0.12);
   border-radius: 4px;
   padding: 1px 5px;
+}
+/* ── Arabic interface (RTL) ── */
+html[dir='rtl'] body,
+html[dir='rtl'] .glass-panel,
+html[dir='rtl'] .glass-panel-sm,
+html[dir='rtl'] .hud-text,
+html[dir='rtl'] .hud-label,
+html[dir='rtl'] .hud-value,
+html[dir='rtl'] .mobile-nav,
+html[dir='rtl'] .mobile-nav-btn,
+html[dir='rtl'] .mobile-nav-inner {
+  font-family: 'Segoe UI', Tahoma, 'Noto Sans Arabic', 'Cairo', system-ui, sans-serif;
+}
+/* Letter-spacing breaks Arabic cursive joining; strip tracking in RTL context,
+   technical/Latin runs (font-mono, coordinates) keep their own classes. */
+html[dir='rtl'] [class*='tracking-'] {
+  letter-spacing: 0 !important;
+}
+/* The map canvas and MapLibre controls stay LTR so camera axes, coordinates
+   and technical identifiers are never mirrored. */
+html[dir='rtl'] .map-container,
+html[dir='rtl'] .maplibregl-ctrl,
+html[dir='rtl'] [dir='ltr'] {
+  direction: ltr;
 }

@@ -783,6 +783,22 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
         'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.3, 5, 0.45, 10, 0.7],
       }});
 
+      // SDK entity nodes — real AIR / SEA / INTEL observations from sdk_entities.
+      map.addLayer({ id: 'sdk-air-nodes', type: 'circle', source: 'sdk-entities', filter: ['==',['get','domain'],'AIR'], paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2, 5,4, 10,5],
+        'circle-color': '#B2EBF2', 'circle-opacity': 0.85,
+        'circle-stroke-color': '#0A0D14', 'circle-stroke-width': 1,
+      }});
+      map.addLayer({ id: 'sdk-sea-nodes', type: 'circle', source: 'sdk-entities', filter: ['==',['get','domain'],'SEA'], paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2, 5,4, 10,5],
+        'circle-color': '#26C6DA', 'circle-opacity': 0.85,
+        'circle-stroke-color': '#0A0D14', 'circle-stroke-width': 1,
+      }});
+      map.addLayer({ id: 'sdk-intel-nodes', type: 'circle', source: 'sdk-entities', filter: ['==',['get','domain'],'INTEL'], paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2, 5,4, 10,5],
+        'circle-color': '#C5CAE9', 'circle-opacity': 0.85,
+        'circle-stroke-color': '#0A0D14', 'circle-stroke-width': 1,
+      }});
       // Maritime Ships (moving entities) — ocean teal family
       map.addLayer({ id: 'ship-dots', type: 'circle', source: 'maritime-ships', paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,2, 5,4, 10,6],
@@ -2019,7 +2035,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
   // Uses real submarine cable data for SEA domain, curated routes for AIR/INTEL
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('sdk-entities', []);
+    setGeo('sdk-entities', Array.isArray(data.sdk_entities) ? data.sdk_entities : []);
 
     const anySDK = activeLayers.sdk_sea || activeLayers.sdk_air || activeLayers.sdk_naval;
     if (!anySDK) {
@@ -2030,14 +2046,18 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     const links: any[] = [];
 
     // ── SEA DOMAIN: Real submarine cable data (1-for-1 Match) ──
-    if (activeLayers.sdk_sea && data.submarine_cables) {
+    // Accept cable data from either the legacy submarine_cables key
+    // (populated by the standalone cables toggle) or the new
+    // sdk_sea_cables key (populated when sdk_sea is toggled on).
+    const cableData = (data.submarine_cables?.length ? data.submarine_cables : data.sdk_sea_cables?.length ? data.sdk_sea_cables : null);
+    if (activeLayers.sdk_sea && cableData) {
       const ignoredColors = new Set(['#9BB5CC', '#A0B8CD', '#8EABC2', '#9bb5cc', '#a0b8cd', '#8eabc2']);
-      for (const cable of data.submarine_cables) {
+      for (const cable of cableData) {
         if (!cable.geometry) continue;
-        
+
         // Remove the light blue background arcs
         if (cable.properties?.color && ignoredColors.has(cable.properties.color)) continue;
-        
+
         links.push({
           type: 'Feature',
           geometry: cable.geometry, // Raw topographic paths exactly from Submarine Map
@@ -2055,7 +2075,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     }
 
     setGeo('sdk-links', links);
-  }, [mapReady, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval, data.submarine_cables, setGeo]);
+  }, [mapReady, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval, data.submarine_cables, data.sdk_sea_cables, data.sdk_entities, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -2161,9 +2181,9 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
 
     setVis(['balloon-dots','balloon-label'], activeLayers.balloons);
     setVis(['rad-glow','rad-dots','rad-label'], activeLayers.radiation);
-    setVis(['sdk-sea','sdk-sea-glow','sdk-sea-atmo'], activeLayers.sdk_sea !== false);
-    setVis(['sdk-air','sdk-air-glow','sdk-air-atmo'], activeLayers.sdk_air !== false);
-    setVis(['sdk-intel','sdk-intel-glow','sdk-intel-atmo'], activeLayers.sdk_naval !== false);
+    setVis(['sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-sea-nodes'], activeLayers.sdk_sea !== false);
+    setVis(['sdk-air','sdk-air-glow','sdk-air-atmo','sdk-air-nodes'], activeLayers.sdk_air !== false);
+    setVis(['sdk-intel','sdk-intel-glow','sdk-intel-atmo','sdk-intel-nodes'], activeLayers.sdk_naval !== false);
     // Sweep layers always visible when data is present (controlled by useEffect)
     setVis(['sweep-connections','sweep-pulse-ring','sweep-device-glow','sweep-device-dots','sweep-device-labels'], true);
   }, [mapReady, activeLayers, setVis]);

@@ -1,6 +1,6 @@
 {
-  "name": "OSIRIS — Global Intelligence Platform",
-  "short_name": "OSIRIS",
+  "name": "M3TM.WORLD — Global Intelligence Platform",
+  "short_name": "M3TM.WORLD",
   "description": "Real-time global OSINT intelligence dashboard. Track 10K+ aircraft, 2K satellites, worldwide CCTV, earthquakes, wildfires, nuclear facilities, and more.",
   "start_url": "/",
   "display": "standalone",

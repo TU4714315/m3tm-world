@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from './camera-feed';
+import { cameraMediaLabel, isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from './camera-feed';
+
+describe('camera media disclosure', () => {
+  it.each([
+    ['jpg', 'صورة تُحدَّث دوريًا'],
+    ['mp4', 'ملف فيديو'],
+    ['hls', 'فيديو HLS'],
+    ['mjpeg', 'تدفّق صور MJPEG'],
+    ['iframe', 'مشغّل مضمّن'],
+    ['unknown', 'صورة'],
+  ])('describes %s without claiming verified live video', (type, label) => {
+    expect(cameraMediaLabel(type)).toBe(label);
+    expect(cameraMediaLabel(type)).not.toContain('مباشر');
+  });
+});
 
 const SKY = 'https://www.skylinewebcams.com/en/webcam/japan/gunma/yubatake/yubatake.html';
 const WATCH = 'https://www.youtube.com/watch?v=UemFRPrl1hk';

@@ -43,7 +43,7 @@ export default function AiOverview({ mode, payload, accent = '#7C4DFF' }: AiOver
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setResult(await res.json());
     } catch (e: any) {
-      setError(e?.message || 'Failed to generate overview');
+      setError(e?.message || 'تعذّر إنشاء النظرة العامة');
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export default function AiOverview({ mode, payload, accent = '#7C4DFF' }: AiOver
         }}
       >
         {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-        {loading ? 'ANALYZING…' : 'AI OVERVIEW'}
+        {loading ? 'جارٍ التحليل…' : 'نظرة عامة بالذكاء الاصطناعي'}
       </button>
 
       <AnimatePresence>
@@ -86,7 +86,7 @@ export default function AiOverview({ mode, payload, accent = '#7C4DFF' }: AiOver
               {/* Header row */}
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-mono tracking-widest text-[9px]" style={{ color: accent }}>
-                  {result ? `OSIRIS ${result.generatedBy === 'gemini' ? 'AI' : 'ANALYST'}` : 'OSIRIS ANALYST'}
+                  {result ? `M3TM.WORLD ${result.generatedBy === 'gemini' ? 'ذكاء اصطناعي' : 'محلل'}` : 'محلل M3TM.WORLD'}
                 </span>
                 <div className="flex items-center gap-2">
                   <button onClick={generate} disabled={loading} className="hover:opacity-70 transition-opacity" title="Regenerate">
@@ -125,7 +125,7 @@ export default function AiOverview({ mode, payload, accent = '#7C4DFF' }: AiOver
                   )}
 
                   <div className="mt-2 text-[9px] font-mono text-[var(--text-muted)] tracking-wide">
-                    {result.generatedBy === 'gemini' ? 'GEMINI 2.0 FLASH' : 'HEURISTIC ANALYST'} ·{' '}
+                    {result.generatedBy === 'gemini' ? 'GEMINI 2.0 FLASH' : 'محلل استدلالي'} ·{' '}
                     {new Date(result.generatedAt).toLocaleTimeString()}
                   </div>
                 </>

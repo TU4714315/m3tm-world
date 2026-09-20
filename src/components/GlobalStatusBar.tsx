@@ -150,23 +150,23 @@ export default function GlobalStatusBar() {
         {/* ── LEFT: Social & Community Links ── */}
         <div className="flex-shrink-0 h-full flex items-center pointer-events-auto">
           {/* Discord — highlighted */}
-          <a href="https://discord.gg/EPaFD5FFKf" target="_blank" rel="noopener noreferrer"
+          <a href="https://discord.gg/EPaFD5FFKf" target="_blank" rel="noopener noreferrer" aria-label="Discord"
             className="h-full px-3 flex items-center gap-1.5 bg-[#5865F2]/10 hover:bg-[#5865F2]/25 border-r border-white/[0.04] transition-all duration-200 group"
           >
             <DiscordIcon />
           </a>
           {/* X / Twitter */}
-          <a href="https://x.com/soulsimplifai" target="_blank" rel="noopener noreferrer"
+          <a href="https://x.com/soulsimplifai" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)"
             className="h-full px-2.5 flex items-center gap-1.5 text-white/40 hover:text-white hover:bg-white/[0.04] border-r border-white/[0.04] transition-all duration-200"
           >
             <XIcon />
           </a>
           {/* Documentation & API reference */}
-          <Link href="/docs" prefetch title="Documentation & API Reference" aria-label="Documentation & API Reference"
+          <Link href="/docs" prefetch title="الوثائق ودليل واجهات API" aria-label="الوثائق ودليل واجهات API"
             className="h-full px-3 flex items-center gap-1.5 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)]/80 hover:text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/25 border-r border-white/[0.04] transition-all duration-200"
           >
             <DocsIcon />
-            <span className="text-[9px] font-bold tracking-[0.15em] uppercase">Docs</span>
+            <span className="text-[9px] font-bold tracking-[0.15em] uppercase">الوثائق</span>
           </Link>
         </div>
 
@@ -212,7 +212,7 @@ export default function GlobalStatusBar() {
           {/* Status indicator */}
           <div className="h-full px-3 flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
-            <span className="text-[#00E676]/70 text-[9px] tracking-[0.2em]">ONLINE</span>
+            <span className="text-[#00E676]/70 text-[9px] tracking-[0.2em]">متصل</span>
           </div>
         </div>
       </div>
@@ -223,15 +223,15 @@ export default function GlobalStatusBar() {
           <div className="bg-black/90 backdrop-blur-xl border border-white/[0.08] rounded-lg px-4 py-3 text-[11px] font-mono whitespace-nowrap shadow-2xl">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[11px]">🔴</span>
-              <span className="font-bold text-[#FF5722]">Magnitude {hoveredQuake.magnitude.toFixed(1)}</span>
+              <span className="font-bold text-[#FF5722]">قوة {hoveredQuake.magnitude.toFixed(1)}</span>
               <span className="text-white/30 text-[9px] bg-white/5 px-1.5 py-0.5 rounded">USGS</span>
             </div>
             <div className="text-[10px] text-white font-bold mb-2">
               {hoveredQuake.place}
             </div>
             <div className="flex flex-col gap-1 text-[10px]">
-              <div className="text-white/50"><span className="text-white/30">Depth:</span> {hoveredQuake.depth} km</div>
-              <div className="text-white/50 mt-1"><span className="text-white/30">Time:</span> {new Date(hoveredQuake.time).toLocaleString()}</div>
+              <div className="text-white/50"><span className="text-white/30">العمق:</span> {hoveredQuake.depth} km</div>
+              <div className="text-white/50 mt-1"><span className="text-white/30">الوقت:</span> {new Date(hoveredQuake.time).toLocaleString()}</div>
             </div>
           </div>
         </div>

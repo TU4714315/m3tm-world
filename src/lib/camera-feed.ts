@@ -13,6 +13,18 @@
 import { isSkylineUrl } from './skyline';
 import { isYouTubeUrl, parseYouTubeUrl, youtubeEmbedUrl } from './youtube';
 
+/** Describe the rendered medium, never infer live video from a URL or player. */
+export function cameraMediaLabel(streamType: string): string {
+  switch (streamType) {
+    case 'jpg': return 'صورة تُحدَّث دوريًا';
+    case 'mp4': return 'ملف فيديو';
+    case 'hls': return 'فيديو HLS';
+    case 'mjpeg': return 'تدفّق صور MJPEG';
+    case 'iframe': return 'مشغّل مضمّن';
+    default: return 'صورة';
+  }
+}
+
 /** The fields the viewer uses to decide how to play a camera. */
 export interface ResolvableCamera {
   external_url?: string;

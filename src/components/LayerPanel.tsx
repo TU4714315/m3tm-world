@@ -50,100 +50,102 @@ interface LayerGroupDef {
 const LAYER_GROUPS: LayerGroupDef[] = [
   {
     label: 'SDK',
-    fullLabel: 'OSIRIS SDK',
+    fullLabel: 'M3TM.WORLD SDK',
     icon: Network,
     layers: [
-      { key: 'sdk_sea', label: 'Maritime Lines', dataKey: 'sdk_entities' },
+      { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'كابلات ثابتة؛ السفن حسب توفر AIS' },
+      { key: 'sdk_air', label: 'الرصد الجوي', dataKey: 'commercial_flights', description: 'مشاهدات طيران دورية' },
+      { key: 'sdk_naval', label: 'رصد الأحداث', dataKey: 'gdelt', description: 'أحداث عامة محددة الموقع' },
     ],
   },
   {
-    label: 'AVIATION',
-    fullLabel: 'AVIATION',
+    label: 'الطيران',
+    fullLabel: 'الطيران',
     icon: Plane,
     layers: [
-      { key: 'flights', label: 'Commercial', dataKey: 'commercial_flights' },
-      { key: 'private', label: 'Private', dataKey: 'private_flights' },
-      { key: 'jets', label: 'Private Jets', dataKey: 'private_jets' },
-      { key: 'military', label: 'Military', dataKey: 'military_flights' },
+      { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
+      { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
+      { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
+      { key: 'military', label: 'العسكرية', dataKey: 'military_flights' },
     ],
   },
   {
-    label: 'MARITIME',
-    fullLabel: 'MARITIME',
+    label: 'البحرية',
+    fullLabel: 'البحرية',
     icon: Ship,
     layers: [
-      { key: 'maritime', label: 'Maritime / Naval', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
+      { key: 'maritime', label: 'البحرية / الحربية', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
     ],
   },
   {
-    label: 'SPACE',
-    fullLabel: 'SPACE TRACKING',
+    label: 'الفضاء',
+    fullLabel: 'تتبع الفضاء',
     icon: Satellite,
     layers: [
-      { key: 'satellites', label: 'All Satellites', dataKey: 'satellites' },
-      { key: 'sat_comms', label: 'Starlink / Comms', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'Military / Intel', dataKey: 'satellites', catKey: 'military' },
-      { key: 'sat_navigation', label: 'GPS / Navigation', dataKey: 'satellites', catKey: 'navigation' },
-      { key: 'sat_earth', label: 'Earth Observation', dataKey: 'satellites', catKey: 'earth_obs' },
-      { key: 'sat_science', label: 'Stations / Telescopes', dataKey: 'satellites', catKey: 'science' },
+      { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
+      { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military', label: 'العسكرية / الاستخبارات', dataKey: 'satellites', catKey: 'military' },
+      { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
+      { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
+      { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
     ],
   },
   {
-    label: 'SURVEIL',
-    fullLabel: 'SURVEILLANCE',
+    label: 'المراقبة',
+    fullLabel: 'المراقبة',
     icon: Camera,
     layers: [
-      { key: 'cctv', label: 'CCTV Cameras', dataKey: 'cameras' },
-      { key: 'cctv_previews', label: 'Live Previews', dataKey: '', parent: 'cctv' },
-      { key: 'live_news', label: 'Live News Feeds', dataKey: 'live_feeds' },
+      { key: 'cctv', label: 'كاميرات المراقبة', dataKey: 'cameras' },
+      { key: 'cctv_previews', label: 'معاينات حية', dataKey: '', parent: 'cctv' },
+      { key: 'live_news', label: 'بث أخباري مباشر', dataKey: 'live_feeds' },
     ],
   },
   {
-    label: 'HAZARD',
-    fullLabel: 'NATURAL HAZARDS',
+    label: 'المخاطر',
+    fullLabel: 'المخاطر الطبيعية',
     icon: CloudLightning,
     layers: [
-      { key: 'earthquakes', label: 'Earthquakes', dataKey: 'earthquakes' },
-      { key: 'fires', label: 'Active Fires', dataKey: 'fires' },
-      { key: 'weather', label: 'Severe Weather', dataKey: 'weather_events' },
+      { key: 'earthquakes', label: 'الزلازل', dataKey: 'earthquakes' },
+      { key: 'fires', label: 'حرائق نشطة', dataKey: 'fires' },
+      { key: 'weather', label: 'طقس شديد', dataKey: 'weather_events' },
     ],
   },
   {
-    label: 'THREAT',
-    fullLabel: 'THREATS & INTEL',
+    label: 'التهديدات',
+    fullLabel: 'التهديدات والاستخبارات',
     icon: AlertTriangle,
     layers: [
-      { key: 'infrastructure', label: 'Nuclear Facilities', dataKey: 'infrastructure' },
-      { key: 'global_incidents', label: 'Global Incidents', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'GDELT Events', dataKey: 'gdelt_events' },
+      { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
+      { key: 'global_incidents', label: 'حوادث عالمية', dataKey: 'gdelt' },
+      { key: 'gdelt_events', label: 'أحداث GDELT', dataKey: 'gdelt_events' },
     ],
   },
   {
-    label: 'NETWORK',
-    fullLabel: 'NETWORK INTEL',
+    label: 'الشبكة',
+    fullLabel: 'استخبارات الشبكة',
     icon: Network,
     layers: [
-      { key: 'malware', label: 'Live Malware', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'Live Attacks', dataKey: 'cyber_attacks' },
+      { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
+      { key: 'cyber_attacks', label: 'هجمات حية', dataKey: 'cyber_attacks' },
     ],
   },
   {
-    label: 'NETINTEL',
-    fullLabel: 'NET & EVENT INTEL',
+    label: 'شبكة وأحداث',
+    fullLabel: 'استخبارات الشبكة والأحداث',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'Internet Outages', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'Attack Origins', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
+      { key: 'cf_outages', label: 'انقطاعات الإنترنت', dataKey: 'cf_outages', requires: 'cloudflare' },
+      { key: 'cf_attacks', label: 'مصادر الهجمات', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
-    label: 'DISPLAY',
-    fullLabel: 'DISPLAY',
+    label: 'العرض',
+    fullLabel: 'العرض',
     icon: Sun,
     layers: [
-      { key: 'day_night', label: 'Day / Night Cycle', dataKey: '' },
-      { key: 'terrain_3d', label: '3D Buildings', description: 'City detail · zoom 14.5+', dataKey: '' },
-      { key: 'terrain_elevation', label: '3D Terrain', description: 'Mountains · zoom 10+', dataKey: '' },
+      { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
+      { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
+      { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
     ],
   },
 ];
@@ -447,7 +449,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         onClick={(e) => { e.stopPropagation(); toggleGroup(group.layers); }}
                         className="px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider text-white/40 hover:text-white hover:bg-white/10 transition-colors"
                       >
-                        {activeCount > 0 ? 'NONE' : 'ALL'}
+                        {activeCount > 0 ? 'لا شيء' : 'الكل'}
                       </button>
                       {isPinned && (
                         <button

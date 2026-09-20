@@ -168,7 +168,7 @@ export function elevationPath(
 /** Wall-clock arrival time for a trip of `seconds` starting now. */
 export function arrivalTime(seconds: number, now: Date = new Date()): string {
   const at = new Date(now.getTime() + seconds * 1000);
-  return at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return at.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
 /**
