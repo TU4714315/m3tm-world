@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   return NextResponse.json({
     status: 'operational',
-    platform: 'OSIRIS',
-    version: '1.0.0',
+    platform: 'M3TM.WORLD',
+    version: '0.1.0',
+    upstream: 'simplifaisoul/osiris',
     uptime: process.uptime ? Math.round(process.uptime()) : 0,
     timestamp: new Date().toISOString(),
     endpoints: [

@@ -2,7 +2,7 @@ param([int]$Port = 3102)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $nodeCommand = (Get-Command node).Source
-if ([int]((& $nodeCommand -p 'process.versions.node.split(".")[0]')) -lt 22) {
+if ([int]((& $nodeCommand -p "process.versions.node.split('.')[0]")) -lt 22) {
     $nodeCommand = Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe'
 }
 if (!(Test-Path -LiteralPath '.next/standalone/server.js')) {

@@ -1243,10 +1243,10 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
         className="absolute bottom-[75px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none"
-        style={{ left: isMobile ? '12px' : '120px' }}
+        style={{ left: isMobile ? '12px' : '120px', right: isMobile ? '12px' : 'auto' }}
       >
         {/* Unified Control Strip */}
-        <div className="flex items-center gap-[3px] p-[3px] pointer-events-auto rounded-xl border border-[var(--border-primary)] bg-[var(--bg-panel)] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.55)]">
+        <div className="flex w-fit max-w-full items-center justify-center gap-[3px] p-[4px] pointer-events-auto rounded-2xl border border-[var(--border-primary)] bg-[rgba(7,9,16,0.88)] backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.58),0_0_24px_rgba(var(--gold-rgb),0.05)]">
           <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} title="كرة ثلاثية الأبعاد" icon={Globe} label="3D" />
           <ViewSegment layoutId="view-projection" active={mapProjection === 'mercator'} onClick={selectFlatMap} title="خريطة ثنائية الأبعاد" icon={MapPinned} label="2D" />
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
