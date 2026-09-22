@@ -323,16 +323,16 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
             style={{ background: 'var(--gold-primary)', boxShadow: '0 0 8px rgba(var(--gold-rgb),0.6)' }}
           />
           <BarChart3 className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
-          <span className="instrument-title">Markets &amp; Intel</span>
-          <span className="instrument-chip" style={{ color: 'var(--alert-green)' }}>Live</span>
+          <span className="instrument-title">الأسواق والبيانات</span>
+          <span className="instrument-chip" style={{ color: 'var(--alert-green)' }}>مباشر</span>
         </button>
         <div className="flex items-center gap-2">
           {age && <span className="text-[9px] font-mono text-[var(--text-muted)]">{age}</span>}
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
-          <button onClick={() => { setMaximized(!maximized); if (!expanded && !maximized) setExpanded(true); }} className="p-1.5 -m-0.5 rounded hover:text-white hover:bg-white/10 transition-colors" title={maximized ? "Restore" : "Maximize"}>
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-world-pulse" />
+          <button onClick={() => { setMaximized(!maximized); if (!expanded && !maximized) setExpanded(true); }} className="p-1.5 -m-0.5 rounded hover:text-white hover:bg-white/10 transition-colors" title={maximized ? "استعادة الحجم" : "تكبير"}>
             {maximized ? <Minimize2 className="w-3.5 h-3.5 text-[var(--text-muted)]" /> : <Maximize2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
           </button>
-          <button onClick={() => setExpanded(!expanded)} title={expanded ? 'Collapse' : 'Expand'}>
+          <button onClick={() => setExpanded(!expanded)} title={expanded ? 'طي' : 'توسيع'}>
             {expanded ? <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
           </button>
         </div>

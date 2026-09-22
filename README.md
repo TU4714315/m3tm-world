@@ -2,7 +2,7 @@
 
 # M3TM.WORLD
 
-### Arabic-first global intelligence & OSINT map
+### خريطة عالمية عربية أولًا للبيانات العامة والحية
 
 [![Production](https://img.shields.io/badge/Production-m3tm--world.vercel.app-D4AF37?style=for-the-badge&logo=vercel&logoColor=white)](https://m3tm-world.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
@@ -10,9 +10,9 @@
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
 [![License](https://img.shields.io/badge/License-MIT-D4AF37?style=for-the-badge)](LICENSE)
 
-**M3TM.WORLD combines geospatial intelligence layers, tracking feeds, OSINT tooling, media sources, and operational map controls in one GPU-accelerated interface.**
+**M3TM.WORLD تجمع طبقات جغرافية وبيانات تتبع ومصادر إعلامية وأدوات بحث وتحقق وعناصر تحكم بالخريطة في واجهة واحدة مسرعة بالرسوميات.**
 
-[Production](https://m3tm-world.vercel.app) · [Source](https://github.com/TU4714315/m3tm-world) · [Upstream OSIRIS](https://github.com/simplifaisoul/osiris)
+[Production](https://m3tm-world.vercel.app) · [Source](https://github.com/TU4714315/m3tm-world)
 
 </div>
 
@@ -20,18 +20,18 @@
 
 ## Overview
 
-M3TM.WORLD is a customized distribution of the OSIRIS intelligence platform, built with Next.js 16 and MapLibre GL. The M3TM.WORLD branch adds its own product identity, Arabic operator experience, deployment surface, media-source labeling, and project-specific integrations while retaining the upstream intelligence-map foundation.
+M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre GL، بواجهة عربية وهوية M3TM.WORLD وطبقات بيانات عامة ومصادر منشورة وتكاملات خاصة بالمشروع.
 
 ### Upstream & license
 
-M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaisoul/osiris) and remains distributed under the upstream MIT license. Upstream attribution is intentionally preserved in the repository history and LICENSE.
+معلومات الترخيص ونَسَب الشفرة المصدرية محفوظة في LICENSE وسجل المستودع.
 
 ### Key Capabilities
 
 | Domain | Data Points | Sources |
 |--------|------------|---------|
 | **Aviation** | Commercial, Private, Military, Jets | OpenSky Network |
-| **Maritime** | 39 Global Ports, 10 Chokepoints | Static Naval Intel |
+| **Maritime** | 39 Global Ports, 10 Chokepoints | Static بيانات بحرية |
 | **CCTV** | 17,000+ Cameras | TfL, WSDOT, Caltrans, ODOT, MDOT, HK Transport Dept, Taiwan THB, NZTA + more |
 | **Seismic** | Real-time M2.5+ | USGS Earthquake API |
 | **Fires** | Active Hotspots | NASA FIRMS |
@@ -39,10 +39,10 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 | **Weather** | Severe Events | NASA EONET |
 | **Space** | Solar Weather, Satellites | NOAA SWPC, N2YO |
 | **Cyber** | CVE Threats, Vulnerability Scanning | NVD, Custom Scanner |
-| **Conflict** | 13 Active Zones | Static OSINT Intel |
+| **Conflict** | 13 Active Zones | Static بيانات عامة |
 | **Crypto** | BTC + ETH Wallet Tracing, OFAC SDN Match | blockstream.info, Blockscout, OpenSanctions |
 | **Sanctions** | Person / Org / Vessel SDN Search | OpenSanctions (US OFAC SDN mirror) |
-| **Telegram OSINT** | Geoparsed Posts from Public Channels | `t.me/s/<channel>` web preview |
+| **Telegram العام** | Geoparsed Posts from Public Channels | `t.me/s/<channel>` web preview |
 
 ---
 
@@ -65,7 +65,7 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 │  /api/gdelt           /api/satellites           │
 │  /api/weather         /api/scanner              │
 │  /api/sentinel        /api/telegram-feed        │
-│  /api/osint/*  (whois, dns, ip, cve, sanctions, │
+│  /api/tools/*  (whois, dns, ip, cve, sanctions, │
 │                 crypto, sweep, threats, …)      │
 ├─────────────────────────────────────────────────┤
 │              EXTERNAL DATA SOURCES               │
@@ -80,7 +80,7 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 
 ## Features
 
-### Intelligence Layers
+### طبقات البيانات
 - **16 toggleable data layers** with real-time entity counts
 - **GPU-accelerated rendering** — all map data rendered via WebGL, not DOM
 - **Progressive loading** — data fetched on-demand when layers are activated
@@ -91,7 +91,7 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 - **DNS Lookup** — Full record resolution (A, AAAA, MX, NS, TXT, CNAME)
 - **WHOIS** — Domain/IP registration data (auto-cross-checked against OFAC SDN)
 - **SSL/TLS Inspector** — Certificate chain analysis
-- **IP Intelligence** — Geolocation, ASN, threat reputation (auto-cross-checked against OFAC SDN)
+- **بيانات IP** — Geolocation, ASN, threat reputation (auto-cross-checked against OFAC SDN)
 - **Vulnerability Scanner** — CVE lookup against NVD database
 - **Crypto Wallet Trace** — BTC + ETH lookup (balance, tx history, OFAC SDN sanctions flag)
 - **OFAC Sanctions Search** — query persons, organizations, vessels and aircraft against the US OFAC SDN list
@@ -101,13 +101,13 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 - Click any news dot on the map to open the live stream
 - Feeds from NBC, CBS, ABC, Sky News, Al Jazeera, France 24, NHK, WION, and more
 
-### Telegram OSINT Layer
+### طبقة قنوات Telegram العامة
 - **Public-channel feed** scraped from the unauthenticated `t.me/s/<channel>` web preview — no Bot API token, no MTProto
-- Default curated set of 5 channels (EN + RU/UA war reporting), overridable via `OSIRIS_TELEGRAM_CHANNELS`
+- Default curated set of 5 channels (EN + RU/UA war reporting), overridable via `M3TM_WORLD_TELEGRAM_CHANNELS`
 - Posts are geoparsed against a multilingual place dictionary (EN + Cyrillic + Arabic) and plotted on the map
 - Click any cyan dot to read the post and jump to the original on Telegram
 
-### Crypto Wallet Intelligence
+### بيانات المحافظ الرقمية
 - **BTC** lookups via [blockstream.info](https://blockstream.info) (Esplora API, keyless)
 - **ETH** lookups via [Blockscout](https://github.com/blockscout/blockscout)'s public ETH instance (`eth.blockscout.com`, keyless)
 - Every lookup is cross-checked against the OFAC SDN sanctioned-address list (mirrored from [`0xB10C/ofac-sanctioned-digital-currency-addresses`](https://github.com/0xB10C/ofac-sanctioned-digital-currency-addresses))
@@ -135,8 +135,8 @@ M3TM.WORLD is derived from [simplifaisoul/osiris](https://github.com/simplifaiso
 ## Quick Start
 
 ```bash
-git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
+git clone https://github.com/TU4714315/m3tm-world.git
+cd m3tm-world
 npm install
 npm run dev
 ```
@@ -146,8 +146,8 @@ Open [http://localhost:3000](http://localhost:3000)
 ### Docker / Self-Hosting
 
 ```bash
-git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
+git clone https://github.com/TU4714315/m3tm-world.git
+cd m3tm-world
 cp .env.template .env     # optional — configure keys / port
 docker compose up -d
 ```
@@ -161,26 +161,26 @@ CasaOS and API-key guide.
 **Prebuilt image (GHCR)** — skip the build and pull it directly:
 
 ```bash
-docker pull ghcr.io/simplifaisoul/osiris:latest
-docker run -d -p 3000:3000 --env-file .env ghcr.io/simplifaisoul/osiris:latest
+docker pull ghcr.io/TU4714315/m3tm-world:latest
+docker run -d -p 3000:3000 --env-file .env ghcr.io/TU4714315/m3tm-world:latest
 ```
 
-**Custom port** — the container always listens on `3000`; set `OSIRIS_PORT` in
-`.env` to change the published host port (e.g. `OSIRIS_PORT=3005`) without
+**Custom port** — the container always listens on `3000`; set `M3TM_WORLD_PORT` in
+`.env` to change the published host port (e.g. `M3TM_WORLD_PORT=3005`) without
 editing the compose file.
 
 ### Environment Variables
 
-OSIRIS works **partially without any API keys** — all core feeds use public,
+M3TM.WORLD works **partially without any API keys** — all core feeds use public,
 keyless sources. Copy [`.env.template`](.env.template) to `.env` and set only
 what you need:
 
 ```env
 # Published host port (container always listens on 3000). Default: 3000
-OSIRIS_PORT=3000
+M3TM_WORLD_PORT=3000
 
 # RECON scanner backend (the only vars the current code reads).
-# SCANNER_KEY must match the backend's OSIRIS_KEY — generate with: openssl rand -hex 32
+# SCANNER_KEY must match the backend's M3TM_WORLD_KEY — generate with: openssl rand -hex 32
 SCANNER_URL=
 SCANNER_KEY=
 
@@ -231,12 +231,12 @@ MIT — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**🛠️ SUPPORT THE OSIRIS PROJECT**
-The OSIRIS Global Intelligence Grid is entirely open-source, but running the backend scanners and data firehoses isn't cheap.
+**🛠️ SUPPORT THE M3TM.WORLD PROJECT**
+The M3TM.WORLD Global Data Map is entirely open-source, but running the backend scanners and data firehoses isn't cheap.
 
-If you want to help keep the servers alive, and support us to get access to better tools  unlock the **Special OSIRIS Console**, Currently Just a Cool UI. a you can officially support the project here : 
+If you want to help keep the servers alive, and support us to get access to better tools  unlock the **Special M3TM.WORLD Console**, Currently Just a Cool UI. a you can officially support the project here :
 
-🔗 [Support OSIRIS on Patreon](https://www.patreon.com/posts/159077425)
+🔗 [Support M3TM.WORLD on Patreon](https://www.patreon.com/posts/159077425)
 
 *Supporters receive the `🔴 RedTeam Console` role and access to encrypted developer comms.*
 

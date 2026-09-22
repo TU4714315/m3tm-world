@@ -84,7 +84,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'العسكرية / الاستخبارات', dataKey: 'satellites', catKey: 'military' },
+      { key: 'sat_military', label: 'العسكرية / الرصدية', dataKey: 'satellites', catKey: 'military' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
@@ -112,7 +112,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'التهديدات',
-    fullLabel: 'التهديدات والاستخبارات',
+    fullLabel: 'الأحداث والمخاطر',
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
@@ -122,7 +122,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'الشبكة',
-    fullLabel: 'استخبارات الشبكة',
+    fullLabel: 'بيانات الشبكة',
     icon: Network,
     layers: [
       { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
@@ -131,7 +131,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'شبكة وأحداث',
-    fullLabel: 'استخبارات الشبكة والأحداث',
+    fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
       { key: 'cf_outages', label: 'انقطاعات الإنترنت', dataKey: 'cf_outages', requires: 'cloudflare' },
@@ -222,11 +222,11 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   };
   const terrainDetails = activeLayers.terrain_elevation ? (
     <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-[10px] text-white/60">
-      <p role="status">{terrainStatus === 'idle' ? `Terrain at zoom ${TERRAIN_MIN_ZOOM}+ · zoom in` : terrainStatus === 'waiting' ? 'Terrain starts when you stop moving' : terrainStatus === 'loading' ? 'Loading nearby terrain…' : terrainStatus === 'error' ? 'Terrain unavailable; the map is still usable.' : 'Terrain on'}</p>
-      {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">Zoom to terrain</button>}
-      {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">Retry terrain</button>}
-      <p className="mt-2 text-white/35">Nearby detail only · cached tiles</p>
-      <a className="mt-1 inline-block underline underline-offset-2" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Terrain credits</a>
+      <p role="status">{terrainStatus === 'idle' ? `Terrain at zoom ${TERRAIN_MIN_ZOOM}+ · zoom in` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
+      {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
+      {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
+      <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
+      <a className="mt-1 inline-block underline underline-offset-2" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">مصادر بيانات التضاريس</a>
     </div>
   ) : null;
 
@@ -307,7 +307,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
 
         {/* MOBILE STYLE STUDIO */}
         <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/[0.06] px-1">
-          <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">Style Studio</span>
+          <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">إعدادات المظهر</span>
           <button
             onClick={() => setStudioOpen(o => !o)}
             aria-pressed={studioOpen}
@@ -327,7 +327,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         {/* MOBILE GHOST TOGGLE */}
         {setTheme && (
           <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] px-1">
-            <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">Ghost Protocol</span>
+            <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">الوضع الخافت</span>
             <button
               onClick={() => setTheme(theme === 'core' ? 'ghost' : 'core')}
               className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
@@ -454,7 +454,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {isPinned && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setPinnedGroup(null); }}
-                          aria-label="Close"
+                          aria-label="إغلاق"
                           className="px-1.5 py-0.5 rounded text-[10px] font-mono text-white/40 hover:text-white hover:bg-white/10 transition-colors"
                         >
                           ✕
@@ -473,7 +473,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             onClick={() => toggle(layer.key)}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={dormant ? 'Turn the layer above on to use this' : undefined}
+                            title={dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
                             className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors cursor-pointer text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                           >
                             {layer.parent && <SubLayerStem />}
@@ -503,13 +503,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       {/* Subtle separator */}
       <div className="w-5 h-px bg-white/[0.06] my-2" />
 
-      {/* Style Studio */}
+      {/* إعدادات المظهر */}
       <button
         onClick={() => setStudioOpen(o => !o)}
         aria-pressed={studioOpen}
         className="w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-500 cursor-pointer"
         style={{ background: studioOpen ? 'var(--hover-accent)' : 'transparent' }}
-        title="Style Studio"
+        title="إعدادات المظهر"
       >
         <SlidersHorizontal
           className="transition-all duration-500"
@@ -525,7 +525,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         {studioOpen && <StyleStudio onClose={() => setStudioOpen(false)} />}
       </AnimatePresence>
 
-      {/* Ghost Protocol Toggle */}
+      {/* الوضع الخافت Toggle */}
       {setTheme && (
         <button
           onClick={() => setTheme(theme === 'core' ? 'ghost' : 'core')}
@@ -533,7 +533,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
           style={{
             background: theme === 'ghost' ? 'rgba(179, 136, 255, 0.1)' : 'transparent',
           }}
-          title="Ghost Protocol"
+          title="الوضع الخافت"
         >
           <Ghost
             className="transition-all duration-500"

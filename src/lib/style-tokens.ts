@@ -62,9 +62,9 @@ export interface StyleSettings {
 
 export const FONT_UI = [
   { label: 'INTER', value: "'Inter', -apple-system, sans-serif" },
-  { label: 'MONO', value: "'JetBrains Mono', monospace" },
-  { label: 'SYSTEM', value: 'system-ui, -apple-system, sans-serif' },
-  { label: 'SERIF', value: "'Iowan Old Style', Georgia, serif" },
+  { label: 'أحادي', value: "'JetBrains Mono', monospace" },
+  { label: 'النظام', value: 'system-ui, -apple-system, sans-serif' },
+  { label: 'تقليدي', value: "'Iowan Old Style', Georgia, serif" },
 ];
 
 export const FONT_MONO = [
@@ -110,12 +110,12 @@ export type Preset = { label: string; patch: Partial<StyleSettings> };
 
 /** Presets carry a full surface ramp so they don't inherit the old one. */
 export const PRESETS: Preset[] = [
-  { label: 'HORUS', patch: { accent: '#d4af37', accent2: '#00e5ff', bg: '#04040a', bgPrimary: '#06060c', bgSecondary: '#0c0e1a', bgTertiary: '#121628', textPrimary: '#e8e6e0', textSecondary: '#9b978e', textMuted: '#5c5a54', textHeading: '#f5f0e0', glow: 0.3, scanlines: 0 } },
-  { label: 'PHANTOM', patch: { accent: '#b388ff', accent2: '#7c4dff', bg: '#05000f', bgPrimary: '#08001a', bgSecondary: '#0d0025', bgTertiary: '#140033', textPrimary: '#e1bee7', textSecondary: '#9575cd', textMuted: '#6a4c93', textHeading: '#b388ff', glow: 0.35, scanlines: 0 } },
-  { label: 'TERMINAL', patch: { accent: '#00ff9c', accent2: '#00b36b', bg: '#000a06', bgPrimary: '#001410', bgSecondary: '#00201a', bgTertiary: '#002d24', textPrimary: '#c8ffe4', textSecondary: '#5fbf95', textMuted: '#2e6b52', textHeading: '#7dffc4', glow: 0.4, scanlines: 0.05 } },
-  { label: 'CRIMSON', patch: { accent: '#ff4d5a', accent2: '#ff9500', bg: '#0c0204', bgPrimary: '#140407', bgSecondary: '#1e070b', bgTertiary: '#2a0a10', textPrimary: '#ffd9dd', textSecondary: '#c98089', textMuted: '#6e3a42', textHeading: '#ff8f97', glow: 0.35, scanlines: 0 } },
-  { label: 'ARCTIC', patch: { accent: '#8fd3ff', accent2: '#4fc3f7', bg: '#04080f', bgPrimary: '#070d18', bgSecondary: '#0b1524', bgTertiary: '#101f33', textPrimary: '#e3f2fd', textSecondary: '#90a4b8', textMuted: '#4a5d70', textHeading: '#c9e7ff', glow: 0.25, scanlines: 0 } },
-  { label: 'BLACKOUT', patch: { accent: '#9e9e9e', accent2: '#616161', bg: '#000000', bgPrimary: '#070707', bgSecondary: '#0e0e0e', bgTertiary: '#161616', textPrimary: '#e0e0e0', textSecondary: '#8a8a8a', textMuted: '#4a4a4a', textHeading: '#f0f0f0', glow: 0.08, scanlines: 0 } },
+  { label: 'ذهبي', patch: { accent: '#d4af37', accent2: '#00e5ff', bg: '#04040a', bgPrimary: '#06060c', bgSecondary: '#0c0e1a', bgTertiary: '#121628', textPrimary: '#e8e6e0', textSecondary: '#9b978e', textMuted: '#5c5a54', textHeading: '#f5f0e0', glow: 0.3, scanlines: 0 } },
+  { label: 'بنفسجي', patch: { accent: '#b388ff', accent2: '#7c4dff', bg: '#05000f', bgPrimary: '#08001a', bgSecondary: '#0d0025', bgTertiary: '#140033', textPrimary: '#e1bee7', textSecondary: '#9575cd', textMuted: '#6a4c93', textHeading: '#b388ff', glow: 0.35, scanlines: 0 } },
+  { label: 'طرفية', patch: { accent: '#00ff9c', accent2: '#00b36b', bg: '#000a06', bgPrimary: '#001410', bgSecondary: '#00201a', bgTertiary: '#002d24', textPrimary: '#c8ffe4', textSecondary: '#5fbf95', textMuted: '#2e6b52', textHeading: '#7dffc4', glow: 0.4, scanlines: 0.05 } },
+  { label: 'قرمزي', patch: { accent: '#ff4d5a', accent2: '#ff9500', bg: '#0c0204', bgPrimary: '#140407', bgSecondary: '#1e070b', bgTertiary: '#2a0a10', textPrimary: '#ffd9dd', textSecondary: '#c98089', textMuted: '#6e3a42', textHeading: '#ff8f97', glow: 0.35, scanlines: 0 } },
+  { label: 'قطبي', patch: { accent: '#8fd3ff', accent2: '#4fc3f7', bg: '#04080f', bgPrimary: '#070d18', bgSecondary: '#0b1524', bgTertiary: '#101f33', textPrimary: '#e3f2fd', textSecondary: '#90a4b8', textMuted: '#4a5d70', textHeading: '#c9e7ff', glow: 0.25, scanlines: 0 } },
+  { label: 'داكن', patch: { accent: '#9e9e9e', accent2: '#616161', bg: '#000000', bgPrimary: '#070707', bgSecondary: '#0e0e0e', bgTertiary: '#161616', textPrimary: '#e0e0e0', textSecondary: '#8a8a8a', textMuted: '#4a4a4a', textHeading: '#f0f0f0', glow: 0.08, scanlines: 0 } },
 ];
 
 /* ── Colour helpers ── */

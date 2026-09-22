@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — AI Intelligence Briefing Endpoint
+ *  M3TM.WORLD — AI Data Briefing Endpoint
  *  POST /api/ai/briefing
  *  Generates structured threat briefings via Gemini
  * ═══════════════════════════════════════════════════════════════
@@ -11,7 +11,7 @@ import {
   createGeminiClient,
   rotateApiKey,
   generateBriefing,
-  type IntelligenceContext,
+  type WorldDataContext,
 } from '@/lib/ai-engine';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +75,7 @@ function getEnvApiKeys(): string[] {
    ───────────────────────────────────────────────────────────── */
 
 interface BriefingRequestBody {
-  context: IntelligenceContext;
+  context: WorldDataContext;
 }
 
 interface BriefingResponse {
@@ -151,7 +151,7 @@ export async function POST(
 
   if (!body.context) {
     return NextResponse.json(
-      { error: 'Intelligence context is required.', code: 'MISSING_CONTEXT' },
+      { error: 'Data context is required.', code: 'MISSING_CONTEXT' },
       { status: 400 }
     );
   }
@@ -201,7 +201,7 @@ export async function POST(
       );
     }
 
-    console.error('[OSIRIS AI] Briefing error:', message);
+    console.error('[M3TM.WORLD] Briefing error:', message);
     return NextResponse.json(
       { error: 'Briefing generation failed. Please try again.', code: 'BRIEFING_FAILED' },
       { status: 500 }

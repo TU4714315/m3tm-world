@@ -4,9 +4,9 @@ import type { IncomingHttpHeaders } from 'http';
 import type { Readable } from 'stream';
 
 /**
- * OSIRIS — JSON fetch over Node's https client.
+ * M3TM.WORLD — JSON fetch over Node's https client.
  *
- * Some upstreams OSIRIS depends on cannot be reached with the bundled undici
+ * Some upstreams M3TM.WORLD depends on cannot be reached with the bundled undici
  * `fetch` from the Next server runtime — it stalls and throws
  * UND_ERR_CONNECT_TIMEOUT after 10s, while `https.get` to the same URL returns
  * in a few hundred ms. This helper is the shared escape hatch.
@@ -16,7 +16,7 @@ import type { Readable } from 'stream';
  * with 406/429 and ask for contact details in their usage policies.
  */
 
-export const OSIRIS_UA = 'OSIRIS-OSINT/1.0 (+https://github.com/simplifaisoul/osiris)';
+export const M3TM_WORLD_UA = 'M3TM-WORLD/1.0 (+https://m3tm.world)';
 
 export interface RequestOptions {
   timeoutMs?: number;
@@ -42,7 +42,7 @@ function request(url: string, { timeoutMs = 20000, headers = {} }: RequestOption
     const req = https.get(
       url,
       {
-        headers: { 'User-Agent': OSIRIS_UA, Accept: 'application/json', 'Accept-Language': 'en', ...headers },
+        headers: { 'User-Agent': M3TM_WORLD_UA, Accept: 'application/json', 'Accept-Language': 'ar-SA,ar;q=0.9,en;q=0.5', ...headers },
         timeout: timeoutMs,
       },
       (res) => {

@@ -1,17 +1,17 @@
-# Osiris Global Intelligence Platform
-# https://osirisai.live
+# M3TM.WORLD — خريطة عالمية للبيانات الحية
+# https://m3tm-world.vercel.app
 
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /api/scanner
-Disallow: /api/osint/*
+Disallow: /api/tools/*
 
 # Allow search engines to index the main page
 Allow: /api/health
 
 # Sitemap
-Sitemap: https://osirisai.live/sitemap.xml
+Sitemap: https://m3tm-world.vercel.app/sitemap.xml
 
 # Crawl-delay for respectful indexing
 Crawl-delay: 10

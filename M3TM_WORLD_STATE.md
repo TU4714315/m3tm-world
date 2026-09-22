@@ -1,5 +1,29 @@
 # M3TM.WORLD STATE
 
+## MASTER CROSS-PROJECT CHECKPOINT — 2026
+- Primary continuity file: docs/M3TM_PROJECTS_INTEGRATION_2026.md
+- Hermes handoff: outputs/HERMES_PROJECTS_INTEGRATION_2026_HANDOFF.txt
+- Desktop shortcut installer: tools/Install-ProjectsIntegration2026Shortcut.ps1
+- Cross-project work involving M3TM.APP and M3TM.WORLD must read the master continuity file first, then verify current Git/CI/production before execution.
+
+## CURRENT EXECUTION — 2026-09-22
+- Branch: `m3tm/world-arabic-neutral-20260920` at HEAD `61826987c31efcca8481f3b52934bb8f1968302a` with substantial local uncommitted work preserved.
+- Hermes is now actively linked to the master checkpoint. Read-only handshake succeeded and a bounded first-gate review of `WorldFeed.tsx` + `WorldMap.tsx` found no confirmed text/JSX corruption and made no changes.
+- `git -c core.whitespace=cr-at-eol diff --check`: PASS after removing four real trailing-whitespace findings; CRLF conversion warnings remain informational.
+- `npx tsc --noEmit --incremental false`: PASS.
+- `npm test`: PASS — 49 files passed, 2 skipped; 625 tests passed, 16 skipped.
+- `npm run build`: PASS — Next.js 16.3.4 production build and TypeScript phase completed successfully.
+- Full `npm run lint` with 8 GB heap: NOT PASS because Node hit the 8 GB heap limit (OOM); this confirms source-wide lint is an infrastructure/debt gate, not a completed quality pass.
+- Targeted lint on `page.tsx`, `WorldMap.tsx`, `WorldFeed.tsx`, `OsintPanel.tsx`, health route, and `next.config.ts`: completed with 309 findings (267 errors / 42 warnings), dominated by legacy `no-explicit-any`, React refs/purity, and set-state-in-effect rules. Do not bulk-fix without HEAD/baseline comparison.
+- Baseline comparison completed for the four core files and is exact: current `page.tsx` 100 errors/19 warnings = HEAD 100/19; current `OsintPanel.tsx` 44/5 = HEAD 44/5; current `WorldMap.tsx` 120/18 = HEAD `OsirisMap.tsx` 120/18; current `WorldFeed.tsx` 3/0 = HEAD `IntelFeed.tsx` 3/0. No lint regression detected in these core files.
+- Local built runtime verification: `/` HTTP 200 and `/api/health` HTTP 200 with `{status:"operational", platform:"M3TM.WORLD", version:"0.1.0"}` on port 3199; the temporary server started for this verification was stopped afterwards.
+- Docker verification: `m3tm-osint-agent-v2`, GHunt, SpiderFoot, TruecallerJS, PhoneInfoga, n8n, and local Supabase stack were running; core services shown by Docker were healthy except services without a declared healthcheck.
+- Desktop shortcut `المشاريع + الدمج 2026.lnk` exists and opens the master checkpoint.
+- Browser/Responsive Gate: PASS on 390x844, 430x932, 768x1024, 1440x900, and 1920x1080. All five runs kept RTL/Arabic, had no horizontal overflow, rendered the map at the full viewport, exposed no forbidden legacy UI label, and emitted no browser console errors.
+- Runtime observation during the visual gate: some MapLibre tile requests were aborted during viewport/tile changes; selected CCTV providers timed out or returned 403 and were honestly omitted; Next.js declined to data-cache oversized /api/flights and /api/cctv responses above 2 MB. The app and /api/health remained HTTP 200/operational; record these as runtime/performance debt, not a hidden PASS.
+- Next safe action: commit the staged release surface, push the branch, open PR, run CI, merge only on green checks, deploy to Vercel, then verify the live site and /api/health.
+
+
 ## CURRENT OWNER HANDOFF — 2026-09-15 23:16 UTC
 - Owner requests removal of the logo's white background and working live-data packages, with Hermes doing implementation to conserve Codex usage. Hermes is the intended sole writer; Codex only coordinates/verifies. Original logo source must be preserved; an exact derived transparent asset is authorized, no redesign.
 - Compact packet: `outputs/hermes-visual-live-task.txt`; named session `M3TM-WORLD-LogoLive-20260915`, actual session `20260915_161618_263092`, active profile `hermescommander`, configured provider/model `opencode-free / deepseek-v4-flash`, no configured fallback. Finite budget 900s/30 turns. No settings/provider/secret/billing changes.

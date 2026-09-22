@@ -2,17 +2,26 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 /**
- * OSIRIS — Military-Grade Intelligence API
- * Fetches Telegram OSINT feeds directly, with a failsafe fallback 
- * to traditional intelligence sources if Telegram blocks the IP.
+ * M3TM.WORLD — Public News Aggregation API
+ * Fetches configured public Telegram feeds directly, with a fallback
+ * to public RSS sources if Telegram blocks the IP.
  */
 
-const TELEGRAM_CHANNELS = [
-  'OSINTtechnical',
+const DEFAULT_TELEGRAM_CHANNELS = [
   'Faytuks',
   'Liveuamap',
-  'CyberKnow'
+  'insiderpaper',
+  'aljazeeraenglish'
 ];
+
+const configuredChannels = (process.env.M3TM_WORLD_TELEGRAM_CHANNELS || '')
+  .split(',')
+  .map(channel => channel.trim().replace(/^@/, ''))
+  .filter(Boolean);
+
+const TELEGRAM_CHANNELS = configuredChannels.length > 0
+  ? configuredChannels
+  : DEFAULT_TELEGRAM_CHANNELS;
 
 const FALLBACK_FEEDS = {
   BBC: 'https://feeds.bbci.co.uk/news/world/rss.xml',
@@ -57,7 +66,7 @@ function parseTelegramHTML(html: string, channel: string): any[] {
     const textRegex = /<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/i;
     const textMatch = blockHtml.match(textRegex);
     if (!textMatch) continue;
-    
+
     const text = textMatch[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
     if (!text || text.length < 10) continue;
 
@@ -87,7 +96,7 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 
     const title = getTag('title').replace(/<[^>]+>/g, '');
     const desc = getTag('description').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"');
-    
+
     items.push({
       title: title.length > 100 ? title.substring(0, 100) + '...' : title,
       description: desc,
@@ -103,9 +112,9 @@ export async function GET() {
   try {
     const feedPromises = TELEGRAM_CHANNELS.map(async (channel) => {
       try {
-        const res = await fetch(`https://t.me/s/${channel}`, { 
-          signal: AbortSignal.timeout(8000), 
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' } 
+        const res = await fetch(`https://t.me/s/${channel}`, {
+          signal: AbortSignal.timeout(8000),
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
         });
         if (!res.ok) return [];
         const html = await res.text();
@@ -130,7 +139,7 @@ export async function GET() {
           return parseRSSItems(xml, source).slice(0, 5);
         } catch { return []; }
       });
-      
+
       const fallbackResults = await Promise.allSettled(fallbackPromises);
       for (const result of fallbackResults) {
         if (result.status === 'fulfilled') allArticles.push(...result.value);
@@ -151,7 +160,7 @@ export async function GET() {
         risk_score: riskScore,
         coords: coords ? [coords[0], coords[1]] : null,
         coords_default: !coords,
-        machine_assessment: riskScore >= 8 ? "AI Analysis indicates elevated tactical priority based on OSINT stream patterns." : null,
+        machine_assessment: riskScore >= 8 ? "AI Analysis indicates elevated tactical priority based on public-source stream patterns." : null,
       };
     });
 
@@ -167,6 +176,6 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return NextResponse.json({ news: [], error: 'Failed to fetch intel' }, { status: 500 });
+    return NextResponse.json({ news: [], error: 'Failed to fetch data' }, { status: 500 });
   }
 }

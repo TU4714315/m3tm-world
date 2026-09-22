@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
-import IntelFeed from '@/components/IntelFeed';
+import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
 import SearchBar from '@/components/SearchBar';
@@ -25,7 +25,7 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldRemote from '@/components/WorldRemote';
 import ArcGISPanel from '@/components/ArcGISPanel';
-const OsirisMap = dynamic(() => import('@/components/OsirisMap'), { ssr: false });
+const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
 const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
@@ -39,7 +39,6 @@ import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, 
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
-const TokenPanel = dynamic(() => import('@/components/TokenPanel'));
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -191,7 +190,7 @@ export default function Dashboard() {
 
   // The popup lives in raw map HTML, so it hands aircraft over through a global.
   useEffect(() => {
-    (window as unknown as { osirisWatchFlight?: (f: WatchedFlight) => void }).osirisWatchFlight = (f) => {
+    (window as unknown as { m3tmWatchFlight?: (f: WatchedFlight) => void }).m3tmWatchFlight = (f) => {
       if (!f?.icao24) return;
       setWatchedFlights((prev) =>
         prev.some((w) => w.icao24 === f.icao24) ? prev : [...prev, f].slice(-6));
@@ -269,11 +268,11 @@ export default function Dashboard() {
   const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
   const [demoMode, setDemoMode] = useState(false);
-  const [osirisTheme, setOsirisTheme] = useState<'core'|'ghost'>('core');
+  const [worldTheme, setWorldTheme] = useState<'core'|'ghost'>('core');
 
   useEffect(() => {
-    document.body.className = osirisTheme === 'core' ? '' : `theme-${osirisTheme}`;
-  }, [osirisTheme]);
+    document.body.className = worldTheme === 'core' ? '' : `theme-${worldTheme}`;
+  }, [worldTheme]);
 
   /* Style Studio overrides are inline on <body>, so they survive the theme
      swap above and only need reapplying once per load. */
@@ -463,7 +462,7 @@ export default function Dashboard() {
       const gk = `${coords.lat.toFixed(1)},${coords.lng.toFixed(1)}`; // coarser grid = more cache hits
       if (geocodeCache.current.has(gk)) { setLocationLabel(geocodeCache.current.get(gk)!); lastGeocodedPos.current = coords; return; }
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&zoom=10&addressdetails=1`, { headers: { 'Accept-Language': 'en' } });
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&zoom=10&addressdetails=1`, { headers: { 'Accept-Language': 'ar-SA,ar;q=0.9,en;q=0.5' } });
         if (res.ok) {
           const d = await res.json();
           const a = d.address || {};
@@ -473,7 +472,7 @@ export default function Dashboard() {
           setLocationLabel(label);
           lastGeocodedPos.current = coords;
         }
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); }
     }, 3000); // 3s debounce (was 1.5s)
   }, []);
 
@@ -483,7 +482,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
       if (res.ok) setRegionDossier(await res.json());
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
+    } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
   }, []);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
@@ -496,7 +495,7 @@ export default function Dashboard() {
   }, []);
 
   // ── Drawing / AOI ──
-  // OsirisMap already owns the draw interaction and the polygon rendering;
+  // WorldMap already owns the draw interaction and the polygon rendering;
   // this only turns a finished ring into a measured, named, coloured record.
   // Restore drawn areas on load. Work that vanishes on refresh is work the
   // operator will not trust the tool with.
@@ -557,7 +556,7 @@ export default function Dashboard() {
 
   const handleExportGeoJSON = useCallback(() => {
     downloadFile(
-      `osiris-aoi-${new Date().toISOString().slice(0, 10)}.geojson`,
+      `m3tm-world-aoi-${new Date().toISOString().slice(0, 10)}.geojson`,
       JSON.stringify(shapesToGeoJSON(drawnPolygons), null, 2),
       'application/geo+json',
     );
@@ -588,7 +587,7 @@ export default function Dashboard() {
       }
       return false;
     } catch (e) {
-      console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e);
+      console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e);
       setBackendStatus('error');
       return false;
     }
@@ -618,7 +617,7 @@ export default function Dashboard() {
       try {
         const r = await fetch('/api/space-weather');
         if (r.ok) setSpaceWeather(await r.json());
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); }
     }, 5000);
 
     // Polling — OPTIMIZED intervals to minimize edge requests
@@ -646,7 +645,7 @@ export default function Dashboard() {
       };
       setDataVersion(value => value + 1);
       setBackendStatus('connected');
-    }, () => console.warn('[OSIRIS] Camera catalogue load failed; bounded retry scheduled'));
+    }, () => console.warn('[M3TM.WORLD] Camera catalogue load failed; bounded retry scheduled'));
   }, [activeLayers.cctv]);
 
   useEffect(() => {
@@ -861,7 +860,7 @@ export default function Dashboard() {
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
-  // ── OSIRIS SDK — Intelligence Fusion Layer ──
+  // ── M3TM.WORLD — shared live-data layer ──
   // Memoized so generated SDK entities recompute only when dataVersion or SDK toggles change.
   const sdkEntities = useMemo(() => {
     const entities: any[] = [];
@@ -905,7 +904,7 @@ export default function Dashboard() {
       if (!g.lat || !g.lng) continue;
       entities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [g.lng, g.lat] },
-        properties: { domain: 'INTEL', name: g.name || 'GDACS Event', source: 'GDACS' },
+        properties: { domain: 'EVENTS', name: g.name || 'حدث GDACS', source: 'GDACS' },
       });
     }
     const newsData = data.news || [];
@@ -913,7 +912,7 @@ export default function Dashboard() {
       if (!n.coords || n.coords.length < 2) continue;
       entities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [n.coords[1], n.coords[0]] },
-        properties: { domain: 'INTEL', name: n.title || 'SIGINT', source: n.source || 'RSS Feed' },
+        properties: { domain: 'NEWS', name: n.title || 'خبر', source: n.source || 'RSS' },
       });
     }
     return entities;
@@ -1027,7 +1026,7 @@ export default function Dashboard() {
                                     <img
                                       dir="ltr"
                                       src="/branding/m3tm-world-logo-transparent.png"
-                                      alt="M3TM.WORLD — منصة استخبارات المصادر المفتوحة"
+                                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
                                       className="w-64 md:w-80 h-auto object-contain rounded-md mb-3 z-[2]"
                                     />
 
@@ -1040,7 +1039,7 @@ export default function Dashboard() {
                 className="overflow-hidden whitespace-nowrap"
               >
                 <p dir="rtl" className="text-[11px] md:text-[10px] tracking-[0.08em] text-[var(--gold-primary)]" style={{ opacity: 0.8 }}>
-                  منصة الاستخبارات العالمية
+                  خريطة عالمية للبيانات الحية
                 </p>
               </motion.div>
             </div>
@@ -1118,8 +1117,8 @@ export default function Dashboard() {
       {/* ── MAP ── (dir=ltr keeps the map canvas unmirrored under RTL UI) ── */}
       <div dir="ltr" className="absolute inset-0">
       <ErrorBoundary name="Map">
-        <OsirisMap 
-          key={osirisTheme}
+        <WorldMap
+          key={worldTheme}
           data={sdkDisplayData}
           activeLayers={activeLayers} 
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
@@ -1136,7 +1135,7 @@ export default function Dashboard() {
           sweepData={sweepData}
           scanTargets={scanTargets}
           demoMode={demoMode}
-          theme={osirisTheme}
+          theme={worldTheme}
           arcgisLayers={arcgisLayers.filter(l => l.visible).map(l => ({ id: l.id, title: l.title, geojson: l.geojson, color: l.color, opacity: l.opacity }))}
           onMapCenter={setMapCenter}
           route={activeRoute}
@@ -1250,8 +1249,8 @@ export default function Dashboard() {
           <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} title="كرة ثلاثية الأبعاد" icon={Globe} label="3D" />
           <ViewSegment layoutId="view-projection" active={mapProjection === 'mercator'} onClick={selectFlatMap} title="خريطة ثنائية الأبعاد" icon={MapPinned} label="2D" />
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
-          <ViewSegment layoutId="view-style" active={mapStyle === 'dark'} onClick={() => setMapStyle('dark')} title="الوضع الليلي" icon={Moon} label="MAP" />
-          <ViewSegment layoutId="view-style" active={mapStyle === 'satellite'} onClick={() => setMapStyle('satellite')} title="عرض الأقمار الصناعية" icon={Satellite} label="SAT" />
+          <ViewSegment layoutId="view-style" active={mapStyle === 'dark'} onClick={() => setMapStyle('dark')} title="الوضع الليلي" icon={Moon} label="خريطة" />
+          <ViewSegment layoutId="view-style" active={mapStyle === 'satellite'} onClick={() => setMapStyle('satellite')} title="عرض الأقمار الصناعية" icon={Satellite} label="قمر" />
         </div>
 
 
@@ -1269,11 +1268,11 @@ export default function Dashboard() {
           <img
                       dir="ltr"
                       src="/branding/m3tm-world-logo-transparent.png"
-                      alt="M3TM.WORLD — منصة استخبارات المصادر المفتوحة"
+                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
                       className="w-[110px] md:w-[150px] max-w-full h-auto object-contain shrink-0 rounded-[5px]"
                     />
           <div dir="rtl" className="hidden sm:flex flex-col items-start gap-0.5 pr-1">
-            <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">منصة استخبارات المصادر المفتوحة</span>
+            <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">بيانات عامة · مصادر منشورة · عرض مباشر</span>
           </div>
         </div>
         <div dir="rtl" className="hidden md:flex items-center gap-3 mt-1.5 pl-[44px] min-w-0 pr-[400px]">
@@ -1305,11 +1304,9 @@ export default function Dashboard() {
         {spaceWeather && <span className="hidden lg:inline" title={`Geomagnetic Storm Index — Kp${spaceWeather.kp_index}`}>الشمس: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
         <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
-        
-        <TokenPanel />
 
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 ml-3 shadow-[0_0_10px_rgba(255,215,0,0.1)]">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
           <span className="text-[var(--gold-primary)] font-bold">دعم</span>
         </a>
       </motion.div>
@@ -1319,9 +1316,8 @@ export default function Dashboard() {
           place would put the support badge underneath the destination field. */}
       {isMobile && !showDirections && !navSession && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
-          <TokenPanel />
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
-            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
             <span className="text-[var(--gold-primary)] font-bold">دعم</span>
           </a>
         </motion.div>
@@ -1330,14 +1326,14 @@ export default function Dashboard() {
 
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />}
+      {showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
 
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
         <div className="relative group">
-          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="استطلاع OSINT — بحث IP ومسح الشبكة وتحديد الموقع" aria-label="استطلاع OSINT" aria-expanded={showIntel}>
+          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="أدوات البحث والتحقق — بحث IP وفحص الشبكة وتحديد الموقع" aria-label="أدوات البحث والتحقق" aria-expanded={showIntel}>
             <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
             {showIntel && (
               <span
@@ -1346,7 +1342,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">استطلاع</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">أدوات</span>
           <AnimatePresence>
             {showIntel && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
@@ -1473,7 +1469,7 @@ export default function Dashboard() {
 
         {/* ── ARCGIS INTEL ── */}
         <div className="relative group">
-          <button onClick={() => { setShowArcGIS(!showArcGIS); setShowRemote(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — البحث عن طبقات الاستخبارات الجغرافية واستيرادها" aria-label="ArcGIS" aria-expanded={showArcGIS}>
+          <button onClick={() => { setShowArcGIS(!showArcGIS); setShowRemote(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — البحث عن طبقات جغرافية واستيرادها" aria-label="ArcGIS" aria-expanded={showArcGIS}>
             <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showArcGIS && (
               <span
@@ -1556,7 +1552,7 @@ export default function Dashboard() {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#111] border-b border-[var(--border-primary)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-osiris-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-world-pulse" />
                   <span className="text-[11px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
                   <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[10px] font-bold">بث مباشر</span>
                   {!liveFeedEmbedAllowed && (
@@ -1635,8 +1631,8 @@ export default function Dashboard() {
               {[
                 { id: 'layers' as const, icon: Layers, label: 'الطبقات' },
                 { id: 'markets' as const, icon: BarChart3, label: 'الأسواق' },
-                { id: 'intel' as const, icon: Newspaper, label: 'الاستخبارات' },
-                { id: 'recon' as const, icon: Radar, label: 'استطلاع' },
+                { id: 'intel' as const, icon: Newspaper, label: 'الأخبار' },
+                { id: 'recon' as const, icon: Radar, label: 'أدوات' },
                 { id: 'search' as const, icon: Search, label: 'بحث' },
                 // Routing was reachable only from the desktop tool rail, so a
                 // phone could not open it at all. It sits next to SEARCH
@@ -1693,7 +1689,7 @@ export default function Dashboard() {
                 <div className="px-3 pb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="hud-text text-[12px] text-[var(--text-primary)]">
-                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والاستخبارات' : mobilePanel === 'intel' ? 'موجز الاستخبارات' : mobilePanel === 'recon' ? 'استطلاع M3TM.WORLD' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
+                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والبيانات' : mobilePanel === 'intel' ? 'موجز الأخبار' : mobilePanel === 'recon' ? 'أدوات البحث والتحقق' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
                     </span>
                     <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
                   </div>
@@ -1708,14 +1704,14 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />
+                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>
                     </>
                   )}
                   {mobilePanel === 'markets' && <MarketsPanel data={data} spaceWeather={spaceWeather} />}
-                  {mobilePanel === 'intel' && <IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+                  {mobilePanel === 'intel' && <WorldFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
@@ -1770,7 +1766,7 @@ export default function Dashboard() {
       {/* ── Region Dossier ── */}
       {(regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
-          <div className="glass-panel p-5 osiris-glow">
+          <div className="glass-panel p-5 world-glow">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-mono font-bold text-[var(--gold-primary)] tracking-wider">ملف المنطقة</h2>
               <button onClick={() => { setRegionDossier(null); setDossierLoading(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">✕</button>
@@ -1778,7 +1774,7 @@ export default function Dashboard() {
             {dossierLoading ? (
               <div className="text-center py-8">
                 <div className="w-5 h-5 border-2 border-[var(--gold-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <span className="text-[9px] font-mono text-[var(--text-muted)] tracking-widest">جارٍ تجميع الاستخبارات...</span>
+                <span className="text-[9px] font-mono text-[var(--text-muted)] tracking-widest">جارٍ تجميع البيانات...</span>
               </div>
             ) : regionDossier && (
               <div className="space-y-3">
@@ -1794,7 +1790,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {regionDossier.head_of_state && (<div><div className="hud-label mb-0.5">رئيس الدولة</div><div className="text-xs text-[var(--gold-primary)]">{regionDossier.head_of_state.name}</div><div className="text-[9px] text-[var(--text-muted)]">{regionDossier.head_of_state.position}</div></div>)}
-                {regionDossier.wikipedia && (<div><div className="hud-label mb-1">موجز استخباراتي</div><div className="flex gap-3">{regionDossier.wikipedia.thumbnail && <img src={regionDossier.wikipedia.thumbnail} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />}<p className="text-[9px] text-[var(--text-secondary)] leading-relaxed">{regionDossier.wikipedia.extract}</p></div></div>)}
+                {regionDossier.wikipedia && (<div><div className="hud-label mb-1">موجز المنطقة</div><div className="flex gap-3">{regionDossier.wikipedia.thumbnail && <img src={regionDossier.wikipedia.thumbnail} alt="" className="w-14 h-14 rounded object-cover flex-shrink-0" />}<p className="text-[9px] text-[var(--text-secondary)] leading-relaxed">{regionDossier.wikipedia.extract}</p></div></div>)}
               </div>
             )}
           </div>

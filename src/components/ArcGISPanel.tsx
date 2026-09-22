@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   ArcGIS Search & Import Panel — OSIRIS OSINT Dashboard
+   ArcGIS Search & Import Panel — M3TM.WORLD
    Premium dark-ops glassmorphism aesthetic
    ═══════════════════════════════════════════════════════════════ */
 
@@ -195,15 +195,15 @@ export default function ArcGISPanel({
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4 text-[#D4AF37]" />
           <span className="text-[11px] font-mono font-bold tracking-[0.2em] text-[#D4AF37] uppercase">
-            ArcGIS Intel
+            بيانات ArcGIS
           </span>
         </div>
         <div className="text-right">
           <div className="text-[10px] font-mono text-[#D4AF37]/80 uppercase tracking-widest">
-            {importedLayers.length} Layers Active
+            {importedLayers.length} طبقات مفعلة
           </div>
           <div className="text-[10px] font-mono font-bold text-[#D4AF37] tabular-nums">
-            {totalFeatures.toLocaleString()} Features
+            {totalFeatures.toLocaleString()} عناصر
           </div>
         </div>
       </div>
@@ -213,7 +213,7 @@ export default function ArcGISPanel({
         <div className="flex items-center gap-2 px-2 py-1 rounded border border-white/[0.04] bg-white/[0.02]">
           <Globe className="w-3 h-3 text-[var(--text-muted)]" />
           <span className="text-[9px] font-mono text-[var(--text-muted)] uppercase tracking-wider flex-1">
-            Map Extent:
+            نطاق الخريطة:
           </span>
           <span className="text-[9px] font-mono text-[var(--text-muted)] tabular-nums truncate max-w-[150px]">
             {mapBounds.west.toFixed(2)}, {mapBounds.south.toFixed(2)} to {mapBounds.east.toFixed(2)}, {mapBounds.north.toFixed(2)}

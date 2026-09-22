@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Keyboard, X } from 'lucide-react';
 
 const SHORTCUTS = [
-  { key: 'F', desc: 'Toggle fullscreen' },
-  { key: 'S', desc: 'Share current view' },
-  { key: 'L', desc: 'Toggle layer panel' },
-  { key: 'M', desc: 'Toggle markets panel' },
-  { key: 'I', desc: 'Toggle intel feed' },
-  { key: 'R', desc: 'Reset to global view' },
-  { key: '?', desc: 'Show this help' },
-  { key: 'ESC', desc: 'Close panels / popups' },
+  { key: 'F', desc: 'تبديل ملء الشاشة' },
+  { key: 'S', desc: 'مشاركة العرض الحالي' },
+  { key: 'L', desc: 'فتح أو إغلاق لوحة الطبقات' },
+  { key: 'M', desc: 'فتح أو إغلاق الأسواق' },
+  { key: 'I', desc: 'فتح أو إغلاق موجز الأخبار' },
+  { key: 'R', desc: 'العودة إلى العرض العالمي' },
+  { key: '?', desc: 'عرض هذه المساعدة' },
+  { key: 'ESC', desc: 'إغلاق اللوحات والنوافذ' },
 ];
 
 export default function KeyboardShortcuts() {
@@ -41,12 +41,12 @@ export default function KeyboardShortcuts() {
           <div className="absolute inset-0 bg-[var(--bg-void)]/80 backdrop-blur-sm" />
           <motion.div
             onClick={e => e.stopPropagation()}
-            className="relative glass-panel p-6 w-[320px] osiris-glow"
+            className="relative glass-panel p-6 w-[320px] world-glow"
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Keyboard className="w-4 h-4 text-[var(--gold-primary)]" />
-                <span className="text-sm font-mono font-bold text-[var(--text-heading)] tracking-wider">SHORTCUTS</span>
+                <span className="text-sm font-mono font-bold text-[var(--text-heading)] tracking-wider">اختصارات لوحة المفاتيح</span>
               </div>
               <button onClick={() => setIsOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X className="w-4 h-4" />
@@ -63,7 +63,7 @@ export default function KeyboardShortcuts() {
               ))}
             </div>
             <div className="mt-4 text-center text-[9px] font-mono text-[var(--text-muted)] tracking-widest">
-              PRESS [?] OR [ESC] TO CLOSE
+              اضغط [?] أو [ESC] للإغلاق
             </div>
           </motion.div>
         </motion.div>

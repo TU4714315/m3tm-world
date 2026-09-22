@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — AI Intelligence Analysis Endpoint
+ *  M3TM.WORLD — AI Data Analysis Endpoint
  *  POST /api/ai/analyze
  *  Rate-limited, multi-key Gemini integration
  * ═══════════════════════════════════════════════════════════════
@@ -10,8 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   createGeminiClient,
   rotateApiKey,
-  analyzeIntelligence,
-  type IntelligenceContext,
+  analyzeWorldData,
+  type WorldDataContext,
 } from '@/lib/ai-engine';
 
 export const dynamic = 'force-dynamic';
@@ -77,7 +77,7 @@ function getEnvApiKeys(): string[] {
 
 interface AnalyzeRequestBody {
   query: string;
-  context: IntelligenceContext;
+  context: WorldDataContext;
 }
 
 interface AnalyzeResponse {
@@ -166,7 +166,7 @@ export async function POST(
 
   if (!body.context) {
     return NextResponse.json(
-      { error: 'Intelligence context is required.', code: 'MISSING_CONTEXT' },
+      { error: 'Data context is required.', code: 'MISSING_CONTEXT' },
       { status: 400 }
     );
   }
@@ -174,7 +174,7 @@ export async function POST(
   // Call Gemini
   try {
     const client = createGeminiClient(apiKey);
-    const analysis = await analyzeIntelligence(client, body.context, body.query.trim());
+    const analysis = await analyzeWorldData(client, body.context, body.query.trim());
 
     return NextResponse.json(
       {
@@ -219,9 +219,9 @@ export async function POST(
       );
     }
 
-    console.error('[OSIRIS AI] Analysis error:', message);
+    console.error('[M3TM.WORLD] Analysis error:', message);
     return NextResponse.json(
-      { error: 'Intelligence analysis failed. Please try again.', code: 'ANALYSIS_FAILED' },
+      { error: 'Data analysis failed. Please try again.', code: 'ANALYSIS_FAILED' },
       { status: 500 }
     );
   }

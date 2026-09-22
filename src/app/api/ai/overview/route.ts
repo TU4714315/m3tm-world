@@ -1,9 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — One-Click AI Overview
+ *  M3TM.WORLD — One-Click AI Overview
  *  POST /api/ai/overview   body: { mode: 'alerts' | 'markets' | 'chain', payload }
  *
- *  Generates a punchy intelligence read-out for the Alerts or Markets
+ *  Generates a punchy data summary for the Alerts or Markets
  *  panel. Uses Gemini when GEMINI_API_KEY_* is configured, otherwise
  *  falls back to a built-in heuristic analyst so the button ALWAYS
  *  works — no key required. Anyone can click it.
@@ -130,7 +130,7 @@ function digestAlerts(payload: any): Digest {
   if (Array.isArray(news) && news.length) {
     const scored = news.map(n => num(n?.risk_score) ?? 0);
     const hot = scored.filter(s => s >= 8).length;
-    facts.push(`${news.length} OSINT news items; ${hot} flagged high-priority (risk ≥ 8).`);
+    facts.push(`${news.length} news items; ${hot} flagged high-priority (risk ≥ 8).`);
     const topItem = [...news].sort((a, b) => (num(b?.risk_score) ?? 0) - (num(a?.risk_score) ?? 0))[0];
     if (topItem?.title) highlights.push(`📰 ${decodeEntities(String(topItem.title)).slice(0, 48)}`);
     if (hot) highlights.push(`🔴 ${hot} hot items`);
@@ -228,14 +228,14 @@ async function geminiOverview(mode: Mode, digest: Digest, keys: string[]): Promi
     const model = client.getGenerativeModel({
       model: 'gemini-2.0-flash',
       systemInstruction:
-        'You are OSIRIS, a terse intelligence analyst. Given structured facts, write a sharp 2-4 sentence situational read-out. No preamble, no markdown headers, no hedging. Lead with the bottom line.',
+        'You are the M3TM.WORLD public-data assistant. Given structured facts, write a concise 2-4 sentence read-out in Arabic. Distinguish facts from inference and avoid military or classified terminology.',
     });
     const prompt = `MODE: ${mode.toUpperCase()}\nBOTTOM LINE: ${digest.summaryLine}\nFACTS:\n${digest.facts.map(f => `- ${f}`).join('\n')}\n\nWrite the read-out now.`;
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
     return text || null;
   } catch (e) {
-    console.warn('[OSIRIS] Gemini overview failed, using heuristic:', e);
+    console.warn('[M3TM.WORLD] Gemini overview failed, using heuristic:', e);
     return null;
   }
 }

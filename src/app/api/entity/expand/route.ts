@@ -4,18 +4,18 @@ import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 export const dynamic = 'force-dynamic';
 
 /**
- * Thin proxy to the OSIRIS Intelligence Layer (osiris-intel).
+ * Thin proxy to the M3TM.WORLD data service.
  *
- * In Docker: fetches from http://osiris-intel:4000/resolve
+ * In Docker: fetches from http://m3tm-world-data:4000/resolve
  * In dev:    fetches from http://localhost:4000/resolve
  *
- * All intelligence logic lives in the intel container — this route
+ * All data-resolution logic lives in the data container — this route
  * just validates the request and forwards it.
  */
 
 const INTEL_URL = process.env.INTEL_URL || (
   process.env.NODE_ENV === 'production'
-    ? 'http://osiris-intel:4000'
+    ? 'http://m3tm-world-data:4000'
     : 'http://localhost:4000'
 );
 
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
 
   try {
     const params = new URLSearchParams({ type, id });
-    // Forward extra aircraft properties to the intel brain
+    // Forward extra aircraft properties to the data service
     for (const key of ['registration', 'model', 'icao24']) {
       const val = searchParams.get(key);
       if (val) params.set(key, val);
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       return NextResponse.json(
-        { error: body.error || `Intel layer returned ${res.status}`, nodes: [], links: [] },
+        { error: body.error || `Data layer returned ${res.status}`, nodes: [], links: [] },
         { status: res.status },
       );
     }
@@ -66,9 +66,9 @@ export async function GET(req: Request) {
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' },
     });
   } catch (e) {
-    console.error('[OSIRIS] Intel proxy error:', e instanceof Error ? e.message : e);
+    console.error('[M3TM.WORLD] Data proxy error:', e instanceof Error ? e.message : e);
     return NextResponse.json(
-      { error: 'Intelligence layer unavailable', nodes: [], links: [] },
+      { error: 'Data layer unavailable', nodes: [], links: [] },
       { status: 502 },
     );
   }
