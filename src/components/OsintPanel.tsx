@@ -58,13 +58,13 @@ const TABS: ToolDef[] = [
 
   { id: 'username', label: 'اسم المستخدم', icon: User, placeholder: 'اسم مستخدم / معرّف للبحث', color: '#00E676', group: 'identity', blurb: 'البحث عن معرّف عبر المنصات' },
   { id: 'github', label: 'استطلاع GITHUB', icon: Terminal, placeholder: 'اسم مستخدم GitHub', color: '#87CEEB', group: 'identity', blurb: 'الملف والمستودعات والتواصل' },
-  { id: 'phone', label: 'استخبارات الهاتف', icon: Phone, placeholder: 'رقم الهاتف (مثال: +1...)', color: '#FF9500', group: 'identity', blurb: 'المشغّل والمنطقة ونوع الخط' },
+  { id: 'phone', label: 'بيانات الهاتف', icon: Phone, placeholder: 'رقم الهاتف (مثال: +1...)', color: '#FF9500', group: 'identity', blurb: 'المشغّل والمنطقة ونوع الخط' },
 
   { id: 'threats', label: 'التهديدات', icon: AlertTriangle, placeholder: 'IP أو نطاق أو تجزئة', color: '#FF9500', group: 'threat', blurb: 'السمعة عبر الموجزات' },
   { id: 'leaks', label: 'تسريبات البيانات', icon: ShieldAlert, placeholder: 'البريد الإلكتروني', color: '#E040FB', group: 'threat', blurb: 'التعرض للاختراق لعنوان' },
   { id: 'infostealer', label: 'سارق المعلومات', icon: Skull, placeholder: 'بريد أو نطاق أو اسم مستخدم أو هاتف', color: '#FF1744', group: 'threat', blurb: 'أصول مخترقة ببرمجيات Hudson Rock الخبيثة' },
 
-  { id: 'crypto', label: 'استخبارات السلسلة', icon: Bitcoin, placeholder: 'عنوان محفظة BTC أو ETH أو SOL', color: '#F7931A', group: 'chain', blurb: 'تحليل المحفظة والموجز اليومي' },
+  { id: 'crypto', label: 'تحليل السلسلة', icon: Bitcoin, placeholder: 'عنوان محفظة BTC أو ETH أو SOL', color: '#F7931A', group: 'chain', blurb: 'تحليل المحفظة والموجز اليومي' },
 ];
 
 interface OsintPanelProps { isOpen?: boolean; onClose?: () => void; isMobile?: boolean; onSweepVisualize?: (data: any) => void; onScanGeolocate?: (target: string, data: any) => void; }
@@ -83,7 +83,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
   const [sweepProgress, setSweepProgress] = useState<{ current: number; total: number } | null>(null);
   const [sweepCidr, setSweepCidr] = useState(24);
   const [cveCache, setCveCache] = useState<Record<string, any>>({});
-  // CHAIN INTEL carries two views: the daily brief needs no target, the wallet
+  // CHAIN DATA carries two views: the daily brief needs no target, the wallet
   // lookup uses the shared query bar.
   const [chainView, setChainView] = useState<'brief' | 'wallet'>('brief');
   /** Free-text filter over the toolkit — 19 modules is too many to scan. */
@@ -129,7 +129,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     });
     // Fetch in parallel
     const results = await Promise.allSettled(
-      missing.map(id => fetch(`/api/osint/cve?cve=${encodeURIComponent(id)}`).then(r => r.json()).then(data => ({ id, data })))
+      missing.map(id => fetch(`/api/tools/cve?cve=${encodeURIComponent(id)}`).then(r => r.json()).then(data => ({ id, data })))
     );
     setCveCache(prev => {
       const next = { ...prev };
@@ -185,7 +185,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       setSweepProgress({ current: 0, total: totalHosts });
       try {
         const t0 = Date.now();
-        const res = await fetch(`/api/osint/sweep?ip=${encodeURIComponent(query)}&cidr=${cidr}`);
+        const res = await fetch(`/api/tools/sweep?ip=${encodeURIComponent(query)}&cidr=${cidr}`);
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Sweep failed (${res.status})`); }
         const initData = await res.json();
 
@@ -251,25 +251,25 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       let url = '';
       switch (activeTab) {
 
-        case 'dns': url = `/api/osint/dns?domain=${encodeURIComponent(query)}`; break;
-        case 'certs': url = `/api/osint/certs?domain=${encodeURIComponent(query)}`; break;
-        case 'whois': url = `/api/osint/whois?domain=${encodeURIComponent(query)}`; break;
-        case 'threats': url = `/api/osint/threats?query=${encodeURIComponent(query)}`; break;
-        case 'bgp': url = `/api/osint/bgp?query=${encodeURIComponent(query)}`; break;
-        case 'mac': url = `/api/osint/mac?mac=${encodeURIComponent(query)}`; break;
-        case 'phone': url = `/api/osint/phone?number=${encodeURIComponent(query)}`; break;
+        case 'dns': url = `/api/tools/dns?domain=${encodeURIComponent(query)}`; break;
+        case 'certs': url = `/api/tools/certs?domain=${encodeURIComponent(query)}`; break;
+        case 'whois': url = `/api/tools/whois?domain=${encodeURIComponent(query)}`; break;
+        case 'threats': url = `/api/tools/threats?query=${encodeURIComponent(query)}`; break;
+        case 'bgp': url = `/api/tools/bgp?query=${encodeURIComponent(query)}`; break;
+        case 'mac': url = `/api/tools/mac?mac=${encodeURIComponent(query)}`; break;
+        case 'phone': url = `/api/tools/phone?number=${encodeURIComponent(query)}`; break;
         case 'leaks': url = `https://api.xposedornot.com/v1/breach-analytics?email=${encodeURIComponent(query)}`; break;
-        case 'infostealer': url = `/api/osint/hudsonrock?query=${encodeURIComponent(query)}`; break;
-        case 'crypto': url = `/api/osint/crypto?address=${encodeURIComponent(query)}`; break;
-        case 'username': url = `/api/osint/username?username=${encodeURIComponent(query)}`; break;
-        case 'github': url = `/api/osint/github?user=${encodeURIComponent(query)}`; break;
+        case 'infostealer': url = `/api/tools/hudsonrock?query=${encodeURIComponent(query)}`; break;
+        case 'crypto': url = `/api/tools/crypto?address=${encodeURIComponent(query)}`; break;
+        case 'username': url = `/api/tools/username?username=${encodeURIComponent(query)}`; break;
+        case 'github': url = `/api/tools/github?user=${encodeURIComponent(query)}`; break;
         case 'vuln': url = `/api/scanner?target=${encodeURIComponent(query)}&type=vuln`; break;
         case 'scanner': url = `/api/scanner?target=${encodeURIComponent(query)}&type=${scanType}`; break;
         case 'headers': url = `/api/scanner?target=${encodeURIComponent(query)}&type=headers`; break;
         case 'ssl': url = `/api/scanner?target=${encodeURIComponent(query)}&type=ssl`; break;
         case 'subdomains': url = `/api/scanner?target=${encodeURIComponent(query)}&type=subdomains`; break;
         case 'tech': url = `/api/scanner?target=${encodeURIComponent(query)}&type=tech`; break;
-        case 'shodan': url = `/api/osint/shodan?ip=${encodeURIComponent(query)}`; break;
+        case 'shodan': url = `/api/tools/shodan?ip=${encodeURIComponent(query)}`; break;
       }
       const res = await fetch(url, activeTab === 'shodan' ? { cache: 'no-store' } : undefined);
       if (activeTab === 'shodan' && res.status === 404) {
@@ -316,7 +316,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
              onScanGeolocate(query, { lat: data.lat, lng: data.lng, type: 'phone', region: data.region });
           }
         } else if (activeTab !== 'sweep' && activeTab !== 'vuln' && activeTab !== 'crypto' && activeTab !== 'username' && activeTab !== 'mac' && activeTab !== 'bgp' && activeTab !== 'github' && activeTab !== 'leaks' && activeTab !== 'phone' && activeTab !== 'infostealer') {
-          fetch(`/api/osint/ip?ip=${encodeURIComponent(query)}`)
+          fetch(`/api/tools/ip?ip=${encodeURIComponent(query)}`)
             .then(r => r.json())
             .then(locData => {
               if (locData && locData.geo && locData.geo.lat && locData.geo.lon && onScanGeolocate) {
@@ -356,7 +356,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     </span>
   );
 
-  // Surfaces an inline OFAC-SDN hit (used by the WHOIS and IP-intel routes
+  // Surfaces an inline OFAC-SDN hit (used by the WHOIS and IP-data routes
   // when their cross-check finds a sanctioned registrant / ASN owner).
   const SanctionsBadge = ({ match }: { match: any }) => {
     if (!match || !Array.isArray(match.hits) || match.hits.length === 0) return null;
@@ -387,7 +387,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       className="mt-2 flex items-center justify-between px-2 py-1.5 rounded bg-[#1A1A18] border border-[var(--border-secondary)]/30 hover:border-[#FF1744]/40 transition-colors"
     >
       <span className="text-[9px] font-mono text-[var(--text-muted)]">
-        Data by Hudson Rock Cavalier · free infostealer intelligence
+        البيانات من Hudson Rock Cavalier · بيانات عامة عن التسريبات
       </span>
       <ExternalLink className="w-2.5 h-2.5 text-[var(--text-muted)]" />
     </a>
@@ -416,7 +416,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     if (activeTab === 'crypto' && chainView === 'brief') {
       return (
         <div>
-          <SectionHeader title="الموجز اليومي — استخبارات السلسلة" icon={Bitcoin} color="#F7931A" />
+          <SectionHeader title="الموجز اليومي — بيانات السلسلة" icon={Bitcoin} color="#F7931A" />
           <ChainBrief />
         </div>
       );
@@ -469,7 +469,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                     <span className="text-[11px] font-mono font-bold text-red-400">{v.id || v.cve || v.name}</span>
                     {v.severity && <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${v.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400' : v.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{v.severity}</span>}
                   </div>
-                  {v.cvss && <div className="text-[10px] font-mono text-[var(--text-muted)] mt-1">CVSS: {v.cvss} ({v.type || 'cve'})</div>}
+                  {v.cvss && <div className="text-[10px] font-mono text-[var(--text-muted)] mt-1">CCSS: {v.cvss} ({v.type || 'cve'})</div>}
                   {v.description && <p className="text-[10px] font-mono text-[var(--text-muted)] mt-1 line-clamp-2">{v.description}</p>}
                 </div>
               ))}
@@ -484,11 +484,11 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                   <div key={i} className="p-2 rounded-lg border border-orange-500/30 bg-orange-500/10 flex flex-col">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-mono font-bold text-orange-400">{e.id}</span>
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">EXPLOIT</span>
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">استغلال</span>
                     </div>
                     <div className="text-[10px] font-mono text-[var(--text-muted)] mt-1 flex justify-between">
                       <span>Source: {e.type?.toUpperCase() || 'UNKNOWN'}</span>
-                      {e.cvss && <span>CVSS: {e.cvss}</span>}
+                      {e.cvss && <span>CCSS: {e.cvss}</span>}
                     </div>
                   </div>
                 ))}
@@ -525,7 +525,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     if (activeTab === 'whois') {
       return (
         <div>
-          <SectionHeader title="استخبارات WHOIS" icon={FileText} color="#FFD700" />
+          <SectionHeader title="بيانات WHOIS" icon={FileText} color="#FFD700" />
           <SanctionsBadge match={r.sanctions_match} />
           <ResultRow label="النطاق" value={r.domain_name || r.domainName || query} color="#FFD700" />
           <ResultRow label="المسجّل" value={r.registrar} />
@@ -545,7 +545,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       const failed = r?.error || (!r && error);
       return (
         <div>
-          <SectionHeader title="استخبارات أجهزة SHODAN" icon={Network} color="#FF3D3D" />
+          <SectionHeader title="بيانات أجهزة SHODAN" icon={Network} color="#FF3D3D" />
           {failed && (
             <div className="mt-2 p-2 border border-red-500/30 bg-red-500/10 rounded">
               <span className="text-[10px] font-mono text-red-400 block">فشل الاستعلام: {typeof failed === 'string' ? failed : 'خطأ غير معروف'}</span>
@@ -611,7 +611,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     if (activeTab === 'bgp') {
       return (
         <div>
-          <SectionHeader title="استخبارات توجيه BGP" icon={Globe} color="#00E5FF" />
+          <SectionHeader title="بيانات توجيه BGP" icon={Globe} color="#00E5FF" />
           <ResultRow label="الاستعلام" value={r.query} color="#00E5FF" />
           {r.type === 'ip' && r.ip && (
             <>
@@ -655,7 +655,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     if (activeTab === 'phone') {
       return (
         <div>
-          <SectionHeader title="استخبارات الهاتف" icon={Phone} color="#FF9500" />
+          <SectionHeader title="بيانات الهاتف" icon={Phone} color="#FF9500" />
           <ResultRow label="الاستعلام" value={r.query} color="#FF9500" />
           <ResultRow label="صالح" value={r.valid ? 'نعم' : 'لا'} color={r.valid ? '#00E676' : '#FF3D3D'} />
           {r.valid && (
@@ -823,8 +823,8 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
       );
     }
 
-    // ── CHAIN INTEL ──
-    // Shares /api/osint/crypto with the standalone CHAIN panel; this is the
+    // ── CHAIN DATA ──
+    // Shares /api/tools/crypto with the standalone CHAIN panel; this is the
     // in-toolkit view of the same wallet report.
     if (activeTab === 'crypto') {
       const ACCENT = '#F7931A';
@@ -840,7 +840,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
       return (
         <div>
-          <SectionHeader title="استخبارات السلسلة" icon={Bitcoin} color={ACCENT} />
+          <SectionHeader title="تحليل السلسلة" icon={Bitcoin} color={ACCENT} />
 
           {/* A sanctions hit dominates the report — surface it before anything else. */}
           {r.sanctions?.hit && (
@@ -966,7 +966,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                   </span>
                   <span className="text-[var(--text-muted)] w-[64px] flex-shrink-0">{t.time ? String(t.time).slice(0, 10) : 'pending'}</span>
                   <span className="flex-1 break-all text-[var(--text-primary)]">{short(t.hash)}</span>
-                  {t.failed && <span className="text-[#FF3D3D]">FAIL</span>}
+                  {t.failed && <span className="text-[#FF3D3D]">فشل</span>}
                   {t.value > 0 && <span className="text-[var(--text-secondary)]">{fmt(t.value)}</span>}
                 </div>
               ))}
@@ -1204,7 +1204,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
     if (activeTab === 'threats') {
       return (
         <div>
-          <SectionHeader title="استخبارات التهديدات" icon={AlertTriangle} color="#FF9500" />
+          <SectionHeader title="مؤشرات المخاطر" icon={AlertTriangle} color="#FF9500" />
           <ResultRow label="Query" value={query} color="#FF9500" />
           <ResultRow label="Risk Score" value={r.risk_score || r.score} color={
             (r.risk_score || r.score || 0) > 70 ? '#FF3D3D' : (r.risk_score || r.score || 0) > 40 ? '#FF9500' : '#00E676'
@@ -1439,7 +1439,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
 
       {/* Input Area */}
       <div className="flex flex-col gap-1.5">
-        {/* CHAIN INTEL view switch — the brief takes no target. */}
+        {/* CHAIN DATA view switch — the brief takes no target. */}
         {activeTab === 'crypto' && (
           <div className="flex gap-1">
             {([['brief', 'الموجز اليومي'], ['wallet', 'تحليل المحفظة']] as const).map(([id, label]) => (
@@ -1658,7 +1658,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                       </div>
                     </div>
 
-                    {/* CVE Intelligence */}
+                    {/* CVE Data */}
                     {device.vulns.length > 0 && (
                       <div className="p-4 border-t border-[#2A2A28]">
                         <div className="text-[11px] font-mono text-[#5C5A54] tracking-widest uppercase mb-3">الثغرات ({device.vulns.length})</div>
@@ -1677,7 +1677,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                                   <div className="flex items-center gap-2">
                                     <span className="text-[11px] font-mono font-bold text-[#E8E6E0]">{cveId}</span>
                                     {info?.cvss != null && (
-                                      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: severityColor + '15', color: severityColor, border: `1px solid ${severityColor}40` }}>CVSS {info.cvss}</span>
+                                      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: severityColor + '15', color: severityColor, border: `1px solid ${severityColor}40` }}>CCSS {info.cvss}</span>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -1767,7 +1767,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-[var(--border-secondary)] bg-[#111] flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <Radar className="w-5 h-5 text-[var(--cyan-primary)] flex-shrink-0" />
-              <span className="text-[16px] text-[var(--text-primary)]">M3TM.WORLD — عدة الاستطلاع</span>
+              <span className="text-[16px] text-[var(--text-primary)]">M3TM.WORLD — أدوات البحث والتحقق</span>
               <span className="gotham-tag gotham-tag--classified" style={{ fontSize: '9px', letterSpacing: 0 }}>{TABS.length} وحدة</span>
               {currentTab && (
                 <>
@@ -1781,7 +1781,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
                 </>
               )}
             </div>
-            <button onClick={() => setIsFullScreen(false)} className="p-2 hover:bg-white/5 rounded transition-colors text-[var(--text-muted)] hover:text-white flex-shrink-0" title="Exit expanded view (Esc)">
+            <button onClick={() => setIsFullScreen(false)} className="p-2 hover:bg-white/5 rounded transition-colors text-[var(--text-muted)] hover:text-white flex-shrink-0" title="الخروج من العرض الموسع (Esc)">
               <Minimize2 className="w-5 h-5" />
             </button>
           </div>
@@ -1815,7 +1815,7 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
   }
 
   return (
-    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3, duration: 0.6 }} className="glass-panel osint-panel flex flex-col overflow-hidden pointer-events-auto shrink-0 h-[500px] max-h-[80vh] resize-y">
+    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3, duration: 0.6 }} className="glass-panel tools-panel flex flex-col overflow-hidden pointer-events-auto shrink-0 h-[500px] max-h-[80vh] resize-y">
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.05)] bg-[rgba(0,0,0,0.3)] hover:bg-[var(--hover-accent)] transition-colors">
         <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 flex-1">
           <Radar className="w-3.5 h-3.5 text-[var(--cyan-primary)]" />
@@ -1823,10 +1823,10 @@ function OsintPanelInner({ isMobile, onSweepVisualize, onScanGeolocate }: OsintP
           <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 5px', letterSpacing: 0 }}>{TABS.length} أداة</span>
         </button>
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsFullScreen(true)} className="p-1.5 -m-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors" title="Full Screen">
+          <button onClick={() => setIsFullScreen(true)} className="p-1.5 -m-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors" title="ملء الشاشة">
              <Maximize2 className="w-3.5 h-3.5" />
           </button>
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--cyan-primary)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--cyan-primary)] animate-world-pulse" />
           <button onClick={() => setExpanded(!expanded)}>
             {expanded ? <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
           </button>

@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Newspaper, ChevronDown, ChevronUp, ExternalLink, MapPin, Zap } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Intelligence Feed
-   SIGINT-style news aggregation with risk scoring
+   M3TM.WORLD — موجز الأخبار
+   تجميع أخبار منشورة مع ترتيب حسب درجة الأهمية
    ═══════════════════════════════════════════════════════════════ */
 
-interface IntelFeedProps {
+interface WorldFeedProps {
   data: any;
   onLocate?: (lat: number, lng: number) => void;
 }
@@ -22,10 +22,10 @@ function getRiskClass(score: number): string {
 }
 
 function getRiskLabel(score: number): string {
-  if (score >= 8) return 'CRITICAL';
-  if (score >= 6) return 'HIGH';
-  if (score >= 4) return 'ELEVATED';
-  return 'LOW';
+  if (score >= 8) return 'حرج';
+  if (score >= 6) return 'مرتفع';
+  if (score >= 4) return 'متوسط';
+  return 'منخفض';
 }
 
 function timeAgo(dateStr: string): string {
@@ -33,16 +33,16 @@ function timeAgo(dateStr: string): string {
     const date = new Date(dateStr);
     const diff = Date.now() - date.getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 60) return `منذ ${mins} د`;
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
+    if (hrs < 24) return `منذ ${hrs} س`;
+    return `منذ ${Math.floor(hrs / 24)} ي`;
   } catch {
     return '';
   }
 }
 
-export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
+export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const news = data.news || [];
@@ -61,14 +61,14 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
       >
         <div className="flex items-center gap-2">
           <Newspaper className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
-          <span className="hud-text text-[11px] text-[var(--text-primary)]">SIGINT FEED</span>
+          <span className="hud-text text-[11px] text-[var(--text-primary)]">موجز الأخبار</span>
           <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 5px' }}>{news.length}</span>
           {news.some((n: any) => n.risk_score >= 8) && (
-            <span className="gotham-tag gotham-tag--critical" style={{ fontSize: '9px', padding: '1px 4px' }}>ALERTS</span>
+            <span className="gotham-tag gotham-tag--critical" style={{ fontSize: '9px', padding: '1px 4px' }}>تنبيهات</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-m3tm-pulse" />
           {expanded ? <ChevronUp className="w-3 h-3 text-[var(--text-muted)]" /> : <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />}
         </div>
       </button>
@@ -86,7 +86,7 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
               {news.length === 0 ? (
                 <div className="px-4 py-6 text-center">
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">
-                    AWAITING INTELLIGENCE...
+                    في انتظار الأخبار...
                   </span>
                 </div>
               ) : (
@@ -155,7 +155,7 @@ export default function IntelFeed({ data, onLocate }: IntelFeedProps) {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ExternalLink className="w-2.5 h-2.5" />
-                            OPEN SOURCE
+                            فتح المصدر
                           </a>
                         </motion.div>
                       )}

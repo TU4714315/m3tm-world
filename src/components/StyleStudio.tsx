@@ -21,7 +21,7 @@ import {
 } from '@/lib/style-tokens';
 
 /**
- * Style Studio — the panel. All token maths lives in `@/lib/style-tokens`;
+ * إعدادات المظهر — the panel. All token maths lives in `@/lib/style-tokens`;
  * this file is the controls and the wiring around them.
  */
 
@@ -74,7 +74,7 @@ function Slider({ label, value, min, max, step, onChange, format }: {
 }
 
 /**
- * A slider with an explicit AUTO state. AUTO means "emit no rule", which is
+ * A slider with an explicit تلقائي state. تلقائي means "emit no rule", which is
  * how an untouched knob leaves the app's own styling intact.
  */
 function AutoSlider({ label, value, min, max, step, whenEnabled, onChange, format }: {
@@ -94,7 +94,7 @@ function AutoSlider({ label, value, min, max, step, whenEnabled, onChange, forma
             : 'border-white/10 text-white/30 hover:text-white/60'
         }`}
       >
-        AUTO
+        تلقائي
       </button>
       <input
         type="range" min={min} max={max} step={step}
@@ -134,7 +134,7 @@ function Segmented({ label, options, value, onChange }: {
   );
 }
 
-const ON_OFF = [{ label: 'ON', value: 'on' }, { label: 'OFF', value: 'off' }];
+const ON_OFF = [{ label: 'تشغيل', value: 'on' }, { label: 'إيقاف', value: 'off' }];
 
 /** Groups rows inside a section without starting a new one. */
 function SubHead({ label, note }: { label: string; note?: string }) {
@@ -289,31 +289,31 @@ function StyleStudio({ onClose, isMobile }: { onClose: () => void; isMobile?: bo
         WebkitBackdropFilter: 'blur(28px) saturate(1.2)',
       }}
       role="dialog"
-      aria-label="Style Studio"
+      aria-label="إعدادات المظهر"
     >
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.07] shrink-0">
         <div className="flex flex-col">
-          <span className="text-[11px] font-mono tracking-[0.22em] uppercase text-[var(--gold-light)]">Style Studio</span>
-          <span className="text-[9px] font-mono tracking-[0.1em] uppercase text-white/25">Live UI tokens</span>
+          <span className="text-[11px] font-mono tracking-[0.08em] text-[var(--gold-light)]">إعدادات المظهر</span>
+          <span className="text-[9px] font-mono tracking-[0.04em] text-white/25">تخصيص مباشر للواجهة</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={paste} title="Paste a shared theme from the clipboard" aria-label="Paste theme" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
+          <button onClick={paste} title="لصق إعدادات مظهر من الحافظة" aria-label="لصق إعدادات المظهر" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
             <ClipboardPaste className="w-3.5 h-3.5" />
           </button>
-          <button onClick={copy} title="Copy this theme as JSON" aria-label="Copy theme" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
+          <button onClick={copy} title="نسخ إعدادات المظهر بصيغة JSON" aria-label="نسخ إعدادات المظهر" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
             {copied ? <Check className="w-3.5 h-3.5 text-[var(--alert-green)]" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
-          <button onClick={reset} title="Reset to the active theme" aria-label="Reset" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
+          <button onClick={reset} title="استعادة المظهر النشط" aria-label="إعادة الضبط" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onClose} title="Close" aria-label="Close Style Studio" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
+          <button onClick={onClose} title="إغلاق" aria-label="إغلاق إعدادات المظهر" className="w-7 h-7 rounded-md flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-3">
-        <Section title="Preset">
+        <Section title="أنماط جاهزة">
           <div className="grid grid-cols-3 gap-1 pt-1">
             {PRESETS.map(p => (
               <button
@@ -328,23 +328,23 @@ function StyleStudio({ onClose, isMobile }: { onClose: () => void; isMobile?: bo
           </div>
         </Section>
 
-        <Section title="Accent">
-          <Row label="Primary"><Swatch label="Primary accent" value={s.accent} onChange={v => set('accent', v)} /></Row>
-          <Row label="Secondary"><Swatch label="Secondary accent" value={s.accent2} onChange={v => set('accent2', v)} /></Row>
-          <Row label="Glow"><Slider label="Glow strength" value={s.glow} min={0} max={1} step={0.01} onChange={v => set('glow', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
+        <Section title="ألوان التمييز">
+          <Row label="أساسي"><Swatch label="لون التمييز الأساسي" value={s.accent} onChange={v => set('accent', v)} /></Row>
+          <Row label="ثانوي"><Swatch label="لون التمييز الثانوي" value={s.accent2} onChange={v => set('accent2', v)} /></Row>
+          <Row label="التوهج"><Slider label="قوة التوهج" value={s.glow} min={0} max={1} step={0.01} onChange={v => set('glow', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
         </Section>
 
-        <Section title="Signal">
-          <Row label="Critical"><Swatch label="Critical colour" value={s.alertRed} onChange={v => set('alertRed', v)} /></Row>
-          <Row label="Warning"><Swatch label="Warning colour" value={s.alertOrange} onChange={v => set('alertOrange', v)} /></Row>
-          <Row label="Nominal"><Swatch label="Nominal colour" value={s.alertGreen} onChange={v => set('alertGreen', v)} /></Row>
-          <Row label="Info"><Swatch label="Info colour" value={s.alertBlue} onChange={v => set('alertBlue', v)} /></Row>
+        <Section title="ألوان الحالات">
+          <Row label="حرج"><Swatch label="لون الحالة الحرجة" value={s.alertRed} onChange={v => set('alertRed', v)} /></Row>
+          <Row label="تحذير"><Swatch label="لون التحذير" value={s.alertOrange} onChange={v => set('alertOrange', v)} /></Row>
+          <Row label="طبيعي"><Swatch label="لون الحالة الطبيعية" value={s.alertGreen} onChange={v => set('alertGreen', v)} /></Row>
+          <Row label="معلومة"><Swatch label="لون المعلومات" value={s.alertBlue} onChange={v => set('alertBlue', v)} /></Row>
         </Section>
 
-        <Section title="Map controls">
-          <Row label="Pan/zoom pad">
+        <Section title="أدوات الخريطة">
+          <Row label="التحريك والتكبير">
             <Segmented
-              label="On-screen pan and zoom pad"
+              label="أزرار التحريك والتكبير على الشاشة"
               options={ON_OFF}
               value={s.mapControls ? 'on' : 'off'}
               onChange={v => set('mapControls', v === 'on')}
@@ -352,57 +352,57 @@ function StyleStudio({ onClose, isMobile }: { onClose: () => void; isMobile?: bo
           </Row>
         </Section>
 
-        <Section title="Map layers">
-          <SubHead label="Cameras" />
-          <Row label="Dots &amp; labels"><ResettableSwatch label="Camera colour" value={s.map.cctv} fallback={MAP_DEFAULTS.cctv} onChange={v => setMap('cctv', v)} /></Row>
+        <Section title="ألوان طبقات الخريطة">
+          <SubHead label="الكاميرات" />
+          <Row label="النقاط والتسميات"><ResettableSwatch label="لون الكاميرات" value={s.map.cctv} fallback={MAP_DEFAULTS.cctv} onChange={v => setMap('cctv', v)} /></Row>
 
-          <SubHead label="Satellites" note="Default keeps each satellite's own mission colour. Change one and it takes over that whole category." />
-          <Row label="Comms"><ResettableSwatch label="Comms satellites" value={s.map.satComms} fallback={MAP_DEFAULTS.satComms} onChange={v => setMap('satComms', v)} /></Row>
-          <Row label="Military"><ResettableSwatch label="Military satellites" value={s.map.satMilitary} fallback={MAP_DEFAULTS.satMilitary} onChange={v => setMap('satMilitary', v)} /></Row>
-          <Row label="Navigation"><ResettableSwatch label="Navigation satellites" value={s.map.satNavigation} fallback={MAP_DEFAULTS.satNavigation} onChange={v => setMap('satNavigation', v)} /></Row>
-          <Row label="Earth obs"><ResettableSwatch label="Earth observation satellites" value={s.map.satEarth} fallback={MAP_DEFAULTS.satEarth} onChange={v => setMap('satEarth', v)} /></Row>
-          <Row label="Science"><ResettableSwatch label="Science satellites" value={s.map.satScience} fallback={MAP_DEFAULTS.satScience} onChange={v => setMap('satScience', v)} /></Row>
-          <Row label="Other"><ResettableSwatch label="Other satellites" value={s.map.satOther} fallback={MAP_DEFAULTS.satOther} onChange={v => setMap('satOther', v)} /></Row>
+          <SubHead label="الأقمار الصناعية" note="الإعداد الافتراضي يحافظ على لون كل فئة. تغيير اللون يطبقه على الفئة كاملة." />
+          <Row label="اتصالات"><ResettableSwatch label="لون أقمار الاتصالات" value={s.map.satComms} fallback={MAP_DEFAULTS.satComms} onChange={v => setMap('satComms', v)} /></Row>
+          <Row label="عسكرية"><ResettableSwatch label="لون الأقمار العسكرية" value={s.map.satMilitary} fallback={MAP_DEFAULTS.satMilitary} onChange={v => setMap('satMilitary', v)} /></Row>
+          <Row label="ملاحة"><ResettableSwatch label="لون أقمار الملاحة" value={s.map.satNavigation} fallback={MAP_DEFAULTS.satNavigation} onChange={v => setMap('satNavigation', v)} /></Row>
+          <Row label="رصد الأرض"><ResettableSwatch label="لون أقمار رصد الأرض" value={s.map.satEarth} fallback={MAP_DEFAULTS.satEarth} onChange={v => setMap('satEarth', v)} /></Row>
+          <Row label="علمية"><ResettableSwatch label="لون الأقمار العلمية" value={s.map.satScience} fallback={MAP_DEFAULTS.satScience} onChange={v => setMap('satScience', v)} /></Row>
+          <Row label="أخرى"><ResettableSwatch label="لون الأقمار الأخرى" value={s.map.satOther} fallback={MAP_DEFAULTS.satOther} onChange={v => setMap('satOther', v)} /></Row>
 
-          <SubHead label="Aircraft" />
-          <Row label="Civil"><ResettableSwatch label="Civil aircraft" value={s.map.flightCivil} fallback={MAP_DEFAULTS.flightCivil} onChange={v => setMap('flightCivil', v)} /></Row>
-          <Row label="Private"><ResettableSwatch label="Private aircraft" value={s.map.flightPrivate} fallback={MAP_DEFAULTS.flightPrivate} onChange={v => setMap('flightPrivate', v)} /></Row>
-          <Row label="Government"><ResettableSwatch label="Government aircraft" value={s.map.flightGov} fallback={MAP_DEFAULTS.flightGov} onChange={v => setMap('flightGov', v)} /></Row>
-          <Row label="Military"><ResettableSwatch label="Military aircraft" value={s.map.flightMilitary} fallback={MAP_DEFAULTS.flightMilitary} onChange={v => setMap('flightMilitary', v)} /></Row>
-          <Row label="Unknown"><ResettableSwatch label="Unknown aircraft" value={s.map.flightUnknown} fallback={MAP_DEFAULTS.flightUnknown} onChange={v => setMap('flightUnknown', v)} /></Row>
+          <SubHead label="الطائرات" />
+          <Row label="مدنية"><ResettableSwatch label="لون الطائرات المدنية" value={s.map.flightCivil} fallback={MAP_DEFAULTS.flightCivil} onChange={v => setMap('flightCivil', v)} /></Row>
+          <Row label="خاصة"><ResettableSwatch label="لون الطائرات الخاصة" value={s.map.flightPrivate} fallback={MAP_DEFAULTS.flightPrivate} onChange={v => setMap('flightPrivate', v)} /></Row>
+          <Row label="حكومية"><ResettableSwatch label="لون الطائرات الحكومية" value={s.map.flightGov} fallback={MAP_DEFAULTS.flightGov} onChange={v => setMap('flightGov', v)} /></Row>
+          <Row label="عسكرية"><ResettableSwatch label="لون الطائرات العسكرية" value={s.map.flightMilitary} fallback={MAP_DEFAULTS.flightMilitary} onChange={v => setMap('flightMilitary', v)} /></Row>
+          <Row label="غير مصنفة"><ResettableSwatch label="لون الطائرات غير المصنفة" value={s.map.flightUnknown} fallback={MAP_DEFAULTS.flightUnknown} onChange={v => setMap('flightUnknown', v)} /></Row>
         </Section>
 
-        <Section title="Surface">
-          <Row label="Background"><Swatch label="Background colour" value={s.bg} onChange={setBg} /></Row>
-          <Row label="Panel"><Slider label="Panel opacity" value={s.panelAlpha} min={0.2} max={1} step={0.01} onChange={v => set('panelAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
-          <Row label="Border"><Slider label="Border strength" value={s.borderAlpha} min={0} max={0.6} step={0.01} onChange={v => set('borderAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
-          <Row label="Blur"><AutoSlider label="Backdrop blur" value={s.blur} min={0} max={64} step={1} whenEnabled={24} onChange={v => set('blur', v)} format={v => `${v}px`} /></Row>
-          <Row label="Radius"><Slider label="Corner radius" value={s.radius} min={0} max={2.5} step={0.05} onChange={v => set('radius', v)} format={v => `${v.toFixed(2)}x`} /></Row>
+        <Section title="السطح">
+          <Row label="الخلفية"><Swatch label="لون الخلفية" value={s.bg} onChange={setBg} /></Row>
+          <Row label="اللوحات"><Slider label="شفافية اللوحات" value={s.panelAlpha} min={0.2} max={1} step={0.01} onChange={v => set('panelAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
+          <Row label="الحدود"><Slider label="قوة الحدود" value={s.borderAlpha} min={0} max={0.6} step={0.01} onChange={v => set('borderAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
+          <Row label="التمويه"><AutoSlider label="تمويه الخلفية" value={s.blur} min={0} max={64} step={1} whenEnabled={24} onChange={v => set('blur', v)} format={v => `${v}px`} /></Row>
+          <Row label="الزوايا"><Slider label="استدارة الزوايا" value={s.radius} min={0} max={2.5} step={0.05} onChange={v => set('radius', v)} format={v => `${v.toFixed(2)}x`} /></Row>
         </Section>
 
-        <Section title="Text">
-          <Row label="Primary"><Swatch label="Primary text" value={s.textPrimary} onChange={v => set('textPrimary', v)} /></Row>
-          <Row label="Secondary"><Swatch label="Secondary text" value={s.textSecondary} onChange={v => set('textSecondary', v)} /></Row>
-          <Row label="Muted"><Swatch label="Muted text" value={s.textMuted} onChange={v => set('textMuted', v)} /></Row>
-          <Row label="Heading"><Swatch label="Heading text" value={s.textHeading} onChange={v => set('textHeading', v)} /></Row>
+        <Section title="النصوص">
+          <Row label="أساسي"><Swatch label="لون النص الأساسي" value={s.textPrimary} onChange={v => set('textPrimary', v)} /></Row>
+          <Row label="ثانوي"><Swatch label="لون النص الثانوي" value={s.textSecondary} onChange={v => set('textSecondary', v)} /></Row>
+          <Row label="هادئ"><Swatch label="لون النص الهادئ" value={s.textMuted} onChange={v => set('textMuted', v)} /></Row>
+          <Row label="العناوين"><Swatch label="لون العناوين" value={s.textHeading} onChange={v => set('textHeading', v)} /></Row>
         </Section>
 
-        <Section title="Typography">
-          <Row label="UI font"><Segmented label="UI font" options={FONT_UI} value={s.fontUi} onChange={v => set('fontUi', v)} /></Row>
-          <Row label="Mono font"><Segmented label="Mono font" options={FONT_MONO} value={s.fontMono} onChange={v => set('fontMono', v)} /></Row>
-          <Row label="Tracking"><AutoSlider label="Mono tracking" value={s.tracking} min={-0.05} max={0.4} step={0.005} whenEnabled={0.2} onChange={v => set('tracking', v)} format={v => `${v.toFixed(2)}em`} /></Row>
+        <Section title="الخطوط">
+          <Row label="خط الواجهة"><Segmented label="خط الواجهة" options={FONT_UI} value={s.fontUi} onChange={v => set('fontUi', v)} /></Row>
+          <Row label="الخط الأحادي"><Segmented label="الخط الأحادي" options={FONT_MONO} value={s.fontMono} onChange={v => set('fontMono', v)} /></Row>
+          <Row label="تباعد الأحرف"><AutoSlider label="تباعد الخط الأحادي" value={s.tracking} min={-0.05} max={0.4} step={0.005} whenEnabled={0.2} onChange={v => set('tracking', v)} format={v => `${v.toFixed(2)}em`} /></Row>
         </Section>
 
-        <Section title="Motion & FX">
-          <Row label="Speed"><Slider label="Motion speed" value={s.motion} min={0} max={2} step={0.05} onChange={v => set('motion', v)} format={v => (v === 0 ? 'off' : `${v.toFixed(2)}x`)} /></Row>
-          <Row label="Scanlines"><Slider label="Scanline overlay" value={s.scanlines} min={0} max={0.2} step={0.005} onChange={v => set('scanlines', v)} format={v => (v === 0 ? 'off' : `${Math.round(v * 500)}%`)} /></Row>
-          <Row label="Grain"><Slider label="Film grain overlay" value={s.grain} min={0} max={0.3} step={0.005} onChange={v => set('grain', v)} format={v => (v === 0 ? 'off' : `${Math.round(v * 333)}%`)} /></Row>
-          <Row label="Vignette"><Slider label="Edge vignette" value={s.vignette} min={0} max={1} step={0.01} onChange={v => set('vignette', v)} format={v => (v === 0 ? 'off' : `${Math.round(v * 100)}%`)} /></Row>
+        <Section title="الحركة والمؤثرات">
+          <Row label="السرعة"><Slider label="سرعة الحركة" value={s.motion} min={0} max={2} step={0.05} onChange={v => set('motion', v)} format={v => (v === 0 ? 'إيقاف' : `${v.toFixed(2)}x`)} /></Row>
+          <Row label="خطوط المسح"><Slider label="تأثير خطوط المسح" value={s.scanlines} min={0} max={0.2} step={0.005} onChange={v => set('scanlines', v)} format={v => (v === 0 ? 'إيقاف' : `${Math.round(v * 500)}%`)} /></Row>
+          <Row label="الحبيبات"><Slider label="تأثير حبيبات الصورة" value={s.grain} min={0} max={0.3} step={0.005} onChange={v => set('grain', v)} format={v => (v === 0 ? 'إيقاف' : `${Math.round(v * 333)}%`)} /></Row>
+          <Row label="تعتيم الحواف"><Slider label="تعتيم الحواف" value={s.vignette} min={0} max={1} step={0.01} onChange={v => set('vignette', v)} format={v => (v === 0 ? 'إيقاف' : `${Math.round(v * 100)}%`)} /></Row>
         </Section>
 
         <p className="text-[9px] font-mono leading-relaxed text-white/20 pt-1 pb-1">
-          Saved to this browser. AUTO leaves the app&apos;s own styling alone, and presets do not touch the map
-          layers &mdash; those carry meaning, not just a look. Reset restores the active theme.
+          تُحفظ هذه الإعدادات في هذا المتصفح. خيار «تلقائي» يترك قيمة التطبيق الأصلية كما هي،
+          ولا تغيّر الأنماط الجاهزة دلالات طبقات الخريطة. إعادة الضبط تستعيد المظهر النشط.
         </p>
       </div>
     </motion.div>,

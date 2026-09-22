@@ -5,7 +5,6 @@ export async function GET() {
     status: 'operational',
     platform: 'M3TM.WORLD',
     version: '0.1.0',
-    upstream: 'simplifaisoul/osiris',
     uptime: process.uptime ? Math.round(process.uptime()) : 0,
     timestamp: new Date().toISOString(),
     endpoints: [

@@ -6,7 +6,7 @@ import { propagateTLE } from '@/lib/orbit';
 export const maxDuration = 60;
 
 /**
- * OSIRIS — Satellite Tracking API
+ * M3TM.WORLD — Satellite Tracking API
  * Fetches TLE data from multiple sources with fallbacks
  * Computes real-time positions using simplified SGP4
  */
@@ -16,9 +16,9 @@ const MISSION_CLASSIFY: Record<string, { mission: string; color: string }> = {
   'USA': { mission: 'Military Recon', color: '#FF3D3D' },
   'NROL': { mission: 'NRO Classified', color: '#FF3D3D' },
   'LACROSSE': { mission: 'SAR Imaging', color: '#00E5FF' },
-  'MENTOR': { mission: 'SIGINT', color: '#FFFFFF' },
-  'ORION': { mission: 'SIGINT', color: '#FFFFFF' },
-  'TRUMPET': { mission: 'SIGINT', color: '#FFFFFF' },
+  'MENTOR': { mission: 'Communications', color: '#FFFFFF' },
+  'ORION': { mission: 'Communications', color: '#FFFFFF' },
+  'TRUMPET': { mission: 'Communications', color: '#FFFFFF' },
   'GPS': { mission: 'Navigation', color: '#448AFF' },
   'NAVSTAR': { mission: 'Navigation', color: '#448AFF' },
   'GLONASS': { mission: 'Navigation', color: '#448AFF' },
@@ -176,7 +176,7 @@ async function fetchCelesTrakGroup(url: string): Promise<{ name: string; line1: 
     const res = await fetch(url, {
       signal: AbortSignal.timeout(30000),
       cache: 'no-store',
-      headers: { 'User-Agent': 'OSIRIS/4.2 (satellite-tracker)' },
+      headers: { 'User-Agent': 'M3TM-WORLD/1.0 (satellite-tracker)' },
     });
     if (!res.ok) return [];
     const text = await res.text();
@@ -303,7 +303,7 @@ export async function GET() {
       } else if (m === 'Commercial Comms' || m === 'Commercial Imaging') category = 'comms';
       else if (m === 'Navigation') category = 'navigation';
       else if (m === 'Weather' || m === 'Earth Observation' || m === 'Earth Science') category = 'earth_obs';
-      else if (m === 'Military Recon' || m === 'NRO Classified' || m === 'SIGINT' || m === 'Early Warning' || m === 'Russian Military' || m === 'Chinese Recon' || m === 'SAR Imaging') category = 'military';
+      else if (m === 'Military Recon' || m === 'NRO Classified' || m === 'Communications' || m === 'Early Warning' || m === 'Russian Military' || m === 'Chinese Recon' || m === 'SAR Imaging') category = 'military';
       else if (m === 'Space Station' || m === 'Space Telescope') category = 'science';
 
       satellites.push({

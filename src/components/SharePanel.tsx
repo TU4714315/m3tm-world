@@ -29,7 +29,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
       .join(',');
     if (layerKeys) params.set('layers', layerKeys);
 
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://osiris.vercel.app';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://m3tm.world';
     return `${base}/?${params.toString()}`;
   }, [mapView, activeLayers, mouseCoords]);
 
@@ -71,7 +71,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         className="glass-panel w-8 h-8 flex items-center justify-center pointer-events-auto hover:border-[var(--gold-primary)] transition-colors"
-        title="Share view (S)"
+        title="مشاركة العرض (S)"
       >
         <Share2 className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
       </motion.button>
@@ -83,7 +83,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto osiris-glow z-[300]"
+            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto world-glow z-[300]"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -131,30 +131,30 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             {/* Quick Share */}
             <div className="flex gap-2">
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏛️ M3TM.WORLD — Global Intelligence Dashboard')}&url=${encodeURIComponent(generateShareUrl())}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('M3TM.WORLD — خريطة عالمية للبيانات الحية')}&url=${encodeURIComponent(generateShareUrl())}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#1DA1F2] hover:text-[#1DA1F2] transition-colors"
               >
-                𝕏 POST
+                مشاركة عبر 𝕏
               </a>
               <a
                 href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(generateShareUrl())}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#0A66C2] hover:text-[#0A66C2] transition-colors"
               >
-                IN SHARE
+                مشاركة عبر LinkedIn
               </a>
               <a
-                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('M3TM.WORLD — Open Source Global Intelligence Platform')}`}
+                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('M3TM.WORLD — خريطة عالمية للبيانات الحية')}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#FF4500] hover:text-[#FF4500] transition-colors"
               >
-                REDDIT
+                مشاركة عبر Reddit
               </a>
             </div>
 
             <div className="mt-3 text-center text-[9px] font-mono text-[var(--text-muted)] tracking-widest">
-              PRESS [S] TO TOGGLE · SHAREABLE LINKS PRESERVE VIEW STATE
+              اضغط [S] لفتح المشاركة · الرابط يحتفظ بحالة العرض الحالية
             </div>
           </motion.div>
         )}

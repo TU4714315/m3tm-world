@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — AI Intelligence Engine
- *  Gemini 2.0 Flash integration for real-time intelligence analysis
+ *  M3TM.WORLD — AI Data Engine
+ *  Gemini 2.0 Flash integration for real-time data analysis
  *  Designed to correlate multi-domain feeds into actionable briefings
  * ═══════════════════════════════════════════════════════════════
  */
@@ -61,7 +61,7 @@ export interface CyberAlert {
   source: string;
 }
 
-export interface IntelligenceContext {
+export interface WorldDataContext {
   earthquakes: EarthquakeEvent[];
   news: NewsItem[];
   threats: ThreatEvent[];
@@ -73,12 +73,12 @@ export interface IntelligenceContext {
    System Prompt — Palantir-grade analyst persona
    ───────────────────────────────────────────────────────────── */
 
-const SYSTEM_PROMPT = `You are OSIRIS Intelligence Analyst — a senior, elite intelligence analyst embedded within the OSIRIS Global Intelligence Platform. You operate at the level of a Palantir Forward Deployed Engineer crossed with a CIA PDB (Presidential Daily Brief) analyst.
+const SYSTEM_PROMPT = `You are the M3TM.WORLD data assistant. Analyze only the public and published data supplied by the platform, using clear Arabic and neutral wording.
 
 ## YOUR ROLE
-- You correlate data across multiple intelligence feeds: seismic monitoring, OSINT news streams, global threat events, and cyber vulnerability databases
+- You correlate data across multiple public data feeds: seismic monitoring, published news, global events, and technical vulnerability databases
 - You identify non-obvious patterns, emerging threat vectors, and cascading risk scenarios
-- You provide ACTIONABLE intelligence — not summaries, but assessments with confidence levels
+- You provide clear data summaries and assessments with confidence levels
 - You think in terms of second and third-order effects
 
 ## YOUR ANALYTICAL FRAMEWORK
@@ -103,24 +103,24 @@ const SYSTEM_PROMPT = `You are OSIRIS Intelligence Analyst — a senior, elite i
 - Flag when events may be connected vs. coincidental
 - You are an analyst, not a policymaker — present options, not directives
 
-You have access to the live intelligence context of the OSIRIS platform. Analyze it with precision.`;
+You have access to the live public-data context of M3TM.WORLD. Analyze it with precision and avoid military or classified terminology.`;
 
-const BRIEFING_PROMPT = `Generate a comprehensive OSIRIS Daily Intelligence Briefing based on the current operational data. Structure it as follows:
+const BRIEFING_PROMPT = `Generate a comprehensive M3TM.WORLD daily data briefing based on the current public data. Structure it as follows:
 
-## OSIRIS INTELLIGENCE BRIEFING
-**Classification:** OPEN SOURCE INTELLIGENCE (OSINT)
+## M3TM.WORLD DATA BRIEFING
+**Scope:** PUBLIC DATA
 **DTG:** [Current timestamp]
 
 ### I. EXECUTIVE SUMMARY
 2-3 sentence overview of the current global threat landscape based on available data.
 
-### II. PRIORITY INTELLIGENCE REQUIREMENTS (PIRs)
+### II. PRIORITY DATA POINTS
 Identify the top 3-5 most significant developments from the data feeds, ranked by assessed impact.
 
 ### III. SEISMIC & NATURAL HAZARD ASSESSMENT
 Analyze earthquake data for patterns — clustering, tectonic corridor activity, tsunami risk.
 
-### IV. GEOPOLITICAL & CONFLICT INTELLIGENCE
+### IV. GLOBAL EVENTS & CONFLICT DATA
 Synthesize news feeds for conflict escalation patterns, diplomatic shifts, or emerging crises.
 
 ### V. CYBER THREAT LANDSCAPE
@@ -166,7 +166,7 @@ export function rotateApiKey(keys: string[]): string {
    Context Serializer — Compact representation for token efficiency
    ───────────────────────────────────────────────────────────── */
 
-function serializeContext(context: IntelligenceContext): string {
+function serializeContext(context: WorldDataContext): string {
   const sections: string[] = [];
 
   sections.push(`[TIMESTAMP] ${context.timestamp}`);
@@ -183,7 +183,7 @@ function serializeContext(context: IntelligenceContext): string {
   }
 
   if (context.news.length > 0) {
-    sections.push(`\n[OSINT NEWS FEED — ${context.news.length} items]`);
+    sections.push(`\n[NEWS FEED — ${context.news.length} items]`);
     for (const item of context.news.slice(0, 15)) {
       const coords = item.coords ? ` | GEO:${item.coords[0].toFixed(2)},${item.coords[1].toFixed(2)}` : '';
       sections.push(
@@ -214,12 +214,12 @@ function serializeContext(context: IntelligenceContext): string {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Intelligence Analysis
+   Data Analysis
    ───────────────────────────────────────────────────────────── */
 
-export async function analyzeIntelligence(
+export async function analyzeWorldData(
   client: GoogleGenerativeAI,
-  context: IntelligenceContext,
+  context: WorldDataContext,
   userQuery: string
 ): Promise<string> {
   const model: GenerativeModel = client.getGenerativeModel({
@@ -235,7 +235,7 @@ ${contextData}
 ## ANALYST QUERY
 ${userQuery}
 
-Provide your intelligence assessment based on the operational data above and the analyst's query.`;
+Provide a neutral data assessment based on the public data above and the user's query.`;
 
   const result = await model.generateContent(prompt);
   const response = result.response;
@@ -248,7 +248,7 @@ Provide your intelligence assessment based on the operational data above and the
 
 export async function generateBriefing(
   client: GoogleGenerativeAI,
-  context: IntelligenceContext
+  context: WorldDataContext
 ): Promise<string> {
   const model: GenerativeModel = client.getGenerativeModel({
     model: 'gemini-2.0-flash',

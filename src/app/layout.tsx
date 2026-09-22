@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import "./globals.css";
 
-const SITE_URL = "https://m3tm.world";
+const SITE_URL = "https://m3tm-world.vercel.app";
 const SITE_NAME = "M3TM.WORLD";
-const SITE_TITLE = "M3TM.WORLD — Open Source Intelligence Platform | Live Flight Tracking, CCTV, OSINT Tools & More";
-const SITE_DESCRIPTION = "The open-source Palantir alternative. Track 10,000+ aircraft, 2,000 satellites, and worldwide CCTV cameras in real-time on a 3D globe. Run Nmap scans, DNS lookups, WHOIS queries, SSL cert analysis & threat intelligence — all from your browser. 20+ live data feeds including earthquakes, wildfires, nuclear facilities, cyber threats, and global conflicts. Free & open source.";
+const SITE_TITLE = "M3TM.WORLD — خريطة عالمية تفاعلية للبيانات الحية";
+const SITE_DESCRIPTION = "منصة مرئية لعرض بيانات عامة وحية على خريطة تفاعلية: حركة الطيران، الأقمار الصناعية، الكاميرات العامة، الطقس، الزلازل، الحرائق، الملاحة البحرية والأخبار من مصادرها المنشورة.";
 
 export const viewport: Viewport = {
   themeColor: "#D4AF37",
@@ -19,43 +19,21 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s | M3TM.WORLD Intelligence",
+    template: "%s | M3TM.WORLD",
   },
   description: SITE_DESCRIPTION,
   keywords: [
-    // OSINT Tools - Primary focus
-    "OSINT tools", "free OSINT tools", "online OSINT toolkit", "OSINT framework",
-    "nmap online", "nmap scanner online", "free nmap scan", "port scanner online",
-    "DNS lookup tool", "WHOIS lookup", "reverse DNS", "DNS records",
-    "SSL certificate checker", "certificate transparency", "cert lookup",
-    "BGP routing lookup", "ASN lookup", "IP geolocation",
-    "threat intelligence", "threat intel lookup", "IP reputation check",
-    "network reconnaissance", "recon tools", "penetration testing tools",
-    "cybersecurity tools", "infosec tools", "security scanner",
-    "linux OSINT tools", "kali linux tools online", "OSINT browser tools",
-    
-    // Intelligence Platform
-    "OSINT", "open source intelligence", "intelligence platform", "global intelligence",
-    "geospatial intelligence", "GEOINT", "SIGINT", "real-time tracking",
-    "palantir alternative", "open source palantir", "intelligence dashboard",
-    
-    // Tracking & Data
     "flight tracker", "aircraft tracking", "ADS-B tracker", "live flight radar",
     "satellite tracking", "ISS tracker", "space station tracker",
     "CCTV cameras live", "security cameras worldwide", "live cameras",
     "earthquake monitor", "seismic activity", "USGS earthquake",
     "wildfire tracker", "NASA FIRMS", "active fires",
-    "nuclear facilities map", "nuclear power plants",
-    "severe weather alerts", "weather radar",
-    "cyber threats dashboard", "CVE tracker",
-    "space weather", "solar storm", "GPS jamming",
-    "defense stocks", "commodities tracker",
-    
-    // Brand
-    "m3tm.world", "M3TM.WORLD",
+    "weather radar", "space weather", "CVE tracker", "خرائط تفاعلية",
+    "بيانات حية", "بيانات مفتوحة", "بحث مفتوح", "تحقق من المصادر",
+    "m3tm.world", "M3TM.WORLD"
   ],
-  authors: [{ name: "Osiris Project", url: "https://github.com/simplifaisoul/osiris" }],
-  creator: "Osiris Project",
+  authors: [{ name: "M3TM.WORLD", url: SITE_URL }],
+  creator: "M3TM.WORLD",
   publisher: "M3TM.WORLD",
   robots: {
     index: true,
@@ -91,32 +69,30 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "M3TM.WORLD — The Open-Source Palantir Alternative | Live Flights, CCTV, Satellites & OSINT Tools",
-    description: "Track 10K+ aircraft, 2K satellites & worldwide CCTV on a 3D globe. Run Nmap, DNS, WHOIS & threat intel scans from your browser. 20+ live intelligence feeds. Free. Open source.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     type: "website",
     siteName: SITE_NAME,
-    locale: "en_US",
+    locale: "ar_SA",
     url: SITE_URL,
     images: [
       {
         url: `${SITE_URL}/m3tm-world-preview.png`,
         width: 1440,
         height: 900,
-        alt: "M3TM.WORLD — Open Source Intelligence Platform with Live Tracking & OSINT Tools",
+        alt: "M3TM.WORLD — خريطة عالمية تفاعلية للبيانات الحية",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "🛰️ M3TM.WORLD — Open Source Palantir Alternative | Live Tracking + OSINT Tools",
-    description: "Track 10K+ flights, satellites & CCTV worldwide. Run Nmap, DNS, WHOIS scans from your browser. 20+ live intel feeds. Free & open source.",
-    creator: "@simplifaisoul",
-    site: "@simplifaisoul",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: [`${SITE_URL}/m3tm-world-preview.png`],
   },
   category: "technology",
-  classification: "Intelligence & Security",
+  classification: "خرائط وبيانات حية",
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
@@ -131,13 +107,13 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "M3TM.WORLD — OSINT Toolkit & Intelligence Platform",
+  name: "M3TM.WORLD",
   alternateName: ["M3TM.WORLD"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
-  applicationCategory: "SecurityApplication",
+  applicationCategory: "DataVisualizationApplication",
   operatingSystem: "Web",
-  browserRequirements: "Requires a modern web browser",
+  browserRequirements: "متصفح ويب حديث",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -145,32 +121,21 @@ const jsonLd = {
     availability: "https://schema.org/InStock",
   },
   featureList: [
-    "Nmap port scanning from the browser — no install required",
-    "DNS record lookup (A, AAAA, MX, NS, TXT, CNAME)",
-    "WHOIS domain registration lookup",
-    "SSL/TLS certificate transparency search",
-    "BGP routing & ASN lookup",
-    "IP geolocation & threat intelligence",
-    "Real-time flight tracking (10,000+ aircraft via ADS-B)",
-    "Satellite tracking (2,000+ objects including ISS)",
-    "Worldwide CCTV camera monitoring (1,400+ feeds)",
-    "Earthquake monitoring (USGS live feed)",
-    "Wildfire detection (NASA FIRMS satellite data)",
-    "Nuclear facility mapping (worldwide)",
-    "Severe weather alerts & tracking",
-    "Cyber threat & CVE intelligence",
-    "Space weather & solar storm monitoring",
-    "GPS jamming detection",
-    "Defense & commodity market tracking",
-    "SIGINT news aggregation feed",
-    "Interactive 3D globe with day/night cycle",
-    "Region intelligence dossier reports",
+    "خريطة عالمية تفاعلية ثنائية وثلاثية الأبعاد",
+    "تتبع حركة الطيران من مصادر ADS-B المنشورة",
+    "تتبع الأقمار الصناعية والأجسام المدارية",
+    "عرض كاميرات عامة وبثوث منشورة",
+    "متابعة الزلازل والحرائق والطقس",
+    "عرض بيانات الملاحة البحرية عند توفرها",
+    "أدوات DNS وWHOIS وشهادات TLS",
+    "تجميع الأخبار وربطها بالموقع الجغرافي",
+    "عرض مصادر البيانات وإسنادها بوضوح"
   ],
   screenshot: `${SITE_URL}/m3tm-world-preview.png`,
   author: {
     "@type": "Organization",
-    name: "Osiris Project",
-    url: "https://github.com/simplifaisoul/osiris",
+    name: "M3TM.WORLD",
+    url: SITE_URL,
   },
 };
 
@@ -189,7 +154,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="canonical" href={SITE_URL} />
-        
+
         {/* JSON-LD Structured Data */}
         <script
           type="application/ld+json"

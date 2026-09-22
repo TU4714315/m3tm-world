@@ -1,16 +1,16 @@
-name: osiris
+name: m3tm-world
 services:
-  osiris:
+  m3tm-world:
     # Builds locally from the Dockerfile so you always run the cloned code.
     # To use the prebuilt image instead, replace the `build:` block below with
     # `image: ghcr.io/simplifaisoul/osiris:latest`.
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: osiris
-    # Host port is configurable via OSIRIS_PORT in .env (defaults to 3000).
+    container_name: m3tm-world
+    # Host port is configurable via M3TM_WORLD_PORT in .env (defaults to 3000).
     ports:
-      - "${OSIRIS_PORT:-3000}:3000"
+      - "${M3TM_WORLD_PORT:-3000}:3000"
     # Optional API keys / scanner backend — copy .env.template to .env and
     # fill in what you need. Missing file is ignored (keyless feeds still work).
     env_file:
@@ -28,25 +28,25 @@ services:
       - default
       - umami_default
 
-  osiris-cache:
+  m3tm-world-cache:
     image: nginx:alpine
-    container_name: osiris-cache
+    container_name: m3tm-world-cache
     ports:
       - "8080:8080"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx-cache:/var/cache/nginx
     depends_on:
-      - osiris
+      - m3tm-world
     restart: unless-stopped
     networks:
       - default
 
-  osiris-intel:
+  m3tm-world-data:
     build:
       context: ./intel
       dockerfile: Dockerfile
-    container_name: osiris-intel
+    container_name: m3tm-world-data
     ports:
       - "4000:4000"
     restart: unless-stopped
@@ -65,26 +65,28 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  main: osiris
+  main: m3tm-world
   author: simplifaisoul
   developer: simplifaisoul
   category: Network
   description:
     en_us: >-
-      OSIRIS is a production-grade open-source OSINT situational-awareness
-      dashboard. It aggregates real-time global intelligence across aviation,
+      M3TM.WORLD is an interactive world-data
+      dashboard for public and live feeds across aviation,
       maritime, CCTV networks, seismic activity, wildfires, news feeds,
       weather, space weather, cyber threats (CVEs) and conflict zones into a
       single GPU-accelerated MapLibre interface. Most features work with no
       API keys.
   tagline:
-    en_us: Real-time global OSINT intelligence dashboard
+    en_us: Real-time interactive world data
+    ar_sa: بيانات عالمية تفاعلية مباشرة
   title:
-    en_us: OSIRIS
-  icon: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/casaos-icon.png
-  thumbnail: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/og-image.png
+    en_us: M3TM.WORLD
+    ar_sa: M3TM.WORLD
+  icon: https://m3tm.world/android-chrome-512x512.png
+  thumbnail: https://m3tm.world/m3tm-world-preview.png
   screenshot_link:
-    - https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/og-image.png
+    - https://m3tm.world/m3tm-world-preview.png
   scheme: http
   hostname: ""
   port_map: "3000"
@@ -93,10 +95,10 @@ x-casaos:
   envs:
     - container: SCANNER_URL
       description:
-        en_us: "(Optional) RECON scanner backend URL, e.g. http://scanner:7700"
+        en_us: "(Optional) scanner backend URL, e.g. http://scanner:7700"
     - container: SCANNER_KEY
       description:
-        en_us: "(Optional) RECON scanner shared secret (must match backend OSIRIS_KEY)."
+        en_us: "(Optional) scanner shared secret; it must match the backend shared key."
     - container: FIRMS_API_KEY
       description:
         en_us: "(Optional) NASA FIRMS API key for active-fire data."

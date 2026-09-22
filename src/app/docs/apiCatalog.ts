@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — API Catalog
+ *  M3TM.WORLD — API Catalog
  *  Machine-readable description of every public route under /api.
  *  Kept in sync by hand with src/app/api/ * /route.ts
  * ═══════════════════════════════════════════════════════════════
@@ -211,7 +211,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/region-dossier',
         method: 'GET',
-        summary: 'Composite intelligence summary for a map location — the panel behind a map right-click.',
+        summary: 'Composite public-data summary for a map location — the panel behind a map right-click.',
         params: [
           { name: 'lat', required: true, desc: 'Latitude of the region.', example: '48.3794' },
           { name: 'lng', required: true, desc: 'Longitude of the region.', example: '31.1656' },
@@ -228,7 +228,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/news',
         method: 'GET',
-        summary: 'Aggregated OSINT news items.',
+        summary: 'Aggregated public news items.',
         returns: ['news', 'total', 'timestamp'],
       },
       {
@@ -362,62 +362,62 @@ export const API_GROUPS: ApiGroup[] = [
     ],
   },
   {
-    id: 'osint',
-    title: 'OSINT Toolkit',
+    id: 'tools',
+    title: 'Public Data Tools',
     blurb:
       'The lookup tools behind the RECON panel. Every route takes a single subject and returns a normalised result, so they compose well in scripts.',
     endpoints: [
       {
-        path: '/api/osint/dns',
+        path: '/api/tools/dns',
         method: 'GET',
         summary: 'Resolves A, AAAA, MX, NS, TXT, and SOA records.',
         params: [{ name: 'domain', required: true, desc: 'Domain to resolve.', example: 'example.com' }],
         returns: ['…record sets'],
       },
       {
-        path: '/api/osint/whois',
+        path: '/api/tools/whois',
         method: 'GET',
         summary: 'Registration and registrar detail for a domain.',
         params: [{ name: 'domain', required: true, desc: 'Domain to look up.', example: 'example.com' }],
         returns: ['…registration record'],
       },
       {
-        path: '/api/osint/certs',
+        path: '/api/tools/certs',
         method: 'GET',
         summary: 'Certificate transparency search — an effective passive subdomain enumerator.',
         params: [{ name: 'domain', required: true, desc: 'Apex domain to search.', example: 'example.com' }],
         returns: ['certificates', 'subdomains', 'total_certs', 'unique_subdomains', 'timestamp'],
       },
       {
-        path: '/api/osint/ip',
+        path: '/api/tools/ip',
         method: 'GET',
         summary: 'Geolocation, ASN, and network ownership for an address.',
         params: [{ name: 'ip', required: true, desc: 'IPv4 or IPv6 address.', example: '8.8.8.8' }],
         returns: ['…address record'],
       },
       {
-        path: '/api/osint/shodan',
+        path: '/api/tools/shodan',
         method: 'GET',
         summary: 'Exposed services, banners, and known vulnerabilities for a host.',
         params: [{ name: 'ip', required: true, desc: 'Address to query.', example: '8.8.8.8' }],
         returns: ['status', 'ports', 'hostnames', 'cpes', 'vulns', 'tags', 'detail'],
       },
       {
-        path: '/api/osint/bgp',
+        path: '/api/tools/bgp',
         method: 'GET',
         summary: 'ASN, prefix, and peering relationships.',
         params: [{ name: 'query', required: true, desc: 'ASN, prefix, or IP.', example: 'AS15169' }],
         returns: ['…routing record'],
       },
       {
-        path: '/api/osint/mac',
+        path: '/api/tools/mac',
         method: 'GET',
         summary: 'Resolves a MAC address or OUI prefix to its hardware vendor.',
         params: [{ name: 'mac', required: true, desc: 'MAC address or OUI prefix.', example: '00:1A:2B:3C:4D:5E' }],
         returns: ['mac', 'prefix', 'vendor', 'address', 'detail'],
       },
       {
-        path: '/api/osint/phone',
+        path: '/api/tools/phone',
         method: 'GET',
         summary: 'Validates and classifies a phone number in E.164 form.',
         params: [{ name: 'number', required: true, desc: 'Number in international format.', example: '+442071234567' }],
@@ -434,21 +434,21 @@ export const API_GROUPS: ApiGroup[] = [
         ],
       },
       {
-        path: '/api/osint/github',
+        path: '/api/tools/github',
         method: 'GET',
         summary: 'Public profile metadata for a GitHub account.',
         params: [{ name: 'user', required: true, desc: 'GitHub username.', example: 'torvalds' }],
         returns: ['username', 'name', 'bio', 'company', 'location', 'blog', 'email', 'twitter', 'public_repos'],
       },
       {
-        path: '/api/osint/leaks',
+        path: '/api/tools/leaks',
         method: 'GET',
         summary: 'Checks an address against known breach corpora.',
         params: [{ name: 'email', required: true, desc: 'Email address to check.' }],
         returns: ['breached', 'breaches', 'data_exposed', 'detail'],
       },
       {
-        path: '/api/osint/hudsonrock',
+        path: '/api/tools/hudsonrock',
         method: 'GET',
         summary: 'Reports whether an asset appears in Hudson Rock\'s infostealer corpus — machines compromised by credential-stealing malware.',
         params: [
@@ -458,14 +458,14 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['query', 'type', 'compromised', 'stealers', 'total_corporate_services', 'total_user_services', 'totalStealers', 'employees', 'users'],
       },
       {
-        path: '/api/osint/cve',
+        path: '/api/tools/cve',
         method: 'GET',
         summary: 'Full NVD record for a single CVE identifier.',
         params: [{ name: 'cve', required: true, desc: 'CVE ID.', example: 'CVE-2021-44228' }],
         returns: ['id', 'description', 'cvss', 'cvss_vector', 'severity', 'published', 'references', 'source'],
       },
       {
-        path: '/api/osint/sanctions',
+        path: '/api/tools/sanctions',
         method: 'GET',
         summary: 'Searches the OpenSanctions mirror of the US OFAC SDN list.',
         params: [
@@ -476,14 +476,14 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['schema', 'total', 'source', 'timestamp'],
       },
       {
-        path: '/api/osint/threats',
+        path: '/api/tools/threats',
         method: 'GET',
-        summary: 'Reputation and threat-intel enrichment for an indicator.',
+        summary: 'إثراء السمعة وبيانات التهديد للمؤشر.',
         params: [{ name: 'query', required: true, desc: 'IP, domain, or file hash.' }],
         returns: ['…enrichment record'],
       },
       {
-        path: '/api/osint/sweep',
+        path: '/api/tools/sweep',
         method: 'GET',
         summary: 'Sweeps a single address or a CIDR range for reachable hosts.',
         params: [
@@ -491,7 +491,7 @@ export const API_GROUPS: ApiGroup[] = [
           { name: 'cidr', desc: 'CIDR range to sweep. Use instead of `ip`.', example: '192.0.2.0/24' },
         ],
         returns: ['target_ip', '…sweep results'],
-        notes: 'Only sweep ranges you are authorised to test.',
+        notes: 'افحص فقط النطاقات المصرح لك باختبارها.',
       },
     ],
   },
@@ -503,7 +503,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/scanner',
         method: 'GET',
-        summary: 'Runs a scan against a target via the OSIRIS scanner backend.',
+        summary: 'Runs a scan against a target via the scanner backend.',
         params: [
           {
             name: 'type',
@@ -516,7 +516,7 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['detail', 'hint', 'failed', 'error'],
         env: ['SCANNER_URL', 'SCANNER_KEY'],
         notes:
-          'Returns 503 when `SCANNER_URL` / `SCANNER_KEY` are unset — that is the supported way to disable RECON. `SCANNER_KEY` must equal the backend’s `OSIRIS_KEY`.',
+          'Returns 503 when `SCANNER_URL` / `SCANNER_KEY` are unset — that is the supported way to disable RECON. `SCANNER_KEY` must equal the backend’s `backend shared key`.',
       },
     ],
   },
@@ -546,10 +546,10 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/ai/analyze',
         method: 'POST',
-        summary: 'Cross-feed correlation and threat assessment over an intelligence context.',
+        summary: 'Cross-feed correlation and threat assessment over an data context.',
         returns: ['…analysis'],
         notes:
-          'Body is an `IntelligenceContext`. Exceeding the limit returns 429. Feed it straight from the read endpoints — the shape matches what they return.',
+          'Body is an `WorldDataContext`. Exceeding the limit returns 429. Feed it straight from the read endpoints — the shape matches what they return.',
         bodyExample: `{
   "earthquakes": [],
   "news": [],
@@ -561,9 +561,9 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/ai/briefing',
         method: 'POST',
-        summary: 'Structured threat briefing in the style of a daily intelligence product.',
+        summary: 'Structured threat briefing in the style of a daily data briefing.',
         returns: ['…briefing'],
-        notes: 'Same `IntelligenceContext` body and same rate limit as `/api/ai/analyze`.',
+        notes: 'Same `WorldDataContext` body and same rate limit as `/api/ai/analyze`.',
         bodyExample: `{
   "earthquakes": [],
   "news": [],

@@ -22,7 +22,7 @@ const API_SECTIONS = [
 ];
 
 const ALL_SECTIONS = [...GUIDE_SECTIONS, ...API_SECTIONS];
-const FALLBACK_ORIGIN = 'https://osirisai.live';
+const FALLBACK_ORIGIN = 'https://m3tm.world';
 
 export default function DocsClient() {
   const [active, setActive] = useState('overview');
@@ -179,7 +179,7 @@ export default function DocsClient() {
           </button>
 
           <a
-            href="https://github.com/simplifaisoul/osiris"
+            href="https://github.com/TU4714315/m3tm-world"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
@@ -273,7 +273,7 @@ export default function DocsClient() {
             </h1>
 
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)] max-w-[42rem]">
-              M3TM.WORLD aggregates aviation, maritime, seismic, conflict, cyber, and OSINT feeds onto a single
+              M3TM.WORLD aggregates aviation, maritime, seismic, conflict, cyber, and public data feeds onto a single
               GPU-rendered map — and exposes every one of them as a plain HTTP endpoint. This is the same API the
               dashboard runs on. There is no separate, privileged internal tier.
             </p>
@@ -364,8 +364,8 @@ print(len(data["commercial_flights"]), "commercial")`,
 # { "stats": { "flights": 9241, "sats": 2043, "cctv": 2117,
 #              "weather": 58, "nuclear": 191, "incidents": 412 },
 #   "timestamp": "2026-07-29T12:00:00Z" }`}</Pre>
-            <p>The OSINT lookups each take one subject, so they compose cleanly in a pipeline:</p>
-            <Pre label="Passive subdomain enumeration" lang="bash">{`curl -s "${origin}/api/osint/certs?domain=example.com" | jq -r '.subdomains[]'`}</Pre>
+            <p>The public-data lookup tools each take one subject, so they compose cleanly in a pipeline:</p>
+            <Pre label="Passive subdomain enumeration" lang="bash">{`curl -s "${origin}/api/tools/certs?domain=example.com" | jq -r '.subdomains[]'`}</Pre>
             <Callout tone="info" title="Try before you write code">
               Every GET endpoint in the reference below has a <strong>Send request</strong> button that runs it against
               this instance and shows the live response.
@@ -374,8 +374,8 @@ print(len(data["commercial_flights"]), "commercial")`,
 
           <Section id="self-hosting" eyebrow="Guide" title="Self-Hosting">
             <p>M3TM.WORLD needs Node 20+ and no database. A local instance is three commands:</p>
-            <Pre label="Local development" lang="bash">{`git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
+            <Pre label="Local development" lang="bash">{`git clone https://github.com/TU4714315/m3tm-world.git
+cd m3tm-world
 npm install
 npm run dev        # http://localhost:3000`}</Pre>
             <p>For a production build, or to run the checks:</p>
@@ -385,7 +385,7 @@ npm test           # vitest
 npm run test:live  # includes tests that hit live upstream feeds`}</Pre>
             <p>
               A <Code>Dockerfile</Code> and <Code>docker-compose.yml</Code> ship with the repository. The container
-              always listens on port 3000 internally; <Code>OSIRIS_PORT</Code> controls the host port it is published
+              always listens on port 3000 internally; <Code>M3TM_WORLD_PORT</Code> controls the host port it is published
               on.
             </p>
             <Pre label="Docker" lang="bash">{`cp .env.example .env
@@ -404,18 +404,18 @@ docker compose up -d`}</Pre>
               {[
                 {
                   k: 'SCANNER_URL / SCANNER_KEY',
-                  v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s OSIRIS_KEY. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
+                  v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s backend shared key. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
                 },
                 {
                   k: 'SDK_INGEST_KEY',
                   v: 'Shared secret for /api/sdk/ingest. The endpoint fails closed: while this is unset, ingestion is disabled and returns 503.',
                 },
                 {
-                  k: 'OSIRIS_TELEGRAM_CHANNELS',
-                  v: 'Comma-separated public Telegram channel names (no @) for the Telegram OSINT layer, overriding the curated default set.',
+                  k: 'M3TM_WORLD_TELEGRAM_CHANNELS',
+                  v: 'Comma-separated public Telegram channel names (no @) for the Telegram news layer, overriding the curated default set.',
                 },
                 {
-                  k: 'OSIRIS_PORT',
+                  k: 'M3TM_WORLD_PORT',
                   v: 'Host port the UI is published on. The container itself always listens on 3000.',
                 },
               ].map(row => (
@@ -458,7 +458,7 @@ docker compose up -d`}</Pre>
                   v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, breach checks, sanctions, CVE lookup, port scanning.',
                 },
                 {
-                  k: 'Intel Feed',
+                  k: 'موجز الأخبار',
                   v: 'A running stream of incoming events across every enabled feed.',
                 },
                 {
@@ -495,7 +495,7 @@ docker compose up -d`}</Pre>
                 { key: 'S', desc: 'Share current view' },
                 { key: 'L', desc: 'Toggle layer panel' },
                 { key: 'M', desc: 'Toggle markets panel' },
-                { key: 'I', desc: 'Toggle intel feed' },
+                { key: 'I', desc: 'إظهار/إخفاء موجز الأخبار' },
                 { key: 'R', desc: 'Reset to global view' },
                 { key: '?', desc: 'Show help' },
                 { key: 'ESC', desc: 'Close panels / popups' },
@@ -546,8 +546,8 @@ docker compose up -d`}</Pre>
               ))}
             </div>
             <Callout tone="warn" title="Responsible use">
-              The RECON scanner and <Code>/api/osint/sweep</Code> generate traffic against the targets you name. Only
-              point them at infrastructure you own or have written authorisation to test. The remaining OSINT routes
+              The RECON scanner and <Code>/api/tools/sweep</Code> generate traffic against the targets you name. Only
+              point them at infrastructure you own or have written authorisation to test. The remaining lookup routes
               are passive and query third-party datasets rather than the subject itself.
             </Callout>
           </Section>
@@ -596,10 +596,10 @@ docker compose up -d`}</Pre>
           {/* Footer */}
           <footer className="border-t border-white/[0.06] pt-6 pb-16 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] font-mono text-[var(--text-muted)]">
             {[
-              { href: 'https://github.com/simplifaisoul/osiris', label: 'GitHub' },
+              { href: 'https://github.com/TU4714315/m3tm-world', label: 'GitHub' },
               { href: 'https://discord.gg/EPaFD5FFKf', label: 'Discord' },
               { href: 'https://x.com/soulsimplifai', label: 'X' },
-              { href: 'https://github.com/simplifaisoul/osiris/issues', label: 'Report an issue' },
+              { href: 'https://github.com/TU4714315/m3tm-world/issues', label: 'Report an issue' },
             ].map(l => (
               <a
                 key={l.label}

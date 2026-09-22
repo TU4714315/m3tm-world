@@ -123,7 +123,7 @@ export default function GlobalStatusBar() {
             .slice(0, 5);
           setQuakes(majorQuakes);
         }
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); }
     };
     fetchData();
     const iv = setInterval(fetchData, 60000);
@@ -146,7 +146,7 @@ export default function GlobalStatusBar() {
       <div className="h-[28px] overflow-hidden bg-[#0a0a0f]/95 border-t border-white/[0.06] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-xl relative">
         {/* Animated scan line */}
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--cyan-primary)]/30 to-transparent" style={{ animation: 'hud-scanline 4s linear infinite' }} />
-        
+
         {/* ── LEFT: Social & Community Links ── */}
         <div className="flex-shrink-0 h-full flex items-center pointer-events-auto">
           {/* Discord — highlighted */}
@@ -189,7 +189,7 @@ export default function GlobalStatusBar() {
                 <span className="text-white/10 mx-2">│</span>
                 {/* Earthquakes */}
                 {quakes.map(quake => (
-                  <span 
+                  <span
                     key={`${quake.id}-${repeatIdx}`}
                     className="inline-flex items-center gap-1 mx-2 cursor-help pointer-events-auto"
                     onMouseEnter={() => setHoveredQuake(quake)}
