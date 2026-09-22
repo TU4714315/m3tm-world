@@ -39,6 +39,25 @@ import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, 
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
+
+const M3TM_APP_ORIGIN = 'https://m3tm.app';
+type EmbeddedNewsItem = {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  latitude: number;
+  longitude: number;
+};
+type EmbeddedNewsPayload = {
+  id?: unknown;
+  title?: unknown;
+  source?: unknown;
+  url?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
+};
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -140,6 +159,8 @@ export default function Dashboard() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
+  const [embedMode, setEmbedMode] = useState(false);
+  const [embeddedNewsItems, setEmbeddedNewsItems] = useState<EmbeddedNewsItem[]>([]);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -148,6 +169,60 @@ export default function Dashboard() {
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const autoLocateCancelled = useRef(false);
+
+  useEffect(() => {
+    const embedded = new URLSearchParams(window.location.search).get('embed') === '1' && window.parent !== window;
+    if (!embedded) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      setEmbedMode(true);
+      setShowSplash(false);
+    });
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== M3TM_APP_ORIGIN || event.source !== window.parent) return;
+      const message = event.data;
+      if (!message || message.source !== 'm3tm-app' || message.type !== 'm3tm:sync' || message.version !== 1) return;
+
+      const items: EmbeddedNewsItem[] = Array.isArray(message.newsItems)
+        ? message.newsItems.flatMap((item: EmbeddedNewsPayload) => {
+            const latitude = Number(item?.latitude);
+            const longitude = Number(item?.longitude);
+            if (
+              typeof item?.id !== 'string'
+              || !item.id
+              || !Number.isFinite(latitude)
+              || !Number.isFinite(longitude)
+              || latitude < -90
+              || latitude > 90
+              || longitude < -180
+              || longitude > 180
+            ) return [];
+            return [{
+              id: item.id,
+              title: String(item.title || 'خبر'),
+              source: String(item.source || ''),
+              url: String(item.url || ''),
+              latitude,
+              longitude,
+            }];
+          })
+        : [];
+
+      setEmbeddedNewsItems(items);
+      if (typeof message.selectedNewsId === 'string') {
+        const selected = items.find(item => item.id === message.selectedNewsId);
+        if (selected) {
+          setFlyToLocation({ lat: selected.latitude, lng: selected.longitude, zoom: 6, ts: Date.now() });
+        }
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('message', onMessage);
+    };
+  }, []);
 
   const [activeCamera, setActiveCamera] = useState<any>(null);
   const [spaceWeather, setSpaceWeather] = useState<any>(null);
@@ -487,12 +562,29 @@ export default function Dashboard() {
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
     if (entity?.type === 'cctv') setActiveCamera(entity);
+    if (embedMode && entity?.type === 'live_news' && typeof entity.id === 'string' && entity.id) {
+      window.parent.postMessage({
+        source: 'm3tm-world',
+        type: 'm3tm:select',
+        version: 1,
+        id: entity.id,
+      }, M3TM_APP_ORIGIN);
+    }
     if (entity?.type === 'live_news' && entity.url) {
       setLiveFeedUrl(entity.url);
       setLiveFeedName(entity.name);
       setLiveFeedEmbedAllowed(entity.embed_allowed !== false);
     }
-  }, []);
+  }, [embedMode]);
+
+  const handleWorldMapReady = useCallback(() => {
+    if (!embedMode) return;
+    window.parent.postMessage({
+      source: 'm3tm-world',
+      type: 'm3tm:ready',
+      version: 1,
+    }, M3TM_APP_ORIGIN);
+  }, [embedMode]);
 
   // ── Drawing / AOI ──
   // WorldMap already owns the draw interaction and the polygon rendering;
@@ -918,7 +1010,23 @@ export default function Dashboard() {
     return entities;
   }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
 
-  const sdkDisplayData = useMemo(() => ({ ...data, sdk_entities: sdkEntities }), [data, sdkEntities]);
+  const embeddedLiveFeeds = useMemo(() => embeddedNewsItems.map(item => ({
+    bridge_id: item.id,
+    name: item.title,
+    city: '',
+    country: item.source,
+    url: item.url,
+    category: 'm3tm-app',
+    embed_allowed: true,
+    lat: item.latitude,
+    lng: item.longitude,
+  })), [embeddedNewsItems]);
+
+  const sdkDisplayData = useMemo(() => ({
+    ...data,
+    sdk_entities: sdkEntities,
+    ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
+  }), [data, embeddedLiveFeeds, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1120,7 +1228,8 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={activeLayers} 
+          activeLayers={activeLayers}
+          onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
           terrainFocus={terrainFocus}
