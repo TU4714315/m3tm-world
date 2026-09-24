@@ -120,7 +120,9 @@ const JET_CRUISE_KTS = 300;
 // zero aircraft without ever throwing. Provider counts are reported in the
 // response now so the next feed to die is visible instead of silent.
 const ADSB_MAX_DIST = 250; // nm — hard cap the provider enforces
-const ADSBFI_BASE = 'https://opendata.adsb.fi/api/v2';
+const ADSBFI_ROOT = 'https://opendata.adsb.fi/api';
+const ADSBFI_REGION_BASE = `${ADSBFI_ROOT}/v3`;
+const ADSBFI_MIL_URL = `${ADSBFI_ROOT}/v2/mil`;
 
 // adsb.fi allows roughly one request per second and soft-throttles over that by
 // returning 200 with an empty ac[] rather than 429, so a parallel fanout looks
@@ -131,7 +133,7 @@ const ADSBFI_GAP_MS = 1100;
 // so the global type feeds collapse to the military one.
 async function fetchAdsbFiRegion(lat: number, lon: number): Promise<any[]> {
   try {
-    const res = await stealthFetch(`${ADSBFI_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
+    const res = await stealthFetch(`${ADSBFI_REGION_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
       signal: AbortSignal.timeout(12000),
     });
     if (res.ok) {
@@ -335,7 +337,7 @@ export async function GET() {
       : { signal: AbortSignal.timeout(30000) };
 
     const [milRes, osRes] = await Promise.allSettled([
-      stealthFetch(`${ADSBFI_BASE}/mil`, { signal: AbortSignal.timeout(15000) }),
+      stealthFetch(ADSBFI_MIL_URL, { signal: AbortSignal.timeout(15000) }),
       skipOpenSky
         ? Promise.reject(new Error('OpenSky in cooldown'))
         // extended=1 appends the ADS-B emitter category as an 18th field. Without
