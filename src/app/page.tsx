@@ -216,13 +216,17 @@ export default function Dashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const embedded = params.get('embed') === '1' && window.parent !== window;
-    if (!embedded) return;
+    const publicSurface = params.get('surface') === 'public';
+    if (!embedded && !publicSurface) return;
 
     const frameId = window.requestAnimationFrame(() => {
-      setEmbedMode(true);
-      setEmbedSurface(params.get('surface') === 'public' ? 'public' : 'internal');
+      setEmbedMode(embedded);
+      setEmbedSurface(publicSurface ? 'public' : 'internal');
       setShowSplash(false);
     });
+    if (!embedded) {
+      return () => window.cancelAnimationFrame(frameId);
+    }
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== M3TM_APP_ORIGIN || event.source !== window.parent) return;
       const message = event.data;
@@ -442,9 +446,10 @@ export default function Dashboard() {
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
 
   useEffect(() => {
-    if (!embedMode || embedSurface !== 'public') return;
+    if (embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
+      if (!embedMode) return;
       setShowLayers(false);
       setShowMarkets(false);
       setShowAlerts(false);
@@ -1085,7 +1090,7 @@ export default function Dashboard() {
   })), [embeddedNewsItems]);
 
   const sdkDisplayData = useMemo(() => (
-    embedMode && embedSurface === 'public'
+    embedSurface === 'public'
       ? {
           live_feeds: embeddedLiveFeeds,
           commercial_flights: data.commercial_flights || [],
