@@ -46,19 +46,19 @@ export default function MapControls({ mapRef, onInteract }: MapControlsProps) {
     <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay: 0.4 }}
       className="absolute right-2 bottom-[112px] md:bottom-12 z-[240] pointer-events-auto" data-map-controls>
-      <div role="group" aria-label="Map camera controls"
+      <div role="group" aria-label="أدوات تحريك وتكبير الخريطة"
         className="flex items-center gap-[3px] p-[3px] rounded-xl border border-[var(--border-secondary)] bg-black/60 backdrop-blur-md shadow-lg transition-opacity opacity-85 hover:opacity-100 focus-within:opacity-100">
         <div className="flex flex-col gap-[3px]">
-          <Btn label="Zoom in" move={{ kind: 'zoom', dir: 1 }} icon={Plus} disabled={limits.max} press={press} release={release} step={step} />
-          <Btn label="Zoom out" move={{ kind: 'zoom', dir: -1 }} icon={Minus} disabled={limits.min} press={press} release={release} step={step} />
+          <Btn label="تكبير" move={{ kind: 'zoom', dir: 1 }} icon={Plus} disabled={limits.max} press={press} release={release} step={step} />
+          <Btn label="تصغير" move={{ kind: 'zoom', dir: -1 }} icon={Minus} disabled={limits.min} press={press} release={release} step={step} />
         </div>
         <div className="desktop-only flex items-center gap-1">
           <div aria-hidden="true" className="h-12 w-px mx-1 bg-[var(--border-secondary)]" />
           <div className="grid grid-cols-3 grid-rows-3 gap-[3px]">
-            <Btn cell="col-start-2 row-start-1" label="Pan north" move={{ kind: 'pan', dx: 0, dy: -1 }} icon={ChevronUp} press={press} release={release} step={step} />
-            <Btn cell="col-start-1 row-start-2" label="Pan west" move={{ kind: 'pan', dx: -1, dy: 0 }} icon={ChevronLeft} press={press} release={release} step={step} />
-            <Btn cell="col-start-3 row-start-2" label="Pan east" move={{ kind: 'pan', dx: 1, dy: 0 }} icon={ChevronRight} press={press} release={release} step={step} />
-            <Btn cell="col-start-2 row-start-3" label="Pan south" move={{ kind: 'pan', dx: 0, dy: 1 }} icon={ChevronDown} press={press} release={release} step={step} />
+            <Btn cell="col-start-2 row-start-1" label="تحريك شمالًا" move={{ kind: 'pan', dx: 0, dy: -1 }} icon={ChevronUp} press={press} release={release} step={step} />
+            <Btn cell="col-start-1 row-start-2" label="تحريك غربًا" move={{ kind: 'pan', dx: -1, dy: 0 }} icon={ChevronLeft} press={press} release={release} step={step} />
+            <Btn cell="col-start-3 row-start-2" label="تحريك شرقًا" move={{ kind: 'pan', dx: 1, dy: 0 }} icon={ChevronRight} press={press} release={release} step={step} />
+            <Btn cell="col-start-2 row-start-3" label="تحريك جنوبًا" move={{ kind: 'pan', dx: 0, dy: 1 }} icon={ChevronDown} press={press} release={release} step={step} />
           </div>
         </div>
       </div>
@@ -72,7 +72,7 @@ function Btn({ cell = '', label, icon: Icon, move, disabled = false, press, rele
   press: (m: CameraMove) => void; release: () => void; step: (m: CameraMove) => void;
 }) {
   return (
-    <button type="button" title={`${label} — hold to keep going`} aria-label={label} disabled={disabled}
+    <button type="button" title={`${label} — اضغط مطولًا للاستمرار`} aria-label={label} disabled={disabled}
       className={`${cell} w-10 h-10 md:w-8 md:h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-accent)] active:text-[var(--gold-light)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--gold-primary)] disabled:opacity-25 touch-none select-none`}
       onPointerDown={e => {
         if (e.button !== 0) return;

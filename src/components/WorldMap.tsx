@@ -166,6 +166,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const ctx = canvas.getContext('2d')!;
     const cx = size / 2, cy = size / 2;
     ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+    ctx.lineWidth = Math.max(1, size * 0.055);
+    ctx.shadowColor = 'rgba(0,0,0,0.72)';
+    ctx.shadowBlur = Math.max(2, size * 0.14);
+    ctx.shadowOffsetY = 1;
     ctx.beginPath();
     ctx.moveTo(cx, cy - size * 0.4);
     ctx.lineTo(cx - size * 0.12, cy + size * 0.1);
@@ -179,6 +184,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     ctx.lineTo(cx + size * 0.12, cy + size * 0.1);
     ctx.closePath();
     ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
     map.addImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
   }, []);
 
@@ -188,6 +195,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+    ctx.lineWidth = Math.max(1, size * 0.055);
+    ctx.shadowColor = 'rgba(0,0,0,0.72)';
+    ctx.shadowBlur = Math.max(2, size * 0.14);
+    ctx.shadowOffsetY = 1;
     ctx.beginPath();
     ctx.arc(size/2, size/2, size/2 - 1, 0, Math.PI * 2);
     ctx.fill();
@@ -857,12 +869,37 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const htmlEsc = (s: any): string => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const idSafe = (s: any): string => String(s ?? '').replace(/[^a-zA-Z0-9_\.\-]/g, '');
     const urlSafe = (s: any): string => { const u = String(s ?? ''); return /^https?:\/\//i.test(u) ? u : '#'; };
+    const arEnum = (value: any, fallback = 'غير معروف'): string => {
+      const key = String(value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+      const labels: Record<string, string> = {
+        UNKNOWN: 'غير معروف', ONLINE: 'متصل', OFFLINE: 'غير متصل',
+        WAR: 'حرب', HIGH: 'مرتفعة', MEDIUM: 'متوسطة', LOW: 'منخفضة',
+        ELEVATED: 'مرتفعة', CRITICAL: 'حرجة', INFO: 'معلومات',
+        SEVERE: 'شديد', CONGESTED: 'مزدحم', NORMAL: 'طبيعي',
+        DANGER: 'خطر', WARNING: 'تحذير', SAFE: 'آمن',
+        ACTIVE: 'نشط', INACTIVE: 'غير نشط',
+        CARGO: 'سفينة شحن', TANKER: 'ناقلة', VESSEL: 'سفينة',
+        PASSENGER: 'سفينة ركاب', FISHING: 'سفينة صيد', TUG: 'قاطرة',
+        RADIOSONDE: 'مسبار جوي', BALLOON: 'بالون',
+        ASCENDING: 'صاعد', DESCENDING: 'هابط', BURST: 'انفجر',
+        WILDFIRE: 'حريق بري', VOLCANO: 'بركان', FLOOD: 'فيضان',
+        DROUGHT: 'جفاف', CYCLONE: 'إعصار', EARTHQUAKE: 'زلزال',
+        'SEVERE STORMS': 'عواصف شديدة', 'SEA AND LAKE ICE': 'جليد بحري وبحيرات',
+        'ACTIVE CONFLICT ZONE': 'منطقة نزاع نشطة',
+        'UNDER CONSTRUCTION': 'قيد الإنشاء',
+        DECOMMISSIONED: 'خارج الخدمة', DECOMMISSIONING: 'قيد الإخراج من الخدمة',
+        OPERATIONAL: 'عامل', OPERATING: 'عامل',
+        NATIONWIDE: 'على مستوى الدولة', REGIONAL: 'إقليمي', LOCAL: 'محلي',
+        TECHNICAL: 'سبب تقني', POWER: 'انقطاع طاقة', GOVERNMENT: 'إجراء حكومي',
+      };
+      return labels[key] ?? fallback;
+    };
 
     const formatTime = (iso: string | null) => {
       if (!iso) return '—';
       try {
         const d = new Date(iso);
-        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short' });
+        return d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', hour12: false, timeZoneName: 'short' });
       } catch { return '—'; }
     };
 
@@ -882,19 +919,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             <span style="color:#5C5A54;font-size:10px;">${htmlEsc(p.icao24||'')}</span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;">
-            <div><span style="color:#5C5A54;font-size:9px;">MODEL</span><br/><span style="color:#B0BEC5;">${htmlEsc(p.model||'—')}</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">ALT</span><br/><span style="color:#B0BEC5;">${p.alt?Math.round(p.alt)+'m':'—'}</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">SPEED</span><br/><span style="color:#B0BEC5;">${p.speed_knots||'—'}kt</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">HDG</span><br/><span style="color:#B0BEC5;">${Math.round(p.heading||0)}°</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">REG</span><br/><span style="color:#B0BEC5;">${htmlEsc(p.registration||'—')}</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">POS</span><br/><span style="color:#B0BEC5;">${coords[1].toFixed(2)},${coords[0].toFixed(2)}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">الطراز</span><br/><span style="color:#B0BEC5;">${htmlEsc(p.model||'—')}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">الارتفاع</span><br/><span style="color:#B0BEC5;">${p.alt?Math.round(p.alt)+' م':'—'}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">السرعة</span><br/><span style="color:#B0BEC5;">${p.speed_knots||'—'} عقدة</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">الاتجاه</span><br/><span style="color:#B0BEC5;">${Math.round(p.heading||0)}°</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">التسجيل</span><br/><span style="color:#B0BEC5;">${htmlEsc(p.registration||'—')}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">الموقع</span><br/><span style="color:#B0BEC5;">${coords[1].toFixed(2)},${coords[0].toFixed(2)}</span></div>
           </div>
           <div id="ac-${idSafe(p.icao24||'')}" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
-            <span style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;">IDENTIFYING AIRFRAME…</span>
+            <span style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;">جارٍ التحقق من بيانات الطائرة…</span>
           </div>
           <button onclick="window.m3tmWatchFlight && window.m3tmWatchFlight({ icao24: '${idSafe(p.icao24||'')}', callsign: '${idSafe(cs)}' })" style="width:100%;margin-top:8px;padding:6px 12px;background:rgba(0,229,255,0.10);border:1px solid rgba(0,229,255,0.35);color:#7FE9FF;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:bold;letter-spacing:0.05em;border-radius:4px;cursor:pointer;">+ متابعة هذه الطائرة</button>
           <div id="${routeLoadingId}" style="margin-top:8px;padding:6px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
-            <span style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;">RESOLVING ROUTE…</span>
+            <span style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;">جارٍ تحديد المسار المنشور…</span>
           </div>
           <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
             <a href="https://www.flightaware.com/live/flight/${encodeURIComponent(cs)}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">FLIGHTAWARE</a>
@@ -911,13 +948,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             .then((d) => {
               const el = document.getElementById(`ac-${p.icao24}`);
               if (!el || !d || d.error) {
-                if (el) el.innerHTML = '<span style="color:#5C5A54;font-size:9px;">AIRFRAME NOT IN REGISTRY</span>';
+                if (el) el.innerHTML = '<span style="color:#5C5A54;font-size:9px;">الطائرة غير موجودة في السجل المتاح</span>';
                 return;
               }
               const bits = [d.registration, d.typeCode, d.operator].filter(Boolean)
                 .map((x: string) => htmlEsc(String(x))).join(' · ');
               el.innerHTML =
-                `<div style="color:#E8E6E0;font-size:11px;line-height:1.35;">${htmlEsc(d.model || 'Unidentified type')}</div>` +
+                `<div style="color:#E8E6E0;font-size:11px;line-height:1.35;">${htmlEsc(d.model || 'طراز غير محدد')}</div>` +
                 (bits ? `<div style="color:#78909C;font-size:9px;margin-top:2px;">${bits}</div>` : '');
             })
             .catch(() => {});
@@ -946,24 +983,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
               const distKm = routeData.totalDistanceKm || 0;
               el.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                  <div><span style="color:#5C5A54;font-size:8px;">FROM</span><br/><span style="color:#E8E6E0;font-size:13px;font-weight:700;">${htmlEsc(routeData.origin.iata || routeData.origin.icao)}</span> <span style="color:#5C5A54;font-size:9px;">${htmlEsc(routeData.origin.city)}</span></div>
+                  <div><span style="color:#5C5A54;font-size:8px;">من</span><br/><span style="color:#E8E6E0;font-size:13px;font-weight:700;">${htmlEsc(routeData.origin.iata || routeData.origin.icao)}</span> <span style="color:#5C5A54;font-size:9px;">${htmlEsc(routeData.origin.city)}</span></div>
                   <span style="color:#5C5A54;font-size:11px;">&rarr;</span>
-                  <div style="text-align:right;"><span style="color:#5C5A54;font-size:8px;">TO</span><br/><span style="color:#E8E6E0;font-size:13px;font-weight:700;">${htmlEsc(routeData.destination.iata || routeData.destination.icao)}</span> <span style="color:#5C5A54;font-size:9px;">${htmlEsc(routeData.destination.city)}</span></div>
+                  <div style="text-align:right;"><span style="color:#5C5A54;font-size:8px;">إلى</span><br/><span style="color:#E8E6E0;font-size:13px;font-weight:700;">${htmlEsc(routeData.destination.iata || routeData.destination.icao)}</span> <span style="color:#5C5A54;font-size:9px;">${htmlEsc(routeData.destination.city)}</span></div>
                 </div>
                 <div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;margin:6px 0;"><div style="width:${pct}%;height:100%;background:rgba(255,255,255,0.35);border-radius:1px;"></div></div>
                 <div style="display:flex;justify-content:space-between;font-size:10px;color:#78909C;">
-                  <span>DEP ${depTime}</span>
+                  <span>إقلاع ${depTime}</span>
                   <span>${pct}% &middot; ${distKm.toLocaleString()}km</span>
-                  <span>ARR ${arrTime}</span>
+                  <span>وصول ${arrTime}</span>
                 </div>
               `;
             } else {
-              el.innerHTML = `<span style="color:#5C5A54;font-size:9px;">NO SCHEDULED ROUTE</span>`;
+              el.innerHTML = `<span style="color:#5C5A54;font-size:9px;">لا يتوفر مسار مجدول منشور</span>`;
             }
           })
           .catch(() => {
             const el = document.getElementById(routeLoadingId);
-            if (el) el.innerHTML = `<span style="color:#5C5A54;font-size:9px;">ROUTE UNAVAILABLE</span>`;
+            if (el) el.innerHTML = `<span style="color:#5C5A54;font-size:9px;">تعذر الحصول على المسار</span>`;
           });
       });
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -1000,13 +1037,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
       popup(coords, `<div style="${pStyle}border:1px solid rgba(255,149,0,0.3);">
-        <div style="color:#FF9500;font-size:14px;font-weight:700;margin-bottom:4px;">M${p.magnitude} EARTHQUAKE</div>
-        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;">${htmlEsc(p.place||'Unknown location')}</div>
+        <div style="color:#FF9500;font-size:14px;font-weight:700;margin-bottom:4px;">زلزال بقوة M${p.magnitude}</div>
+        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;">${htmlEsc(p.place||'موقع غير محدد')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
-          <div><span style="color:#5C5A54;">DEPTH</span><br/><span style="color:#E8E6E0;">${p.depth||'—'}km</span></div>
+          <div><span style="color:#5C5A54;">العمق</span><br/><span style="color:#E8E6E0;">${p.depth||'—'} كم</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}, ${coords[0].toFixed(3)}</span></div>
         </div>
-        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 ${p.source === 'NIGGG-BAS' ? 'NIGGG-BAS' : 'USGS DETAILS'}</a>
+        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 ${p.source === 'NIGGG-BAS' ? 'NIGGG-BAS' : 'تفاصيل المصدر'}</a>
       </div>`);
     });
 
@@ -1107,12 +1144,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
       popup(coords, `<div style="${pStyle}border:1px solid rgba(255,107,0,0.3);">
-        <div style="color:#FF6B00;font-size:12px;font-weight:700;margin-bottom:6px;">🔥 ACTIVE FIRE DETECTED</div>
+        <div style="color:#FF6B00;font-size:12px;font-weight:700;margin-bottom:6px;">🔥 تم رصد حريق نشط</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">BRIGHTNESS</span><br/><span style="color:#FF6B00;">${p.brightness||'—'}K</span></div>
+          <div><span style="color:#5C5A54;">درجة السطوع</span><br/><span style="color:#FF6B00;">${p.brightness||'—'}K</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
         </div>
-        <a href="https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;l:noaa20-viirs,viirs,modis_a,modis_t;@${coords[0]},${coords[1]},10z" target="_blank" style="${linkStyle}color:#FF6B00;border:1px solid rgba(255,107,0,0.4);background:rgba(255,107,0,0.1);">🛰️ NASA FIRMS MAP</a>
+        <a href="https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;l:noaa20-viirs,viirs,modis_a,modis_t;@${coords[0]},${coords[1]},10z" target="_blank" style="${linkStyle}color:#FF6B00;border:1px solid rgba(255,107,0,0.4);background:rgba(255,107,0,0.1);">🛰️ خريطة NASA FIRMS</a>
       </div>`);
     });
 
@@ -1121,9 +1158,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
-      const tType = (p.threat_type || 'malware').replace(/_/g, ' ').toUpperCase();
+      const tType = p.threat_type === 'malware_download'
+        ? 'تنزيل برمجية ضارة'
+        : p.threat_type === 'botnet'
+          ? 'شبكة روبوتات'
+          : p.threat_type === 'phishing'
+            ? 'تصيد'
+            : 'تهديد برمجي';
       const statusColor = p.status === 'online' ? '#39FF14' : '#FF1744';
-      const place = [p.city, p.country].filter(Boolean).join(', ') || 'UNKNOWN';
+      const place = [p.city, p.country].filter(Boolean).join(', ') || 'غير معروف';
       const host = p.as_name ? `AS${p.asn} ${p.as_name}` : '';
       const urls = Number(p.url_count) || 1;
       // Every field below is observed. Where the old popup linked to a generic
@@ -1135,17 +1178,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div style="color:#FF1744;font-size:12px;font-weight:700;letter-spacing:0.1em;text-shadow:0 0 4px rgba(255,23,68,0.5);">[ ${htmlEsc(tType)} ]</div>
           <div style="color:#5C5A54;font-size:9px;">${htmlEsc(place)}</div>
         </div>
-        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:2px;">${htmlEsc(p.malware || 'Unclassified payload')}</div>
+        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:2px;">${htmlEsc(p.malware || 'حمولة غير مصنفة')}</div>
         ${host ? `<div style="color:#5C5A54;font-size:9px;margin-bottom:10px;">${htmlEsc(host)}</div>` : '<div style="margin-bottom:10px;"></div>'}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;margin-bottom:8px;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;">
-          <div><span style="color:#5C5A54;">HOST</span><br/><span style="color:#00E5FF;font-family:monospace;">${htmlEsc(p.ip)}:${htmlEsc(String(p.port ?? 0))}</span></div>
-          <div><span style="color:#5C5A54;">STATUS</span><br/><span style="color:${statusColor};">${htmlEsc((p.status||'unknown').toUpperCase())}</span></div>
-          <div><span style="color:#5C5A54;">LIVE URLS</span><br/><span style="color:#E8E6E0;">${urls}</span></div>
-          <div><span style="color:#5C5A54;">LAST REPORT</span><br/><span style="color:#E8E6E0;">${htmlEsc((p.last_seen || '').split(' ')[0] || '—')}</span></div>
+          <div><span style="color:#5C5A54;">المضيف</span><br/><span style="color:#00E5FF;font-family:monospace;">${htmlEsc(p.ip)}:${htmlEsc(String(p.port ?? 0))}</span></div>
+          <div><span style="color:#5C5A54;">الحالة</span><br/><span style="color:${statusColor};">${arEnum(p.status)}</span></div>
+          <div><span style="color:#5C5A54;">روابط نشطة</span><br/><span style="color:#E8E6E0;">${urls}</span></div>
+          <div><span style="color:#5C5A54;">آخر بلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc((p.last_seen || '').split(' ')[0] || '—')}</span></div>
         </div>
-        <div style="color:#5C5A54;font-size:9px;margin-bottom:10px;">First seen ${htmlEsc((p.first_seen || '').split(' ')[0] || '—')}${p.reporter ? ` · reported by ${htmlEsc(p.reporter)}` : ''}</div>
+        <div style="color:#5C5A54;font-size:9px;margin-bottom:10px;">أول رصد ${htmlEsc((p.first_seen || '').split(' ')[0] || '—')}${p.reporter ? ` · أبلغ عنه ${htmlEsc(p.reporter)}` : ''}</div>
         <div style="display:flex;gap:6px;">
-          ${ref ? `<a href="${ref}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:#E8E6E0;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);">URLHAUS REPORT ↗</a>` : ''}
+          ${ref ? `<a href="${ref}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:#E8E6E0;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.05);">تقرير URLhaus ↗</a>` : ''}
         </div>
       </div>`);
     });
@@ -1164,17 +1207,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       <div style="${pStyle}border:1px solid ${accent}66;min-width:250px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
-          <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.15em;">${htmlEsc(p.quad_label)}</span>
+          <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.15em;">${({ '1': 'تعاون لفظي', '2': 'تعاون مادي', '3': 'نزاع لفظي', '4': 'نزاع مادي' } as Record<string,string>)[String(p.quad)] || 'حدث دولي'}</span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name)}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
-          <span style="opacity:0.6;">Avg tone</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
-          <span style="opacity:0.6;">Articles</span><span style="color:#E8E6E0;">${htmlEsc(p.articles)}</span>
-          <span style="opacity:0.6;">Country</span><span style="color:#E8E6E0;">${htmlEsc(p.country || '—')}</span>
+          <span style="opacity:0.6;">مؤشر Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
+          <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
+          <span style="opacity:0.6;">المقالات</span><span style="color:#E8E6E0;">${htmlEsc(p.articles)}</span>
+          <span style="opacity:0.6;">الدولة</span><span style="color:#E8E6E0;">${htmlEsc(p.country || '—')}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z</div>
-        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">SOURCE ARTICLE</a>` : ''}
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">المصدر المنشور</a>` : ''}
       </div>`);
     });
 
@@ -1192,19 +1235,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
           <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.15em;">
-            ${ongoing ? 'ONGOING OUTAGE' : 'RESOLVED OUTAGE'}
+            ${ongoing ? 'انقطاع جارٍ' : 'انقطاع منتهٍ'}
           </span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name)}</div>
         ${p.description ? `<div style="color:#9B978E;font-size:10px;line-height:1.6;margin-bottom:8px;">${htmlEsc(p.description)}</div>` : ''}
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">Cause</span><span style="color:#E8E6E0;">${htmlEsc(p.cause || 'Unspecified')}</span>
-          <span style="opacity:0.6;">Scope</span><span style="color:#E8E6E0;">${htmlEsc(p.scope || 'Nationwide')}</span>
-          <span style="opacity:0.6;">Started</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start).slice(0, 16).replace('T', ' '))}</span>
-          ${p.end ? `<span style="opacity:0.6;">Ended</span><span style="color:#E8E6E0;">${htmlEsc(String(p.end).slice(0, 16).replace('T', ' '))}</span>` : ''}
+          <span style="opacity:0.6;">السبب</span><span style="color:#E8E6E0;">${arEnum(p.cause, 'غير محدد')}</span>
+          <span style="opacity:0.6;">النطاق</span><span style="color:#E8E6E0;">${arEnum(p.scope, 'غير محدد')}</span>
+          <span style="opacity:0.6;">بدأ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start).slice(0, 16).replace('T', ' '))}</span>
+          ${p.end ? `<span style="opacity:0.6;">انتهى</span><span style="color:#E8E6E0;">${htmlEsc(String(p.end).slice(0, 16).replace('T', ' '))}</span>` : ''}
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;">Cloudflare Radar</div>
-        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">RADAR DETAIL</a>` : ''}
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">تفاصيل الرصد</a>` : ''}
       </div>`);
     });
 
@@ -1217,15 +1260,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       <div style="${pStyle}border:1px solid rgba(255,61,61,0.4);min-width:230px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:#FF3D3D;box-shadow:0 0 8px #FF3D3D;"></span>
-          <span style="color:#FF3D3D;font-size:10px;font-weight:700;letter-spacing:0.15em;">L3 ATTACK ORIGIN</span>
+          <span style="color:#FF3D3D;font-size:10px;font-weight:700;letter-spacing:0.15em;">مصدر هجوم طبقة 3</span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name)}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">Share</span><span style="color:#FF6B6B;font-weight:700;">${htmlEsc(p.share)}%</span>
-          <span style="opacity:0.6;">Code</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
+          <span style="opacity:0.6;">الحصة</span><span style="color:#FF6B6B;font-weight:700;">${htmlEsc(p.share)}%</span>
+          <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;line-height:1.5;">
-          Share of observed layer-3 attack traffic by origin · Cloudflare Radar
+          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر · Cloudflare Radar
         </div>
       </div>`);
     });
@@ -1245,18 +1288,18 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       // "CONFLICT EVENT" — on a live sample that mislabelled 342 of 369
       // events, nearly all of them wildfires.
       const KIND: Record<string, [string, string]> = {
-        earthquake: ['🌐 EARTHQUAKE',   '#FF9500'],
-        wildfire:   ['🔥 WILDFIRE',     '#FF6B1A'],
-        flood:      ['🌊 FLOOD',        '#00B0FF'],
-        weather:    ['🌀 TROPICAL CYCLONE', '#00E5FF'],
-        volcano:    ['🌋 VOLCANO',      '#FF3D3D'],
-        drought:    ['☀️ DROUGHT',      '#FFD500'],
+        earthquake: ['🌐 زلزال', '#FF9500'],
+        wildfire:   ['🔥 حريق بري', '#FF6B1A'],
+        flood:      ['🌊 فيضان', '#00B0FF'],
+        weather:    ['🌀 إعصار مداري', '#00E5FF'],
+        volcano:    ['🌋 بركان', '#FF3D3D'],
+        drought:    ['☀️ جفاف', '#FFD500'],
       };
-      const [kindLabel, kindColor] = KIND[String(p.kind)] ?? ['⚠️ GLOBAL INCIDENT', '#FF3D3D'];
+      const [kindLabel, kindColor] = KIND[String(p.kind)] ?? ['⚠️ حدث عالمي', '#FF3D3D'];
 
       popup(coords, `<div style="${pStyle}border:1px solid ${kindColor}4d;">
         <div style="color:${kindColor};font-size:12px;font-weight:700;margin-bottom:6px;">${kindLabel}</div>
-        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.name||'Unclassified incident')}</div>
+        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.name||'حدث عام غير مصنف')}</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}flex:1;text-align:center;color:${kindColor};border:1px solid ${kindColor}66;background:${kindColor}26;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
       </div>`);
     });
@@ -1268,10 +1311,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
-        <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'WARNING EVENT')}</div>
-        <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'Global event detected at this location.')}</div>
+        <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
+        <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${color};">${(p.severity||'unknown').toUpperCase()}</span></div>
+          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${color};">${arEnum(p.severity)}</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
         </div>
         ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
@@ -1294,7 +1337,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         const p = e.features[0].properties as any;
         const coords = e.lngLat;
         const srcUrl = p.url || SDK_SOURCE_URLS[p.source] || 'https://m3tm.world';
-        const domainLabel = p.domain === 'SEA' ? '⚓ MARITIME' : p.domain === 'AIR' ? '✈ AIR CORRIDOR' : '🛡 بيانات بحرية';
+        const domainLabel = p.domain === 'SEA' ? '⚓ مسار بحري' : p.domain === 'AIR' ? '✈ ممر جوي' : '🛡 بيانات عامة';
         const domainColor = p.domain === 'SEA' ? '#4FC3F7' : p.domain === 'AIR' ? '#B3E5FC' : '#81D4FA';
         const linkStyle = 'text-decoration:none;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.05em;';
         popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid ${domainColor}40;">
@@ -1303,9 +1346,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             <span style="color:${domainColor};font-size:11px;font-weight:700;letter-spacing:0.1em;">${domainLabel}</span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;margin-bottom:8px;">
-            <div><span style="color:#5C5A54;">FROM</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.fromName || 'Origin')}</span></div>
-            <div><span style="color:#5C5A54;">TO</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.toName || 'Destination')}</span></div>
-            <div><span style="color:#5C5A54;">DOMAIN</span><br/><span style="color:${domainColor};">${p.domain}</span></div>
+            <div><span style="color:#5C5A54;">من</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.fromName || 'نقطة البداية')}</span></div>
+            <div><span style="color:#5C5A54;">إلى</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.toName || 'الوجهة')}</span></div>
+            <div><span style="color:#5C5A54;">المجال</span><br/><span style="color:${domainColor};">${p.domain === 'SEA' ? 'بحري' : p.domain === 'AIR' ? 'جوي' : 'عام'}</span></div>
             <div><span style="color:#5C5A54;">المصدر</span><br/><a href="${urlSafe(srcUrl)}" target="_blank" style="color:${domainColor};text-decoration:underline;cursor:pointer;">${htmlEsc(p.source === 'Naval Public Data' ? 'مصدر بحري' : (p.source || 'M3TM.WORLD'))}</a></div>
           </div>
           <a href="${urlSafe(srcUrl)}" target="_blank" style="${linkStyle}color:${domainColor};border:1px solid ${domainColor}40;background:${domainColor}18;display:inline-block;margin-top:4px;">فتح المصدر ↗</a>
@@ -1319,25 +1362,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
       const sevColor = (p.severity || 5) >= 8 ? '#FF1744' : (p.severity || 5) >= 6 ? '#FF6D00' : '#FFD600';
-      const sevLabel = (p.severity || 5) >= 8 ? 'CRITICAL' : (p.severity || 5) >= 6 ? 'HIGH' : 'MEDIUM';
+      const sevLabel = (p.severity || 5) >= 8 ? 'حرجة' : (p.severity || 5) >= 6 ? 'مرتفعة' : 'متوسطة';
       popup(coords, `<div style="${pStyle}border:1px solid ${sevColor}40;box-shadow:inset 0 0 20px ${sevColor}10, 0 0 15px ${sevColor}15;">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid ${sevColor}30;padding-bottom:6px;margin-bottom:8px;">
-          <div style="color:${sevColor};font-size:12px;font-weight:700;letter-spacing:0.12em;text-shadow:0 0 6px ${sevColor}60;">⚡ ${htmlEsc((p.action || 'ATTACK').toUpperCase())}</div>
+          <div style="color:${sevColor};font-size:12px;font-weight:700;letter-spacing:0.12em;text-shadow:0 0 6px ${sevColor}60;">⚡ ${htmlEsc(p.action || 'هجوم')}</div>
           <div style="font-size:8px;padding:2px 6px;border-radius:3px;font-weight:700;letter-spacing:0.1em;background:${sevColor}20;color:${sevColor};border:1px solid ${sevColor}50;">${sevLabel}</div>
         </div>
-        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:10px;">${htmlEsc(p.malware || 'Unknown Payload')}</div>
+        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:10px;">${htmlEsc(p.malware || 'حمولة غير معروفة')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;margin-bottom:8px;background:rgba(0,0,0,0.35);padding:8px;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
-          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">SOURCE ORIGIN</span><br/><span style="color:#FF5252;font-family:monospace;">${p.src_lat || '?'}°, ${p.src_lng || '?'}°</span></div>
-          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">TARGET</span><br/><span style="color:#00E5FF;font-family:monospace;">${htmlEsc(p.target_ip || '—')}</span></div>
-          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">TARGET COUNTRY</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.target_country || '—')}</span></div>
-          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">PORT</span><br/><span style="color:#FFD600;font-family:monospace;">${p.port || '—'}</span></div>
+          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">موقع المصدر</span><br/><span style="color:#FF5252;font-family:monospace;">${p.src_lat || '?'}°, ${p.src_lng || '?'}°</span></div>
+          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">الهدف</span><br/><span style="color:#00E5FF;font-family:monospace;">${htmlEsc(p.target_ip || '—')}</span></div>
+          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">دولة الهدف</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.target_country || '—')}</span></div>
+          <div><span style="color:#5C5A54;font-size:7px;letter-spacing:0.1em;">المنفذ</span><br/><span style="color:#FFD600;font-family:monospace;">${p.port || '—'}</span></div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <div style="flex:1;height:3px;border-radius:2px;background:linear-gradient(90deg, ${sevColor}00, ${sevColor});opacity:0.5;"></div>
-          <span style="font-size:7px;color:#5C5A54;letter-spacing:0.15em;">SEVERITY ${p.severity || '?'}/10</span>
+          <span style="font-size:7px;color:#5C5A54;letter-spacing:0.15em;">الشدة ${p.severity || '?'}/10</span>
           <div style="flex:1;height:3px;border-radius:2px;background:linear-gradient(90deg, ${sevColor}, ${sevColor}00);opacity:0.5;"></div>
         </div>
-        <div style="margin-top:8px;font-size:7px;color:#5C5A54;text-align:center;letter-spacing:0.1em;">SOURCE: ABUSE.CH FEODO TRACKER</div>
+        <div style="margin-top:8px;font-size:7px;color:#5C5A54;text-align:center;letter-spacing:0.1em;">المصدر: ABUSE.CH FEODO TRACKER</div>
       </div>`);
     });
 
@@ -1353,10 +1396,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       if (!p) return;
       const coords = e.features[0].geometry.coordinates.slice();
       popup(coords, `<div style="${pStyle}border:1px solid rgba(255,61,61,0.5);">
-        <div style="color:#FF3D3D;font-size:12px;font-weight:700;margin-bottom:6px;">🎯 TARGET: ${htmlEsc(p.id)}</div>
-        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;">${htmlEsc(p.city || 'Unknown')}, ${htmlEsc(p.country || 'Unknown')} — ${htmlEsc(p.isp || 'Unknown ISP')}</div>
+        <div style="color:#FF3D3D;font-size:12px;font-weight:700;margin-bottom:6px;">🎯 الهدف: ${htmlEsc(p.id)}</div>
+        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;">${htmlEsc(p.city || 'غير معروف')}, ${htmlEsc(p.country || 'غير معروف')} — ${htmlEsc(p.isp || 'مزود غير معروف')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
-          <div><span style="color:#5C5A54;">TYPE</span><br/><span style="color:#00E5FF;">${(p.type || 'UNKNOWN').toUpperCase()}</span></div>
+          <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:#00E5FF;">${arEnum(p.type, 'غير معروف')}</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
         </div>
       </div>`);
@@ -1373,7 +1416,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       let threatsHtml = '';
       if (activeThreats.length > 0) {
         threatsHtml = `<div style="margin-top:8px;padding-top:6px;border-top:1px solid ${color}40;color:${color};font-size:9px;font-weight:bold;">
-          ACTIVE THREATS:<br/>${activeThreats.map((t: string) => `⚠ ${htmlEsc(t)}`).join('<br/>')}
+          تهديدات نشطة:<br/>${activeThreats.map((t: string) => `⚠ ${htmlEsc(t)}`).join('<br/>')}
         </div>`;
       }
 
@@ -1381,7 +1424,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:4px;">🏢 ${htmlEsc(p.name)}</div>
         <div style="font-size:9px;color:#aaa;margin-bottom:8px;">${htmlEsc(p.category)} | ${htmlEsc(p.city)}, ${htmlEsc(p.country)}</div>
         <div style="display:grid;grid-template-columns:1fr;gap:4px;font-size:11px;">
-          <div><span style="color:#5C5A54;font-size:9px;">SCM RISK LEVEL</span><br/><span style="color:${color};font-weight:bold;">${p.risk_level}</span></div>
+          <div><span style="color:#5C5A54;font-size:9px;">مستوى مخاطر سلسلة الإمداد</span><br/><span style="color:${color};font-weight:bold;">${arEnum(p.risk_level)}</span></div>
         </div>
         ${threatsHtml}
       </div>`);
@@ -1401,11 +1444,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="font-size:12px;margin-bottom:8px;color:#fff;">${p.ip}</div>
         ${hostnames.length > 0 ? `<div style="font-size:9px;color:#8A8880;margin-bottom:6px;">${hostnames.join(', ')}</div>` : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">PORTS</span><br/><span style="color:#E8E6E0;">${ports.length}</span></div>
-          <div><span style="color:#5C5A54;">RISK</span><br/><span style="color:${riskColors[p.risk_level] || '#666'};">${p.risk_level}</span></div>
+          <div><span style="color:#5C5A54;">المنافذ</span><br/><span style="color:#E8E6E0;">${ports.length}</span></div>
+          <div><span style="color:#5C5A54;">المخاطر</span><br/><span style="color:${riskColors[p.risk_level] || '#666'};">${arEnum(p.risk_level)}</span></div>
         </div>
-        <div style="font-size:9px;color:#8A8880;margin-bottom:6px;">Open: ${ports.slice(0, 12).join(', ')}${ports.length > 12 ? ' ...' : ''}</div>
-        ${vulns.length > 0 ? `<div style="font-size:9px;color:#FF3D3D;margin-bottom:6px;">⚠ CVEs: ${vulns.slice(0, 5).join(', ')}${vulns.length > 5 ? ` +${vulns.length - 5} more` : ''}</div>` : ''}
+        <div style="font-size:9px;color:#8A8880;margin-bottom:6px;">المفتوحة: ${ports.slice(0, 12).join(', ')}${ports.length > 12 ? ' ...' : ''}</div>
+        ${vulns.length > 0 ? `<div style="font-size:9px;color:#FF3D3D;margin-bottom:6px;">⚠ الثغرات: ${vulns.slice(0, 5).join(', ')}${vulns.length > 5 ? ` +${vulns.length - 5} إضافية` : ''}</div>` : ''}
       </div>`);
     });
 
@@ -1416,12 +1459,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       popup(coords, `<div style="${pStyle}border:1px solid ${p.color}40;">
         <div style="color:${p.color};font-size:12px;font-weight:700;letter-spacing:0.1em;margin-bottom:4px;">🎈 ${p.callsign}</div>
-        <div style="font-size:9px;color:#aaa;margin-bottom:8px;">${p.type.toUpperCase()} / STATUS: ${p.status.toUpperCase()}</div>
+        <div style="font-size:9px;color:#aaa;margin-bottom:8px;">النوع: ${arEnum(p.type, 'مسبار جوي')} · الحالة: ${arEnum(p.status)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
-          <div><span style="color:#5C5A54;">ALTITUDE</span><br/><span style="color:#E8E6E0;">${p.altitude} m</span></div>
-          <div><span style="color:#5C5A54;">SPEED</span><br/><span style="color:#E8E6E0;">${Math.round(p.speed)} km/h</span></div>
-          <div><span style="color:#5C5A54;">VERT RATE</span><br/><span style="color:${p.verticalRate > 0 ? '#00E676' : '#FF3D3D'};">${p.verticalRate.toFixed(1)} m/s</span></div>
-          <div><span style="color:#5C5A54;">TEMP</span><br/><span style="color:#E8E6E0;">${p.temperature}°C</span></div>
+          <div><span style="color:#5C5A54;">الارتفاع</span><br/><span style="color:#E8E6E0;">${p.altitude} m</span></div>
+          <div><span style="color:#5C5A54;">السرعة</span><br/><span style="color:#E8E6E0;">${Math.round(p.speed)} كم/س</span></div>
+          <div><span style="color:#5C5A54;">معدل الصعود</span><br/><span style="color:${p.verticalRate > 0 ? '#00E676' : '#FF3D3D'};">${p.verticalRate.toFixed(1)} م/ث</span></div>
+          <div><span style="color:#5C5A54;">الحرارة</span><br/><span style="color:#E8E6E0;">${p.temperature}°C</span></div>
         </div>
       </div>`);
     });
@@ -1436,9 +1479,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:4px;">☢️ ${p.name}</div>
         <div style="font-size:9px;color:#aaa;margin-bottom:8px;">${p.city}, ${p.country}</div>
         <div style="display:grid;grid-template-columns:1fr;gap:4px;font-size:11px;">
-          <div><span style="color:#5C5A54;font-size:9px;">READING</span><br/><span style="color:${color};font-weight:bold;">${p.reading} nSv/h</span></div>
-          <div><span style="color:#5C5A54;font-size:9px;">STATUS</span><br/><span style="color:${color};">${p.status}</span></div>
-          <div><span style="color:#5C5A54;font-size:9px;">NETWORK</span><br/><span style="color:#E8E6E0;">${p.network}</span></div>
+          <div><span style="color:#5C5A54;font-size:9px;">القراءة</span><br/><span style="color:${color};font-weight:bold;">${p.reading} nSv/h</span></div>
+          <div><span style="color:#5C5A54;font-size:9px;">الحالة</span><br/><span style="color:${color};">${arEnum(p.status)}</span></div>
+          <div><span style="color:#5C5A54;font-size:9px;">الشبكة</span><br/><span style="color:#E8E6E0;">${p.network}</span></div>
         </div>
       </div>`);
     });
@@ -1453,17 +1496,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
       popup(coords, `<div style="${pStyle}border:1px solid ${color}60;box-shadow:inset 0 0 12px ${color}15;">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid ${color}40;padding-bottom:6px;margin-bottom:8px;">
-          <div style="color:${color};font-size:12px;font-weight:700;letter-spacing:0.1em;">${icon} [ ${(p.type||'VESSEL').toUpperCase()} ]</div>
-          <div style="color:#5C5A54;font-size:9px;">FLAG: ${p.flag||'UNK'}</div>
+          <div style="color:${color};font-size:12px;font-weight:700;letter-spacing:0.1em;">${icon} [ ${arEnum(p.type, 'سفينة')} ]</div>
+          <div style="color:#5C5A54;font-size:9px;">العلم: ${htmlEsc(p.flag||'—')}</div>
         </div>
-        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:10px;">${p.name || 'UNIDENTIFIED VESSEL'}</div>
+        <div style="color:#E8E6E0;font-size:11px;font-weight:bold;margin-bottom:10px;">${p.name || 'سفينة غير معرّفة'}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;margin-bottom:8px;background:rgba(0,0,0,0.3);padding:6px;border-radius:4px;">
-          <div><span style="color:#5C5A54;">SPEED</span><br/><span style="color:${color};font-family:monospace;">${Number(p.speed).toFixed(1)} kn</span></div>
-          <div><span style="color:#5C5A54;">HEADING</span><br/><span style="color:${color};font-family:monospace;">${Number(p.heading).toFixed(0)}°</span></div>
-          <div><span style="color:#5C5A54;">LATITUDE</span><br/><span style="color:#E8E6E0;font-family:monospace;">${coords[1].toFixed(4)}°</span></div>
-          <div><span style="color:#5C5A54;">LONGITUDE</span><br/><span style="color:#E8E6E0;font-family:monospace;">${coords[0].toFixed(4)}°</span></div>
+          <div><span style="color:#5C5A54;">السرعة</span><br/><span style="color:${color};font-family:monospace;">${Number(p.speed).toFixed(1)} عقدة</span></div>
+          <div><span style="color:#5C5A54;">الاتجاه</span><br/><span style="color:${color};font-family:monospace;">${Number(p.heading).toFixed(0)}°</span></div>
+          <div><span style="color:#5C5A54;">خط العرض</span><br/><span style="color:#E8E6E0;font-family:monospace;">${coords[1].toFixed(4)}°</span></div>
+          <div><span style="color:#5C5A54;">خط الطول</span><br/><span style="color:#E8E6E0;font-family:monospace;">${coords[0].toFixed(4)}°</span></div>
         </div>
-        <div><span style="color:#5C5A54;font-size:9px;">DESTINATION: </span><span style="color:#E8E6E0;font-size:9px;">${p.destination || 'UNKNOWN'}</span></div>
+        <div><span style="color:#5C5A54;font-size:9px;">الوجهة: </span><span style="color:#E8E6E0;font-size:9px;">${p.destination || 'غير معروفة'}</span></div>
         <a href="https://www.marinetraffic.com/en/ais/details/ships/mmsi:${p.mmsi}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>
       </div>`);
     });
@@ -1475,14 +1518,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       const iconEmoji = p.icon === 'cyclone' ? '🌀' : p.icon === 'volcano' ? '🌋' : p.icon === 'flood' ? '🌊' : p.icon === 'drought' ? '🏜️' : p.icon === 'ice' ? '🧊' : p.icon === 'weather' ? '⚠️' : '⚡';
       popup(coords, `<div style="${pStyle}border:1px solid rgba(224,64,251,0.3);">
-        <div style="color:#E040FB;font-size:14px;font-weight:700;margin-bottom:6px;">${iconEmoji} ${p.type || 'Weather Event'}</div>
-        <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${p.title || 'Unknown event'}</div>
+        <div style="color:#E040FB;font-size:14px;font-weight:700;margin-bottom:6px;">${iconEmoji} ${arEnum(p.type, 'حدث جوي')}</div>
+        <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${p.title || 'حدث غير محدد'}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${p.severity === 'high' ? '#FF1744' : '#FFD700'};">${(p.severity||'low').toUpperCase()}</span></div>
+          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${p.severity === 'high' ? '#FF1744' : '#FFD700'};">${arEnum(p.severity, 'منخفضة')}</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
         </div>
         <div style="display:flex;gap:6px;">
-          ${p.source ? `<a href="${p.source}" target="_blank" style="${linkStyle}color:#E040FB;border:1px solid rgba(224,64,251,0.4);background:rgba(224,64,251,0.1);">📡 SOURCE</a>` : ''}
+          ${p.source ? `<a href="${p.source}" target="_blank" style="${linkStyle}color:#E040FB;border:1px solid rgba(224,64,251,0.4);background:rgba(224,64,251,0.1);">📡 المصدر</a>` : ''}
         </div>
       </div>`);
     });
@@ -1510,24 +1553,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         `<div><span style="color:#5C5A54;">${label}</span><br/><span style="color:${color};">${value}</span></div>`;
 
       const ref = p.sourceUrl
-        ? `<a href="${htmlEsc(p.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1A;">REFERENCE</a>`
+        ? `<a href="${htmlEsc(p.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1A;">المرجع</a>`
         : '';
 
       popup(coords, `<div style="${pStyle}border:1px solid ${accent}4D;">
-        <div style="color:${accent};font-size:14px;font-weight:700;margin-bottom:2px;">☢️ ${htmlEsc(p.name || 'Nuclear Facility')}</div>
+        <div style="color:${accent};font-size:14px;font-weight:700;margin-bottom:2px;">☢️ ${htmlEsc(p.name || 'منشأة نووية')}</div>
         <div style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;margin-bottom:10px;">${htmlEsc([p.city, p.country].filter(Boolean).join(', ')) || '—'}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 6px;font-size:9px;">
-          ${row('STATUS', htmlEsc(status) || '—', accent)}
-          ${row('OWNER', htmlEsc(p.owner) || '—')}
-          ${row('REACTORS', p.reactors ? htmlEsc(p.reactors) : '—', accent)}
-          ${row('CAPACITY', p.capacityMW ? `${Number(p.capacityMW).toLocaleString()} MWe` : '—')}
+          ${row('الحالة', arEnum(status, 'غير محددة'), accent)}
+          ${row('المالك', htmlEsc(p.owner) || '—')}
+          ${row('المفاعلات', p.reactors ? htmlEsc(p.reactors) : '—', accent)}
+          ${row('القدرة', p.capacityMW ? `${Number(p.capacityMW).toLocaleString()} MWe` : '—')}
         </div>
         <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);font-size:9px;color:#5C5A54;">
           ${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${ref}
-          <a href="https://www.google.com/maps/@${coords[1]},${coords[0]},14z/data=!3m1!1e3" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#8A8880;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);">SATELLITE</a>
+          <a href="https://www.google.com/maps/@${coords[1]},${coords[0]},14z/data=!3m1!1e3" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#8A8880;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);">عرض القمر الصناعي</a>
         </div>
       </div>`);
     });
@@ -1538,22 +1581,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       if (!p) return;
       const coords = (e.features![0].geometry as any).coordinates;
       const typeColor = p.type === 'naval' ? '#FF3D3D' : p.type === 'energy' ? '#FF9500' : '#00BCD4';
-      const typeLabel = p.type === 'naval' ? 'NAVAL BASE' : p.type === 'energy' ? 'ENERGY PORT' : 'CONTAINER PORT';
+      const typeLabel = p.type === 'naval' ? 'قاعدة بحرية' : p.type === 'energy' ? 'ميناء طاقة' : 'ميناء حاويات';
 
       const congestionHtml = p.congestion ? `
         <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.1);">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
-            <div><span style="color:#5C5A54;font-size:9px;">CONGESTION</span><br/><span style="color:${p.congestion === 'SEVERE' ? '#FF1744' : p.congestion === 'CONGESTED' ? '#FF9500' : '#00E676'};font-weight:bold;font-size:10px;">${p.congestion}</span></div>
-            <div><span style="color:#5C5A54;font-size:9px;">EST. DWELL TIME</span><br/><span style="color:#E8E6E0;font-weight:bold;font-size:10px;">${p.dwell_time || 'Unknown'}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">الازدحام</span><br/><span style="color:${p.congestion === 'SEVERE' ? '#FF1744' : p.congestion === 'CONGESTED' ? '#FF9500' : '#00E676'};font-weight:bold;font-size:10px;">${arEnum(p.congestion)}</span></div>
+            <div><span style="color:#5C5A54;font-size:9px;">زمن الانتظار التقديري</span><br/><span style="color:#E8E6E0;font-weight:bold;font-size:10px;">${p.dwell_time || 'غير معروف'}</span></div>
           </div>
         </div>` : '';
 
       popup(coords, `<div style="${pStyle}border:1px solid ${typeColor}40;">
         <div style="color:${typeColor};font-weight:bold;font-size:11px;margin-bottom:4px;">${p.name}</div>
         <div style="color:#999;font-size:9px;margin-bottom:6px;">${typeLabel} — ${p.country}</div>
-        ${p.volume ? `<div style="font-size:9px;color:#aaa;">Volume: <span style="color:${typeColor};font-weight:bold;">${p.volume}</span></div>` : ''}
-        ${p.fleet ? `<div style="font-size:9px;color:#aaa;">Fleet: <span style="color:${typeColor};font-weight:bold;">${p.fleet}</span></div>` : ''}
-        ${p.rank ? `<div style="font-size:9px;color:#aaa;">Global Rank: <span style="color:${typeColor};font-weight:bold;">#${p.rank}</span></div>` : ''}
+        ${p.volume ? `<div style="font-size:9px;color:#aaa;">الحجم: <span style="color:${typeColor};font-weight:bold;">${p.volume}</span></div>` : ''}
+        ${p.fleet ? `<div style="font-size:9px;color:#aaa;">الأسطول: <span style="color:${typeColor};font-weight:bold;">${p.fleet}</span></div>` : ''}
+        ${p.rank ? `<div style="font-size:9px;color:#aaa;">الترتيب العالمي: <span style="color:${typeColor};font-weight:bold;">#${p.rank}</span></div>` : ''}
         ${congestionHtml}
       </div>`);
     });
@@ -1566,8 +1609,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const riskCol = p.risk === 'CRITICAL' ? '#FF1744' : p.risk === 'HIGH' ? '#FF9500' : p.risk === 'ELEVATED' ? '#FFD700' : '#00E676';
       popup(coords, `<div style="${pStyle}border:1px solid ${riskCol}40;">
         <div style="color:#FF9500;font-weight:bold;font-size:11px;margin-bottom:4px;">${p.name}</div>
-        <div style="font-size:9px;color:#aaa;">Traffic: <span style="color:#fff;">${p.traffic}</span></div>
-        <div style="font-size:9px;color:#aaa;">Risk: <span style="color:${riskCol};font-weight:bold;">${p.risk}</span></div>
+        <div style="font-size:9px;color:#aaa;">الحركة: <span style="color:#fff;">${p.traffic}</span></div>
+        <div style="font-size:9px;color:#aaa;">المخاطر: <span style="color:${riskCol};font-weight:bold;">${arEnum(p.risk)}</span></div>
       </div>`);
     });
 
@@ -1669,10 +1712,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         if (!map.hasImage(id)) return;
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext('2d')!;
-        const cx = size / 2, cy = size / 2;
-        ctx.fillStyle = color;
-        ctx.beginPath();
+    const ctx = canvas.getContext('2d')!;
+    const cx = size / 2, cy = size / 2;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(255,255,255,0.72)';
+    ctx.lineWidth = Math.max(1, size * 0.055);
+    ctx.shadowColor = 'rgba(0,0,0,0.72)';
+    ctx.shadowBlur = Math.max(2, size * 0.14);
+    ctx.shadowOffsetY = 1;
+    ctx.beginPath();
         ctx.moveTo(cx, cy - size * 0.4);
         ctx.lineTo(cx - size * 0.12, cy + size * 0.1);
         ctx.lineTo(cx - size * 0.4, cy + size * 0.2);
@@ -1683,8 +1731,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         ctx.lineTo(cx + size * 0.4, cy + size * 0.3);
         ctx.lineTo(cx + size * 0.4, cy + size * 0.2);
         ctx.lineTo(cx + size * 0.12, cy + size * 0.1);
-        ctx.closePath();
-        ctx.fill();
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
         map.updateImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
       };
 
@@ -2074,7 +2124,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             source: 'Global Subsea Cable Network',
             url: 'https://www.submarinecablemap.com/',
             ...cable.properties,
-            color: '#1976D2', // Darker blue as requested, more transparent in layer paint
+            color: '#1976D2', // Darker blue as requested, with extra transparency in layer paint
           },
         });
       }
@@ -2106,9 +2156,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
           properties: {
-            label: z.label,
+            label: z.labelAr || z.label,
             severity: z.severity,
-            description: `${z.description}${z.eventCount > 0 ? ` [${z.eventCount} live events detected]` : ''}`,
+            description: `${z.descriptionAr || z.description}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
             sourceUrl: z.sourceUrl,
             eventCount: z.eventCount,
           },
@@ -2121,9 +2171,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             type: 'Feature' as const,
             geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
             properties: {
-              label: (e.title || 'CONFLICT EVENT').substring(0, 60).toUpperCase(),
+              label: 'بلاغ نزاع مرصود',
               severity: 'war',
-              description: e.title || 'Live conflict event detected by GDELT.',
+              description: 'بلاغ عام مرتبط بمنطقة نزاع. افتح المصدر للاطلاع على النص الأصلي.',
               sourceUrl: e.url || '',
             },
           }));
@@ -2132,12 +2182,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       } catch (e) {
         // Fallback: if API fails, use minimal known zones
         const FALLBACK_ZONES = [
-          { label: 'UKRAINE WAR', severity: 'war', lat: 48.5, lng: 31.2, description: 'Ongoing Russian invasion of Ukraine.', sourceUrl: 'https://liveuamap.com/' },
-          { label: 'GAZA CONFLICT', severity: 'war', lat: 31.35, lng: 34.35, description: 'Active military operations in Gaza.', sourceUrl: 'https://israelpalestine.liveuamap.com/' },
-          { label: 'SUDAN CIVIL WAR', severity: 'war', lat: 15.0, lng: 30.0, description: 'SAF vs RSF armed conflict.', sourceUrl: 'https://sudan.liveuamap.com/' },
-          { label: 'YEMEN WAR', severity: 'war', lat: 15.5, lng: 48.0, description: 'Houthi operations and Red Sea threats.', sourceUrl: 'https://yemen.liveuamap.com/' },
-          { label: 'MYANMAR CONFLICT', severity: 'war', lat: 19.5, lng: 96.5, description: 'Military junta vs opposition forces.', sourceUrl: 'https://myanmar.liveuamap.com/' },
-          { label: 'SYRIA', severity: 'high', lat: 35.0, lng: 38.5, description: 'Ongoing civil conflict.', sourceUrl: 'https://syria.liveuamap.com/' },
+          { label: 'الحرب في أوكرانيا', severity: 'war', lat: 48.5, lng: 31.2, description: 'منطقة نزاع مسلح مستمر وفق المصادر العامة.', sourceUrl: 'https://liveuamap.com/' },
+          { label: 'نزاع غزة', severity: 'war', lat: 31.35, lng: 34.35, description: 'منطقة نزاع وأزمة إنسانية وفق المصادر العامة.', sourceUrl: 'https://israelpalestine.liveuamap.com/' },
+          { label: 'الحرب في السودان', severity: 'war', lat: 15.0, lng: 30.0, description: 'نزاع مسلح مستمر وفق المصادر العامة.', sourceUrl: 'https://sudan.liveuamap.com/' },
+          { label: 'نزاع اليمن', severity: 'war', lat: 15.5, lng: 48.0, description: 'نزاع مستمر ومخاطر إقليمية وبحرية وفق المصادر العامة.', sourceUrl: 'https://yemen.liveuamap.com/' },
+          { label: 'نزاع ميانمار', severity: 'war', lat: 19.5, lng: 96.5, description: 'نزاع داخلي مستمر وفق المصادر العامة.', sourceUrl: 'https://myanmar.liveuamap.com/' },
+          { label: 'نزاع سوريا', severity: 'high', lat: 35.0, lng: 38.5, description: 'نزاع داخلي وبلاغات أمنية متفرقة وفق المصادر العامة.', sourceUrl: 'https://syria.liveuamap.com/' },
         ];
         const fallbackFeatures = FALLBACK_ZONES.map(z => ({
           type: 'Feature' as const,

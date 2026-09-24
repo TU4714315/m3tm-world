@@ -110,6 +110,7 @@ const CELESTRAK_GROUPS = [
   // Other NOAA
   `${CT}nnss${FMT}`, `${CT}musson${FMT}`,
 ];
+const CELESTRAK_MILITARY_GROUP_INDEX = CELESTRAK_GROUPS.findIndex(url => url.includes('GROUP=military'));
 
 // SatNOGS Open API - Fallback source
 const SATNOGS_API = 'https://db.satnogs.org/api/tle/?format=json';
@@ -194,7 +195,12 @@ export async function GET() {
     let allSats: any[] = globalCachedSats;
     let source = 'memory-cache';
 
-    if (globalCachedSats.length === 0 || globalCachedSats.length < 5000 || nowTime - globalCacheTime > 3600000) { // refresh if empty, too few, or stale
+    if (
+      globalCachedSats.length === 0 ||
+      globalCachedSats.length < 5000 ||
+      nowTime - globalCacheTime > 3600000 ||
+      globalCachedSats.some(sat => typeof sat.sensitiveMilitary !== 'boolean')
+    ) { // refresh if empty, too few, stale, or from a pre-safety cache
       
       // Primary: Fetch multiple CelesTrak groups in parallel
       const groupResults = await Promise.allSettled(
@@ -203,6 +209,14 @@ export async function GET() {
       
       const seen = new Set<string>();
       const merged: { name: string; line1: string; line2: string }[] = [];
+      const sensitiveMilitaryIds = new Set<string>();
+
+      const militaryResult = groupResults[CELESTRAK_MILITARY_GROUP_INDEX];
+      if (militaryResult?.status === 'fulfilled') {
+        for (const sat of militaryResult.value) {
+          sensitiveMilitaryIds.add(sat.line1.substring(2, 7).trim());
+        }
+      }
       
       // 1. Add all newly fetched satellites
       for (const result of groupResults) {
@@ -211,7 +225,7 @@ export async function GET() {
             const noradId = sat.line1.substring(2, 7).trim();
             if (!seen.has(noradId)) {
               seen.add(noradId);
-              merged.push(sat);
+              merged.push({ ...sat, sensitiveMilitary: sensitiveMilitaryIds.has(noradId) } as any);
             }
           }
         }
@@ -223,7 +237,7 @@ export async function GET() {
         const noradId = sat.line1.substring(2, 7).trim();
         if (!seen.has(noradId)) {
           seen.add(noradId);
-          merged.push(sat);
+          merged.push({ ...sat, sensitiveMilitary: Boolean(sat.sensitiveMilitary) || sensitiveMilitaryIds.has(noradId) } as any);
           backfilled++;
         }
       }
@@ -298,7 +312,8 @@ export async function GET() {
       const upperName = sat.name.toUpperCase();
       
       // Debris detection
-      if (upperName.includes(' DEB') || upperName.includes('DEBRIS') || upperName.includes(' R/B')) {
+      if (sat.sensitiveMilitary === true) category = 'military';
+      else if (upperName.includes(' DEB') || upperName.includes('DEBRIS') || upperName.includes(' R/B')) {
         category = 'other'; // debris goes to "other" category
       } else if (m === 'Commercial Comms' || m === 'Commercial Imaging') category = 'comms';
       else if (m === 'Navigation') category = 'navigation';
@@ -318,19 +333,25 @@ export async function GET() {
       });
     }
 
-    const cacheControl = satellites.length < 10 
-      ? 'no-store, max-age=0' 
+    // Public WORLD exposes only explicitly public-safe mission families. Unknown
+    // objects are intentionally excluded because name-based classification alone
+    // cannot prove that an unlabelled active-catalog object is non-sensitive.
+    const publicSafeCategories = new Set(['comms', 'navigation', 'earth_obs', 'science']);
+    const publicSatellites = satellites.filter((satellite) => publicSafeCategories.has(satellite.category));
+
+    const cacheControl = publicSatellites.length < 10
+      ? 'no-store, max-age=0'
       : 'public, s-maxage=120, stale-while-revalidate=300';
 
     // Count by category
     const categoryCounts: Record<string, number> = {};
-    for (const s of satellites) {
+    for (const s of publicSatellites) {
       categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
     }
 
     return NextResponse.json({
-      satellites,
-      total: satellites.length,
+      satellites: publicSatellites,
+      total: publicSatellites.length,
       category_counts: categoryCounts,
       source,
       raw_count: allSats.length,

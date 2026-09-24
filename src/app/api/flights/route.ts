@@ -453,8 +453,10 @@ export async function GET() {
       commercial_flights: commercial,
       private_flights:    privateFl,
       private_jets:       jets,
-      military_flights:   military,
-      gps_jamming:        aggregateJamming(gpsJamming, JAMMING_NACAP_THRESHOLD),
+      // Precise military tracks and live interference indicators are not part
+      // of the public WORLD contract. Keep classification server-side only.
+      military_flights:   [],
+      gps_jamming:        [],
       total:              allRaw.length,
       source,
       // Per-feed counts so a provider that starts answering 200 with no aircraft

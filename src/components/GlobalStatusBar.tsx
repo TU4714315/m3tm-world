@@ -196,7 +196,7 @@ export default function GlobalStatusBar() {
                     onMouseLeave={() => setHoveredQuake(null)}
                   >
                     <span className="text-[#FF5722] text-[9px]">🔴</span>
-                    <span className="text-[#FF5722] font-bold">M{quake.magnitude.toFixed(1)}</span>
+                    <span className="text-[#FF5722] font-bold">قوة {quake.magnitude.toFixed(1)}</span>
                     <span className="text-white/30 truncate max-w-[140px]">{quake.place}</span>
                   </span>
                 ))}
@@ -230,8 +230,8 @@ export default function GlobalStatusBar() {
               {hoveredQuake.place}
             </div>
             <div className="flex flex-col gap-1 text-[10px]">
-              <div className="text-white/50"><span className="text-white/30">العمق:</span> {hoveredQuake.depth} km</div>
-              <div className="text-white/50 mt-1"><span className="text-white/30">الوقت:</span> {new Date(hoveredQuake.time).toLocaleString()}</div>
+              <div className="text-white/50"><span className="text-white/30">العمق:</span> {hoveredQuake.depth} كم</div>
+              <div className="text-white/50 mt-1"><span className="text-white/30">الوقت:</span> {new Date(hoveredQuake.time).toLocaleString('ar-SA')}</div>
             </div>
           </div>
         </div>

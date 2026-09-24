@@ -259,7 +259,7 @@ export default function NavigationView({
       {/* ── the turn after this one ── */}
       {progress && !arrived && route.steps[progress.stepIndex + 1] && (
         <div className="glass-panel px-4 py-2 flex items-center gap-3">
-          <span className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-muted)] flex-shrink-0">Then</span>
+          <span className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-muted)] flex-shrink-0">ثم</span>
           <ManeuverIcon type={route.steps[progress.stepIndex + 1].type} className="w-4 h-4" />
           <span className="text-[11px] text-[var(--text-secondary)] truncate">
             {route.steps[progress.stepIndex + 1].instruction}

@@ -244,7 +244,7 @@ function Tile({ cam: camera, onOpen }: { cam: PreviewCamera; onOpen: (cam: Previ
 
         <div className="pointer-events-none absolute left-1.5 top-1.5 flex items-center gap-1 bg-black/70 px-1 py-[1px]">
           <span className="h-1 w-1 rounded-full bg-[var(--alert-red)] animate-pulse" />
-          <span className="font-mono text-[7px] tracking-[0.18em] text-white/75">LIVE</span>
+          <span className="font-mono text-[7px] tracking-[0.18em] text-white/75">مباشر</span>
         </div>
 
         {/* Hover only: the tile is already a button, this says what it opens. */}
@@ -253,7 +253,7 @@ function Tile({ cam: camera, onOpen }: { cam: PreviewCamera; onOpen: (cam: Previ
           style={{ color: CAM }}
         >
           <Maximize2 className="h-2 w-2" />
-          <span className="font-mono text-[7px] tracking-[0.18em]">OPEN</span>
+          <span className="font-mono text-[7px] tracking-[0.18em]">فتح</span>
         </div>
 
         {!loaded && (

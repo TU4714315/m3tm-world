@@ -44,10 +44,10 @@ const EARTH_RADIUS_KM = 6371;
  * labelling it one would be worse than saying nothing.
  */
 function regime(altKm: number): { label: string; note: string } {
-  if (altKm < 2000) return { label: 'LEO', note: 'Low Earth orbit' };
-  if (altKm < 35000) return { label: 'MEO', note: 'Medium Earth orbit' };
-  if (altKm <= 36500) return { label: 'GEO', note: 'Geostationary belt' };
-  return { label: 'HEO', note: 'High / highly elliptical' };
+  if (altKm < 2000) return { label: 'LEO', note: 'مدار أرضي منخفض' };
+  if (altKm < 35000) return { label: 'MEO', note: 'مدار أرضي متوسط' };
+  if (altKm <= 36500) return { label: 'GEO', note: 'حزام ثابت بالنسبة للأرض' };
+  return { label: 'HEO', note: 'مدار عالٍ / شديد الإهليلجية' };
 }
 
 /** Circular-orbit speed implied by the period; the point of it is scale, not precision. */
@@ -56,10 +56,23 @@ function speedKmS(altKm: number, periodMinutes: number): number {
 }
 
 function period(minutes: number): string {
-  if (minutes < 100) return `${minutes.toFixed(1)} min`;
+  if (minutes < 100) return `${minutes.toFixed(1)} د`;
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes - h * 60);
-  return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${h} س ${String(m).padStart(2, '0')} د`;
+}
+
+function missionAr(mission?: string): string {
+  const labels: Record<string, string> = {
+    'Military Recon': 'استطلاع عسكري', 'NRO Classified': 'مهمة مصنفة',
+    'SAR Imaging': 'تصوير راداري', Communications: 'اتصالات', Navigation: 'ملاحة',
+    'Early Warning': 'إنذار مبكر', 'Commercial Comms': 'اتصالات تجارية',
+    'Earth Imaging': 'تصوير الأرض', 'Commercial Imaging': 'تصوير تجاري',
+    'Space Station': 'محطة فضائية', 'Russian Military': 'عسكري روسي',
+    'Chinese Recon': 'استطلاع صيني', Weather: 'طقس', 'Earth Observation': 'رصد الأرض',
+    'Earth Science': 'علوم الأرض', 'Space Telescope': 'تلسكوب فضائي', Unknown: 'مهمة غير معروفة',
+  };
+  return labels[String(mission ?? '')] ?? mission ?? 'مهمة غير معروفة';
 }
 
 /** Only a literal hex colour reaches an inline style. */
@@ -91,7 +104,7 @@ export default function SatelliteCard({ sat, onClose }: { sat: SatelliteDetail; 
       className="pointer-events-auto absolute left-2 right-2 top-16 z-[350] overflow-hidden rounded-lg border bg-[var(--bg-panel)] shadow-[0_6px_20px_rgba(0,0,0,0.45)] backdrop-blur-2xl md:left-[72px] md:right-auto md:top-[88px] md:w-[248px]"
       style={{ borderColor: `${accent}33` }}
       role="dialog"
-      aria-label={`Satellite ${sat.name}`}
+      aria-label={`القمر الصناعي ${sat.name}`}
     >
       {/* A rule in the satellite's own colour, matching its marker and its track. */}
       <div className="h-px w-full" style={{ background: `${accent}99` }} />
@@ -103,43 +116,43 @@ export default function SatelliteCard({ sat, onClose }: { sat: SatelliteDetail; 
             {sat.name}
           </div>
           <div className="truncate text-[9px] font-mono tracking-[0.12em] text-[var(--text-secondary)]">
-            {sat.mission || 'Unknown mission'}
+            {missionAr(sat.mission)}
           </div>
         </div>
         <button
           onClick={onClose}
           className="-mr-1 -mt-1 flex-shrink-0 rounded-md p-1 text-[var(--text-muted)] transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50"
-          aria-label="Clear satellite selection"
-          title="Clear selection (Esc)"
+          aria-label="إلغاء تحديد القمر الصناعي"
+          title="إلغاء التحديد (Esc)"
         >
           <X className="h-3 w-3" />
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-x-2.5 gap-y-2 px-2.5 py-2.5">
-        <Field label="ALTITUDE" value={`${Math.round(sat.alt).toLocaleString()} km`} color="var(--cyan-primary)" />
-        <Field label="ORBIT" value={shell.label} color={accent} />
+        <Field label="الارتفاع" value={`${Math.round(sat.alt).toLocaleString()} كم`} color="var(--cyan-primary)" />
+        <Field label="المدار" value={shell.label} color={accent} />
         <Field
-          label="PERIOD"
+          label="الفترة"
           value={sat.periodMinutes ? period(sat.periodMinutes) : '—'}
         />
         <Field
-          label="SPEED"
-          value={sat.periodMinutes ? `${speedKmS(sat.alt, sat.periodMinutes).toFixed(2)} km/s` : '—'}
+          label="السرعة"
+          value={sat.periodMinutes ? `${speedKmS(sat.alt, sat.periodMinutes).toFixed(2)} كم/ث` : '—'}
         />
-        <Field label="LATITUDE" value={`${sat.lat.toFixed(3)}°`} />
-        <Field label="LONGITUDE" value={`${sat.lng.toFixed(3)}°`} />
-        <Field label="NORAD ID" value={sat.noradId || '—'} />
-        <Field label="CLASS" value={shell.note} />
+        <Field label="خط العرض" value={`${sat.lat.toFixed(3)}°`} />
+        <Field label="خط الطول" value={`${sat.lng.toFixed(3)}°`} />
+        <Field label="معرّف NORAD" value={sat.noradId || '—'} />
+        <Field label="الفئة" value={shell.note} />
       </div>
 
       {/* What the globe is showing, so a missing track reads as a known state
           rather than as the selection having silently failed. */}
       <div className="flex items-center gap-1.5 border-t border-[var(--border-secondary)] px-2.5 py-1.5 text-[8px] font-mono tracking-[0.12em] text-[var(--text-muted)]">
         <Orbit className="h-2.5 w-2.5" />
-        {sat.track === 'loading' && <span>PLOTTING ORBIT…</span>}
-        {sat.track === 'ready' && <span style={{ color: accent }}>ORBIT TRACK ON GLOBE</span>}
-        {sat.track === 'unavailable' && <span>NO TRACK — TLE UNAVAILABLE</span>}
+        {sat.track === 'loading' && <span>جارٍ رسم المدار…</span>}
+        {sat.track === 'ready' && <span style={{ color: accent }}>المسار المداري ظاهر على الكرة</span>}
+        {sat.track === 'unavailable' && <span>المسار غير متاح — بيانات TLE غير متوفرة</span>}
       </div>
 
       {sat.noradId && (
@@ -150,7 +163,7 @@ export default function SatelliteCard({ sat, onClose }: { sat: SatelliteDetail; 
           className="flex items-center justify-center gap-1.5 border-t px-2.5 py-2 text-[9px] font-mono tracking-[0.15em] transition-colors"
           style={{ borderColor: 'var(--border-secondary)', color: accent, background: `${accent}0a` }}
         >
-          TRACK ON N2YO <ExternalLink className="h-2.5 w-2.5" />
+          تتبع عبر N2YO <ExternalLink className="h-2.5 w-2.5" />
         </a>
       )}
     </div>

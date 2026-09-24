@@ -21,7 +21,20 @@ export const dynamic = 'force-dynamic';
 
 const CACHE_FILE = join(process.cwd(), '.next', 'cache', 'satellites-tle-cache.json');
 
-interface Tle { name: string; line1: string; line2: string }
+interface Tle { name: string; line1: string; line2: string; sensitiveMilitary?: boolean }
+
+const PUBLIC_SAFE_NAME_HINTS = [
+  'STARLINK', 'ONEWEB', 'PLANET', 'WORLDVIEW',
+  'GPS', 'NAVSTAR', 'GLONASS', 'GALILEO', 'BEIDOU',
+  'FENGYUN', 'GOES', 'NOAA', 'METEOSAT', 'LANDSAT', 'SENTINEL', 'TERRA', 'AQUA',
+  'ISS', 'TIANGONG', 'HUBBLE', 'JAMES WEBB',
+];
+
+function isPublicSafeTle(tle: Tle): boolean {
+  if (tle.sensitiveMilitary === true) return false;
+  const upper = String(tle.name ?? '').toUpperCase();
+  return PUBLIC_SAFE_NAME_HINTS.some(hint => upper.includes(hint));
+}
 
 let cache: { at: number; byNorad: Map<string, Tle> } | null = null;
 const CACHE_TTL_MS = 5 * 60_000;
@@ -38,7 +51,9 @@ function catalogue(): Map<string, Tle> {
     if (existsSync(CACHE_FILE)) {
       const parsed = JSON.parse(readFileSync(CACHE_FILE, 'utf8')) as { sats?: Tle[] };
       for (const sat of parsed.sats ?? []) {
-        if (sat?.line1 && sat?.line2) byNorad.set(noradOf(sat.line1), sat);
+        if (sat?.line1 && sat?.line2 && isPublicSafeTle(sat)) {
+          byNorad.set(noradOf(sat.line1), sat);
+        }
       }
     }
   } catch {
