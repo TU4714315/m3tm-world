@@ -117,6 +117,24 @@ const KNOWN_CONFLICTS = [
     bounds: { minLat: 3, maxLat: 15, minLng: 33, maxLng: 48 } },
 ];
 
+const CONFLICT_ARABIC: Record<string, { label: string; description: string }> = {
+  ukraine: { label: 'الحرب في أوكرانيا', description: 'منطقة نزاع مسلح مستمر في أوكرانيا وفق البلاغات والمصادر العامة.' },
+  gaza: { label: 'نزاع غزة', description: 'منطقة نزاع وأزمة إنسانية في قطاع غزة وفق البلاغات والمصادر العامة.' },
+  lebanon: { label: 'الحدود اللبنانية', description: 'بلاغات عامة عن توتر وعمليات عسكرية عبر الحدود في جنوب لبنان.' },
+  sudan: { label: 'الحرب في السودان', description: 'نزاع مسلح مستمر بين أطراف سودانية وفق المصادر العامة.' },
+  myanmar: { label: 'نزاع ميانمار', description: 'نزاع داخلي مستمر بين السلطة العسكرية وقوى معارضة وفق المصادر العامة.' },
+  yemen: { label: 'نزاع اليمن', description: 'نزاع مستمر وبلاغات عن مخاطر إقليمية وبحرية مرتبطة باليمن.' },
+  syria: { label: 'نزاع سوريا', description: 'نزاع داخلي وبلاغات أمنية متفرقة في سوريا وفق المصادر العامة.' },
+  drc: { label: 'شرق الكونغو الديمقراطية', description: 'نزاع مسلح واضطراب إقليمي في شرق الكونغو الديمقراطية.' },
+  'red-sea': { label: 'مخاطر البحر الأحمر', description: 'بلاغات عامة عن مخاطر واعتداءات تؤثر في الملاحة بالبحر الأحمر.' },
+  'taiwan-strait': { label: 'مضيق تايوان', description: 'توتر إقليمي وتدريبات معلنة في محيط مضيق تايوان.' },
+  'korean-dmz': { label: 'المنطقة المنزوعة السلاح الكورية', description: 'توتر مستمر وبلاغات عامة على الحدود بين الكوريتين.' },
+  sahel: { label: 'اضطرابات الساحل', description: 'نزاعات واضطرابات أمنية وسياسية متفرقة في منطقة الساحل.' },
+  somalia: { label: 'الصومال', description: 'نزاع وعمليات أمنية مستمرة في الصومال وفق المصادر العامة.' },
+  iraq: { label: 'اضطرابات العراق', description: 'بلاغات عامة عن نشاط مسلح واضطرابات أمنية متفرقة في العراق.' },
+  ethiopia: { label: 'إثيوبيا', description: 'توترات ونزاعات إقليمية متفرقة في إثيوبيا وفق المصادر العامة.' },
+};
+
 // Parse GDELT DOC pointdata CSV response into events
 function parsePointDataCSV(csv: string): ConflictEvent[] {
   const events: ConflictEvent[] = [];
@@ -286,10 +304,12 @@ export async function GET() {
       return {
         id: zone.id,
         label: zone.label,
+        labelAr: CONFLICT_ARABIC[zone.id]?.label ?? zone.label,
         severity: zone.severity,
         lat: zone.lat,
         lng: zone.lng,
         description: zone.description,
+        descriptionAr: CONFLICT_ARABIC[zone.id]?.description ?? zone.description,
         sourceUrl: zone.sourceUrl,
         region: zone.region,
         events: zoneEvents.slice(0, 20),
@@ -319,10 +339,12 @@ export async function GET() {
     const fallbackZones = KNOWN_CONFLICTS.map(zone => ({
       id: zone.id,
       label: zone.label,
+      labelAr: CONFLICT_ARABIC[zone.id]?.label ?? zone.label,
       severity: zone.severity,
       lat: zone.lat,
       lng: zone.lng,
       description: zone.description,
+      descriptionAr: CONFLICT_ARABIC[zone.id]?.description ?? zone.description,
       sourceUrl: zone.sourceUrl,
       region: zone.region,
       events: [],

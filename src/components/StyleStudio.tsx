@@ -87,7 +87,7 @@ function AutoSlider({ label, value, min, max, step, whenEnabled, onChange, forma
       <button
         onClick={() => onChange(auto ? whenEnabled : null)}
         aria-pressed={auto}
-        title={auto ? `${label}: following the app's own styling` : `${label}: overridden`}
+        title={auto ? `${label}: يتبع تنسيق التطبيق` : `${label}: قيمة مخصصة`}
         className={`px-1.5 py-0.5 rounded text-[8px] font-mono tracking-wider border transition-colors shrink-0 ${
           auto
             ? 'border-[var(--border-active)] bg-[var(--gold-primary)]/15 text-[var(--gold-light)]'
@@ -105,7 +105,7 @@ function AutoSlider({ label, value, min, max, step, whenEnabled, onChange, forma
         className={`min-w-0 flex-1 h-1 appearance-none rounded-full bg-white/10 accent-[var(--gold-primary)] ${auto ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
       />
       <span className="text-[10px] font-mono tabular-nums text-white/40 w-9 text-right">
-        {auto ? 'auto' : format(value)}
+        {auto ? 'تلقائي' : format(value)}
       </span>
     </div>
   );
@@ -161,8 +161,8 @@ function ResettableSwatch({ label, value, fallback, onChange }: {
     <div className="flex items-center gap-1.5">
       <button
         onClick={() => onChange(fallback)}
-        title={`Restore the default ${label.toLowerCase()}`}
-        aria-label={`Restore default ${label}`}
+        title={`استعادة القيمة الافتراضية لـ ${label.toLowerCase()}`}
+        aria-label={`استعادة الافتراضي: ${label}`}
         className={`w-5 h-5 rounded flex items-center justify-center transition-opacity ${
           changed ? 'text-white/35 hover:text-white/80 hover:bg-white/5' : 'opacity-0 pointer-events-none'
         }`}
@@ -358,7 +358,6 @@ function StyleStudio({ onClose, isMobile }: { onClose: () => void; isMobile?: bo
 
           <SubHead label="الأقمار الصناعية" note="الإعداد الافتراضي يحافظ على لون كل فئة. تغيير اللون يطبقه على الفئة كاملة." />
           <Row label="اتصالات"><ResettableSwatch label="لون أقمار الاتصالات" value={s.map.satComms} fallback={MAP_DEFAULTS.satComms} onChange={v => setMap('satComms', v)} /></Row>
-          <Row label="عسكرية"><ResettableSwatch label="لون الأقمار العسكرية" value={s.map.satMilitary} fallback={MAP_DEFAULTS.satMilitary} onChange={v => setMap('satMilitary', v)} /></Row>
           <Row label="ملاحة"><ResettableSwatch label="لون أقمار الملاحة" value={s.map.satNavigation} fallback={MAP_DEFAULTS.satNavigation} onChange={v => setMap('satNavigation', v)} /></Row>
           <Row label="رصد الأرض"><ResettableSwatch label="لون أقمار رصد الأرض" value={s.map.satEarth} fallback={MAP_DEFAULTS.satEarth} onChange={v => setMap('satEarth', v)} /></Row>
           <Row label="علمية"><ResettableSwatch label="لون الأقمار العلمية" value={s.map.satScience} fallback={MAP_DEFAULTS.satScience} onChange={v => setMap('satScience', v)} /></Row>
@@ -368,13 +367,13 @@ function StyleStudio({ onClose, isMobile }: { onClose: () => void; isMobile?: bo
           <Row label="مدنية"><ResettableSwatch label="لون الطائرات المدنية" value={s.map.flightCivil} fallback={MAP_DEFAULTS.flightCivil} onChange={v => setMap('flightCivil', v)} /></Row>
           <Row label="خاصة"><ResettableSwatch label="لون الطائرات الخاصة" value={s.map.flightPrivate} fallback={MAP_DEFAULTS.flightPrivate} onChange={v => setMap('flightPrivate', v)} /></Row>
           <Row label="حكومية"><ResettableSwatch label="لون الطائرات الحكومية" value={s.map.flightGov} fallback={MAP_DEFAULTS.flightGov} onChange={v => setMap('flightGov', v)} /></Row>
-          <Row label="عسكرية"><ResettableSwatch label="لون الطائرات العسكرية" value={s.map.flightMilitary} fallback={MAP_DEFAULTS.flightMilitary} onChange={v => setMap('flightMilitary', v)} /></Row>
           <Row label="غير مصنفة"><ResettableSwatch label="لون الطائرات غير المصنفة" value={s.map.flightUnknown} fallback={MAP_DEFAULTS.flightUnknown} onChange={v => setMap('flightUnknown', v)} /></Row>
         </Section>
 
         <Section title="السطح">
           <Row label="الخلفية"><Swatch label="لون الخلفية" value={s.bg} onChange={setBg} /></Row>
           <Row label="اللوحات"><Slider label="شفافية اللوحات" value={s.panelAlpha} min={0.2} max={1} step={0.01} onChange={v => set('panelAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
+          <Row label="شريط الجوال"><Slider label="عتامة شريط الجوال" value={s.mobileNavAlpha} min={0.15} max={0.95} step={0.01} onChange={v => set('mobileNavAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
           <Row label="الحدود"><Slider label="قوة الحدود" value={s.borderAlpha} min={0} max={0.6} step={0.01} onChange={v => set('borderAlpha', v)} format={v => `${Math.round(v * 100)}%`} /></Row>
           <Row label="التمويه"><AutoSlider label="تمويه الخلفية" value={s.blur} min={0} max={64} step={1} whenEnabled={24} onChange={v => set('blur', v)} format={v => `${v}px`} /></Row>
           <Row label="الزوايا"><Slider label="استدارة الزوايا" value={s.radius} min={0} max={2.5} step={0.05} onChange={v => set('radius', v)} format={v => `${v.toFixed(2)}x`} /></Row>

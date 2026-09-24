@@ -242,7 +242,9 @@ function buildSnapshot(now: number): string {
     }
   }
 
-  const ships = Array.from(shipsCache.values());
+  // Public WORLD never exposes military-class AIS tracks.
+  const ships = Array.from(shipsCache.values()).filter(ship => ship.type !== 'military');
+  const publicPorts = PORTS.filter(port => port.type !== 'naval');
 
   // Dynamically calculate live traffic (Fast approximation of Haversine)
   const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
@@ -251,7 +253,7 @@ function buildSnapshot(now: number): string {
     return Math.sqrt(dx * dx + dy * dy) * 111.32;
   };
 
-  const dynamicPorts = PORTS.map(port => {
+  const dynamicPorts = publicPorts.map(port => {
     let nearbyCount = 0;
     let waitingCount = 0;
 

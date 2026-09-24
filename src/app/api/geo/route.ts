@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
             city: d.city,
             regionName: d.region,
             country: d.country_name,
-            isp: d.org || 'Unknown',
-            org: d.org || 'Unknown',
-            as: d.asn ? `AS${d.asn} ${d.org}` : 'Unknown',
+            isp: d.org || 'غير معروف',
+            org: d.org || 'غير معروف',
+            as: d.asn ? `AS${d.asn} ${d.org}` : 'غير معروف',
           });
         }
       }
@@ -54,15 +54,15 @@ export async function GET(request: NextRequest) {
         if (d.latitude) {
           return NextResponse.json({
             status: 'success',
-            query: d.ipAddress || ip || 'auto',
+            query: d.ipAddress || ip || 'تلقائي',
             lat: d.latitude,
             lon: d.longitude,
-            city: d.cityName || 'Unknown',
-            regionName: d.regionName || 'Unknown',
-            country: d.countryName || 'Unknown',
-            isp: d.isp || 'Unknown',
-            org: d.isp || 'Unknown',
-            as: 'Unknown',
+            city: d.cityName || 'غير معروف',
+            regionName: d.regionName || 'غير معروف',
+            country: d.countryName || 'غير معروف',
+            isp: d.isp || 'غير معروف',
+            org: d.isp || 'غير معروف',
+            as: 'غير معروف',
           });
         }
       }
@@ -85,11 +85,13 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* fall through */ }
 
-    return NextResponse.json({ error: 'All geolocation providers failed' }, { status: 502 });
+    // Geolocation is an optional convenience. A provider outage must not turn a
+    // healthy public WORLD load into a browser-visible 5xx. The client already
+    // requires status === 'success' before moving the camera, so an explicit
+    // unavailable state preserves behavior without inventing a location.
+    return NextResponse.json({ status: 'unavailable', reason: 'تعذر تحديد الموقع تلقائيًا' });
   } catch (e) {
-    return NextResponse.json(
-      { error: 'Failed to reach geolocation service', detail: e instanceof Error ? e.message : String(e) },
-      { status: 503 }
-    );
+    console.warn('[M3TM.WORLD] Geolocation unavailable:', e instanceof Error ? e.message : e);
+    return NextResponse.json({ status: 'unavailable', reason: 'تعذر تحديد الموقع تلقائيًا' });
   }
 }

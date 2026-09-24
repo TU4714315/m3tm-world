@@ -30,6 +30,7 @@ const FALLBACK_FEEDS = {
 };
 
 const RISK_KEYWORDS = ['war','missile','strike','attack','crisis','tension','military','conflict','defense','clash','nuclear','invasion','bomb','drone','weapon','sanctions','ceasefire','escalation', 'killed', 'destroyed', 'operation', 'casualty', 'frontline', 'threat'];
+const M3TM_APP_PUBLIC_NEWS = 'https://m3tm.app/data/news.json';
 
 const KEYWORD_COORDS: Record<string, [number, number]> = {
   'ukraine': [49.487, 31.272], 'kyiv': [50.450, 30.523], 'russia': [61.524, 105.318],
@@ -110,6 +111,68 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 
 export async function GET() {
   try {
+    // M3TM.APP already publishes a sanitized, source-backed Arabic feed. Reuse
+    // that public contract first so the standalone WORLD surface and the APP
+    // embed speak the same language and do not independently reinterpret news.
+    try {
+      const published = await fetch(M3TM_APP_PUBLIC_NEWS, {
+        signal: AbortSignal.timeout(15000),
+        next: { revalidate: 60 },
+      });
+      if (published.ok) {
+        const payload = await published.json() as { items?: unknown; fetchedAt?: unknown };
+        const fetchedAt = typeof payload.fetchedAt === 'string'
+          ? payload.fetchedAt
+          : new Date().toISOString();
+        const rows: Record<string, unknown>[] = Array.isArray(payload.items)
+          ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+          : [];
+        const arabicRows = rows.filter((item) => /[\u0600-\u06FF]/.test(String(item.title || '')));
+        const news = arabicRows.slice(0, 160).map((item) => {
+          const lat = Number(item.latitude);
+          const lng = Number(item.longitude);
+          const hasCoords = Number.isFinite(lat) && Math.abs(lat) <= 90
+            && Number.isFinite(lng) && Math.abs(lng) <= 180;
+          const severityScore: Record<string, number> = {
+            critical: 9,
+            high: 7,
+            medium: 5,
+            low: 3,
+            info: 1,
+          };
+          return {
+            id: String(item.id || crypto.createHash('md5').update(String(item.sourceUrl || '') + String(item.publishedAt || '')).digest('hex')),
+            title: String(item.title || 'خبر منشور'),
+            description: String(item.summary || ''),
+            link: String(item.sourceUrl || ''),
+            published: String(item.publishedAt || fetchedAt),
+            source: String(item.source || 'M3TM.APP'),
+            risk_score: severityScore[String(item.severity || '').toLowerCase()] ?? 1,
+            coords: hasCoords ? [lat, lng] : null,
+            coords_default: !hasCoords,
+            language: 'ar',
+            verification_status: 'source-reported',
+            machine_assessment: null,
+          };
+        });
+        if (news.length > 0) {
+          return NextResponse.json({
+            news,
+            total: news.length,
+            timestamp: fetchedAt,
+            language: 'ar',
+            source: 'M3TM.APP public feed',
+          }, {
+            headers: {
+              'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+            },
+          });
+        }
+      }
+    } catch {
+      // WORLD keeps its independent public-source fallback below.
+    }
+
     const feedPromises = TELEGRAM_CHANNELS.map(async (channel) => {
       try {
         const res = await fetch(`https://t.me/s/${channel}`, {
@@ -160,7 +223,9 @@ export async function GET() {
         risk_score: riskScore,
         coords: coords ? [coords[0], coords[1]] : null,
         coords_default: !coords,
-        machine_assessment: riskScore >= 8 ? "AI Analysis indicates elevated tactical priority based on public-source stream patterns." : null,
+        language: 'source',
+        verification_status: 'source-reported',
+        machine_assessment: null,
       };
     });
 

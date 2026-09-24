@@ -38,6 +38,7 @@ export interface StyleSettings {
   bgSecondary: string;
   bgTertiary: string;
   panelAlpha: number;
+  mobileNavAlpha: number;
   borderAlpha: number;
   textPrimary: string;
   textSecondary: string;
@@ -87,6 +88,7 @@ export const DEFAULTS: StyleSettings = {
   bgSecondary: '#0c0e1a',
   bgTertiary: '#121628',
   panelAlpha: 0.88,
+  mobileNavAlpha: 0.58,
   borderAlpha: 0.15,
   textPrimary: '#e8e6e0',
   textSecondary: '#9b978e',
@@ -190,6 +192,7 @@ export function sanitize(input: unknown, base: StyleSettings): StyleSettings {
     bgSecondary: normHex(o.bgSecondary, base.bgSecondary),
     bgTertiary: normHex(o.bgTertiary, base.bgTertiary),
     panelAlpha: normNum(o.panelAlpha, base.panelAlpha, 0.2, 1),
+    mobileNavAlpha: normNum(o.mobileNavAlpha, base.mobileNavAlpha, 0.15, 0.95),
     borderAlpha: normNum(o.borderAlpha, base.borderAlpha, 0, 0.6),
     textPrimary: normHex(o.textPrimary, base.textPrimary),
     textSecondary: normHex(o.textSecondary, base.textSecondary),
@@ -245,6 +248,7 @@ export function buildVars(s: StyleSettings): Record<string, string> {
     '--bg-secondary': s.bgSecondary,
     '--bg-tertiary': s.bgTertiary,
     '--bg-panel': rgba(s.bg, s.panelAlpha),
+    '--mobile-nav-bg': rgba(s.bg, s.mobileNavAlpha),
     '--bg-panel-solid': s.bgSecondary,
     '--border-primary': rgba(s.accent, s.borderAlpha),
     '--border-secondary': rgba(s.accent, s.borderAlpha * 0.45),
@@ -376,6 +380,7 @@ export function readTheme(): StyleSettings {
     bgSecondary: hex('--bg-secondary', DEFAULTS.bgSecondary),
     bgTertiary: hex('--bg-tertiary', DEFAULTS.bgTertiary),
     panelAlpha: parseAlpha(v('--bg-panel', ''), DEFAULTS.panelAlpha),
+    mobileNavAlpha: parseAlpha(v('--mobile-nav-bg', ''), DEFAULTS.mobileNavAlpha),
     borderAlpha: parseAlpha(v('--border-primary', ''), DEFAULTS.borderAlpha),
     textPrimary: hex('--text-primary', DEFAULTS.textPrimary),
     textSecondary: hex('--text-secondary', DEFAULTS.textSecondary),

@@ -78,18 +78,24 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: false, private: false, jets: false, military: false, maritime: true,
-  satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
-  sat_earth: false, sat_science: false, balloons: false, cctv: true, cctv_previews: true,
+  flights: true, private: false, jets: false, military: false, maritime: true,
+  satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
+  sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, war_alerts: false, day_night: true,
-  cables: true, sdk_sea: true, sdk_air: true, sdk_naval: true, terrain_3d: false,
-  terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: false,
+  infrastructure: false, global_incidents: true, conflict_zones: true, war_alerts: false, day_night: true,
+  cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
+  terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
   cf_outages: false, cf_attacks: false,
 };
 
 const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
-  Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [key, key === 'live_news']),
+  Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [
+    key,
+    [
+      'live_news', 'global_incidents', 'conflict_zones', 'gdelt_events',
+      'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+    ].includes(key),
+  ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
 
 function useIsMobile() {
@@ -122,7 +128,7 @@ const UptimeClock = () => {
     }, 1000);
     return () => clearInterval(iv);
   }, []);
-  return <span className="hidden lg:inline">UPTIME: <span className="text-[var(--gold-primary)]">{uptime}</span></span>;
+  return <span className="hidden lg:inline">مدة التشغيل: <span className="text-[var(--gold-primary)]">{uptime}</span></span>;
 };
 
 const ZuluClock = () => {
@@ -130,11 +136,11 @@ const ZuluClock = () => {
   useEffect(() => {
     const iv = setInterval(() => {
       const now = new Date();
-      setTime(`ZULU ${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')}Z`);
+      setTime(`التوقيت العالمي ${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')} UTC`);
     }, 1000);
     return () => clearInterval(iv);
   }, []);
-  return <span className="text-[var(--cyan-primary)] font-bold tabular-nums">{time || 'ZULU --:--:--Z'}</span>;
+  return <span className="text-[var(--cyan-primary)] font-bold tabular-nums">{time || 'التوقيت العالمي --:--:-- UTC'}</span>;
 };
 
 /** Real entity count — no fake throughput metrics */
@@ -408,7 +414,7 @@ export default function Dashboard() {
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
@@ -596,7 +602,7 @@ export default function Dashboard() {
         if (res.ok) {
           const d = await res.json();
           const a = d.address || {};
-          const label = [a.city||a.town||a.village||a.county, a.state||a.region, a.country].filter(Boolean).join(', ') || 'Unknown';
+          const label = [a.city||a.town||a.village||a.county, a.state||a.region, a.country].filter(Boolean).join(', ') || 'غير معروف';
           if (geocodeCache.current.size > 500) { const it = geocodeCache.current.keys(); for (let i=0;i<100;i++) { const k = it.next().value; if(k) geocodeCache.current.delete(k); }}
           geocodeCache.current.set(gk, label);
           setLocationLabel(label);
@@ -1019,7 +1025,6 @@ export default function Dashboard() {
       ...(data.commercial_flights || []),
       ...(data.private_flights || []),
       ...(data.private_jets || []),
-      ...(data.military_flights || []),
     ];
     const flightStep = Math.max(1, Math.floor(allFlights.length / 60));
     for (let i = 0; i < allFlights.length; i += flightStep) {
@@ -1027,7 +1032,7 @@ export default function Dashboard() {
       if (!f.lat || !f.lng) continue;
       entities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] },
-        properties: { domain: 'AIR', name: f.callsign?.trim() || 'TRACK', source: 'ADS-B / OpenSky' },
+        properties: { domain: 'AIR', name: f.callsign?.trim() || 'مسار', source: 'ADS-B / OpenSky' },
       });
     }
     const ships = data.maritime_ships || [];
@@ -1081,7 +1086,16 @@ export default function Dashboard() {
 
   const sdkDisplayData = useMemo(() => (
     embedMode && embedSurface === 'public'
-      ? { live_feeds: embeddedLiveFeeds, sdk_entities: [] }
+      ? {
+          live_feeds: embeddedLiveFeeds,
+          commercial_flights: data.commercial_flights || [],
+          satellites: data.satellites || [],
+          category_counts: data.category_counts || {},
+          gdelt: data.gdelt || [],
+          gdelt_events: data.gdelt_events || [],
+          earthquakes: data.earthquakes || [],
+          sdk_entities: [],
+        }
       : {
           ...data,
           sdk_entities: sdkEntities,
@@ -1867,11 +1881,11 @@ export default function Dashboard() {
                     <>
                       <div className="glass-panel-sm p-2 mb-2">
                         <div className="grid grid-cols-5 gap-1 text-center">
-                          <div><div className="hud-label" style={{fontSize:'9px'}}>AIR</div><div className="hud-value text-[10px]">{totalFlights.toLocaleString()}</div></div>
-                          <div><div className="hud-label" style={{fontSize:'9px'}}>SAT</div><div className="hud-value text-[10px]">{(data.satellites?.length||0)}</div></div>
-                          <div><div className="hud-label" style={{fontSize:'9px'}}>CAM</div><div className="hud-value text-[10px]">{(data.cameras?.length||0)}</div></div>
-                          <div><div className="hud-label" style={{fontSize:'9px'}}>WX</div><div className="hud-value text-[10px]" style={{color:'var(--accent-weather)'}}>{(data.weather_events?.length||0)}</div></div>
-                          <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
+                          <div><div className="hud-label" style={{fontSize:'9px'}}>طيران</div><div className="hud-value text-[10px]">{totalFlights.toLocaleString()}</div></div>
+                          <div><div className="hud-label" style={{fontSize:'9px'}}>أقمار</div><div className="hud-value text-[10px]">{(data.satellites?.length||0)}</div></div>
+                          <div><div className="hud-label" style={{fontSize:'9px'}}>كاميرات</div><div className="hud-value text-[10px]">{(data.cameras?.length||0)}</div></div>
+                          <div><div className="hud-label" style={{fontSize:'9px'}}>طقس</div><div className="hud-value text-[10px]" style={{color:'var(--accent-weather)'}}>{(data.weather_events?.length||0)}</div></div>
+                          <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
                       <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />

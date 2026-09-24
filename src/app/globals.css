@@ -15,6 +15,7 @@
   --bg-secondary: #11141F;
   --bg-tertiary: #121628;
   --bg-panel: rgba(22, 26, 44, 0.94);
+  --mobile-nav-bg: rgba(4, 4, 10, 0.58);
   --bg-panel-solid: #161A2C;
 
   /* ── Gold Accent (Eye of Horus) ── */
@@ -418,7 +419,8 @@ html:has(.docs-root) body {
   display: none;
   padding: 0 4px;
   padding-bottom: env(safe-area-inset-bottom, 4px);
-  background: linear-gradient(180deg, transparent 0%, rgba(4,4,10,0.95) 30%);
+  background: linear-gradient(180deg, transparent 0%, var(--mobile-nav-bg) 35%);
+  pointer-events: none;
 }
 
 .mobile-nav-inner {
@@ -427,6 +429,8 @@ html:has(.docs-root) body {
   align-items: center;
   padding: 6px 2px 4px;
   gap: 0;
+  background: var(--mobile-nav-bg);
+  pointer-events: auto;
 }
 
 .mobile-nav-btn {

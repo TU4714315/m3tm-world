@@ -49,12 +49,12 @@ interface LayerGroupDef {
 
 const LAYER_GROUPS: LayerGroupDef[] = [
   {
-    label: 'SDK',
-    fullLabel: 'M3TM.WORLD SDK',
+    label: 'عام',
+    fullLabel: 'بيانات M3TM.WORLD العامة',
     icon: Network,
     layers: [
       { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'كابلات ثابتة؛ السفن حسب توفر AIS' },
-      { key: 'sdk_air', label: 'الرصد الجوي', dataKey: 'commercial_flights', description: 'مشاهدات طيران دورية' },
+      { key: 'sdk_air', label: 'الرصد الجوي العام', dataKey: 'commercial_flights', description: 'مشاهدات طيران مدنية دورية' },
       { key: 'sdk_naval', label: 'رصد الأحداث', dataKey: 'gdelt', description: 'أحداث عامة محددة الموقع' },
     ],
   },
@@ -66,7 +66,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
-      { key: 'military', label: 'العسكرية', dataKey: 'military_flights' },
     ],
   },
   {
@@ -74,7 +73,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'البحرية',
     icon: Ship,
     layers: [
-      { key: 'maritime', label: 'البحرية / الحربية', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
+      { key: 'maritime', label: 'الملاحة البحرية العامة', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
     ],
   },
   {
@@ -84,7 +83,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'العسكرية / الرصدية', dataKey: 'satellites', catKey: 'military' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
@@ -112,12 +110,13 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'التهديدات',
-    fullLabel: 'الأحداث والمخاطر',
+    fullLabel: 'الأحداث والبلاغات العامة',
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'global_incidents', label: 'حوادث عالمية', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'أحداث GDELT', dataKey: 'gdelt_events' },
+      { key: 'conflict_zones', label: 'مناطق النزاع المعلنة', description: 'مؤشرات مرجعية وبلاغات من مصادر عامة', dataKey: '' },
+      { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
+      { key: 'gdelt_events', label: 'أحداث وضربات منشورة', description: 'بلاغات من مصادر عامة؛ ليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
     ],
   },
   {
@@ -222,7 +221,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   };
   const terrainDetails = activeLayers.terrain_elevation ? (
     <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-[10px] text-white/60">
-      <p role="status">{terrainStatus === 'idle' ? `Terrain at zoom ${TERRAIN_MIN_ZOOM}+ · zoom in` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
+      <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
       {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
       <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
@@ -300,7 +299,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   </button>
                 );
               })}
-              {group.label === 'DISPLAY' && terrainDetails}
+              {group.label === 'العرض' && terrainDetails}
             </div>
           </div>
         ))}
@@ -383,7 +382,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               <button
                 onClick={() => setPinnedGroup(isPinned ? null : group.label)}
                 aria-expanded={isOpen}
-                aria-label={`${group.fullLabel}${activeCount ? ` — ${activeCount} active` : ''}`}
+                aria-label={`${group.fullLabel}${activeCount ? ` — ${activeCount} مفعلة` : ''}`}
                 title={group.fullLabel}
                 className="relative w-10 h-10 flex items-center justify-center cursor-pointer rounded-lg transition-all duration-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
                 style={{
@@ -490,7 +489,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                           </button>
                         );
                       })}
-                      {group.label === 'DISPLAY' && terrainDetails}
+                      {group.label === 'العرض' && terrainDetails}
                     </div>
                   </motion.div>
                 )}
