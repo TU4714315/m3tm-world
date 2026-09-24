@@ -48,6 +48,9 @@ type EmbeddedNewsItem = {
   url: string;
   latitude: number;
   longitude: number;
+  originLatitude?: number;
+  originLongitude?: number;
+  routeStatus?: 'verified';
 };
 type EmbeddedNewsPayload = {
   id?: unknown;
@@ -56,7 +59,38 @@ type EmbeddedNewsPayload = {
   url?: unknown;
   latitude?: unknown;
   longitude?: unknown;
+  originLatitude?: unknown;
+  originLongitude?: unknown;
+  routeStatus?: unknown;
 };
+
+type EmbeddedRoute = {
+  geometry: { type: 'LineString'; coordinates: [number, number][] };
+  from: { lat: number; lng: number };
+  to: { lat: number; lng: number };
+};
+
+function toEmbeddedCoordinate(value: unknown, min: number, max: number): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) && coordinate >= min && coordinate <= max ? coordinate : null;
+}
+
+const DEFAULT_ACTIVE_LAYERS = {
+  flights: false, private: false, jets: false, military: false, maritime: true,
+  satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
+  sat_earth: false, sat_science: false, balloons: false, cctv: true, cctv_previews: true,
+  live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
+  infrastructure: false, global_incidents: true, war_alerts: false, day_night: true,
+  cables: true, sdk_sea: true, sdk_air: true, sdk_naval: true, terrain_3d: false,
+  terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: false,
+  cf_outages: false, cf_attacks: false,
+};
+
+const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
+  Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [key, key === 'live_news']),
+) as typeof DEFAULT_ACTIVE_LAYERS;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -160,7 +194,10 @@ export default function Dashboard() {
   const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
   const [embedMode, setEmbedMode] = useState(false);
+  const [embedSurface, setEmbedSurface] = useState<'public' | 'internal'>('internal');
   const [embeddedNewsItems, setEmbeddedNewsItems] = useState<EmbeddedNewsItem[]>([]);
+  const [embeddedRoute, setEmbeddedRoute] = useState<EmbeddedRoute | null>(null);
+  const worldMapReadyRef = useRef(false);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
@@ -171,40 +208,54 @@ export default function Dashboard() {
   const autoLocateCancelled = useRef(false);
 
   useEffect(() => {
-    const embedded = new URLSearchParams(window.location.search).get('embed') === '1' && window.parent !== window;
+    const params = new URLSearchParams(window.location.search);
+    const embedded = params.get('embed') === '1' && window.parent !== window;
     if (!embedded) return;
 
     const frameId = window.requestAnimationFrame(() => {
       setEmbedMode(true);
+      setEmbedSurface(params.get('surface') === 'public' ? 'public' : 'internal');
       setShowSplash(false);
     });
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== M3TM_APP_ORIGIN || event.source !== window.parent) return;
       const message = event.data;
-      if (!message || message.source !== 'm3tm-app' || message.type !== 'm3tm:sync' || message.version !== 1) return;
+      if (!message || message.source !== 'm3tm-app' || message.version !== 1) return;
+      if (message.type === 'm3tm:hello') {
+        if (worldMapReadyRef.current) {
+          window.parent.postMessage({ source: 'm3tm-world', type: 'm3tm:ready', version: 1 }, M3TM_APP_ORIGIN);
+        }
+        return;
+      }
+      if (message.type !== 'm3tm:sync') return;
 
       const items: EmbeddedNewsItem[] = Array.isArray(message.newsItems)
         ? message.newsItems.flatMap((item: EmbeddedNewsPayload) => {
-            const latitude = Number(item?.latitude);
-            const longitude = Number(item?.longitude);
+            const latitude = toEmbeddedCoordinate(item?.latitude, -90, 90);
+            const longitude = toEmbeddedCoordinate(item?.longitude, -180, 180);
             if (
               typeof item?.id !== 'string'
               || !item.id
-              || !Number.isFinite(latitude)
-              || !Number.isFinite(longitude)
-              || latitude < -90
-              || latitude > 90
-              || longitude < -180
-              || longitude > 180
+              || latitude === null
+              || longitude === null
             ) return [];
-            return [{
+            const originLatitude = toEmbeddedCoordinate(item?.originLatitude, -90, 90);
+            const originLongitude = toEmbeddedCoordinate(item?.originLongitude, -180, 180);
+            const verifiedRoute = item?.routeStatus === 'verified' && originLatitude !== null && originLongitude !== null;
+            const mapped: EmbeddedNewsItem = {
               id: item.id,
               title: String(item.title || 'خبر'),
               source: String(item.source || ''),
               url: String(item.url || ''),
               latitude,
               longitude,
-            }];
+            };
+            if (verifiedRoute) {
+              mapped.originLatitude = originLatitude;
+              mapped.originLongitude = originLongitude;
+              mapped.routeStatus = 'verified';
+            }
+            return [mapped];
           })
         : [];
 
@@ -213,7 +264,26 @@ export default function Dashboard() {
         const selected = items.find(item => item.id === message.selectedNewsId);
         if (selected) {
           setFlyToLocation({ lat: selected.latitude, lng: selected.longitude, zoom: 6, ts: Date.now() });
+          if (selected.routeStatus === 'verified' && selected.originLatitude !== undefined && selected.originLongitude !== undefined) {
+            setEmbeddedRoute({
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [selected.originLongitude, selected.originLatitude],
+                  [selected.longitude, selected.latitude],
+                ],
+              },
+              from: { lat: selected.originLatitude, lng: selected.originLongitude },
+              to: { lat: selected.latitude, lng: selected.longitude },
+            });
+          } else {
+            setEmbeddedRoute(null);
+          }
+        } else {
+          setEmbeddedRoute(null);
         }
+      } else {
+        setEmbeddedRoute(null);
       }
     };
 
@@ -363,43 +433,25 @@ export default function Dashboard() {
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
-  const [activeLayers, setActiveLayers] = useState({
-    flights: false,
-    private: false,
-    jets: false,
-    military: false,
-    maritime: true,
-    satellites: false,
-    sat_comms: false,
-    sat_military: false,
-    sat_navigation: false,
-    sat_earth: false,
-    sat_science: false,
-    balloons: false,
-    cctv: true,
-    /* The live preview tiles over the camera dots — see CctvPreviews. */
-    cctv_previews: true,
-    live_news: true,
-    earthquakes: true,
-    fires: false,
-    weather: false,
-    radiation: false,
-    infrastructure: false,
-    global_incidents: true,
-    war_alerts: false,
-    day_night: true,
-    cables: true,
-    sdk_sea: true,
-    sdk_air: true,
-    sdk_naval: true,
-    terrain_3d: false,
-    terrain_elevation: false,
-    malware: false,
-    cyber_attacks: false,
-    gdelt_events: false,
-    cf_outages: false,
-    cf_attacks: false,
-  });
+  const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
+
+  useEffect(() => {
+    if (!embedMode || embedSurface !== 'public') return;
+    const frameId = window.requestAnimationFrame(() => {
+      setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
+      setShowLayers(false);
+      setShowMarkets(false);
+      setShowAlerts(false);
+      setShowSpaceCam(false);
+      setShowIntel(false);
+      setShowDrawing(false);
+      setShowDirections(false);
+      setShowRemote(false);
+      setShowArcGIS(false);
+      setMobilePanel(null);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [embedMode, embedSurface]);
   // Server-side capability flags — gate layers that need credentials.
   const selectFlatMap = () => {
     setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
@@ -428,6 +480,7 @@ export default function Dashboard() {
 
     // Restore active layers from URL if present
     const p = new URLSearchParams(window.location.search);
+    if (p.get('embed') === '1' && window.parent !== window) return;
     const layers = p.get('layers');
     if (layers) {
       const active = layers.split(',');
@@ -478,7 +531,9 @@ export default function Dashboard() {
     if (urlTimer.current) clearTimeout(urlTimer.current);
     urlTimer.current = setTimeout(() => {
       const active = Object.entries(activeLayers).filter(([,v]) => v).map(([k]) => k).join(',');
-      const url = `${window.location.pathname}?layers=${active}`;
+      const params = new URLSearchParams(window.location.search);
+      params.set('layers', active);
+      const url = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState(null, '', url);
     }, 1500);
   }, [activeLayers]);
@@ -569,6 +624,7 @@ export default function Dashboard() {
         version: 1,
         id: entity.id,
       }, M3TM_APP_ORIGIN);
+      return;
     }
     if (entity?.type === 'live_news' && entity.url) {
       setLiveFeedUrl(entity.url);
@@ -578,6 +634,7 @@ export default function Dashboard() {
   }, [embedMode]);
 
   const handleWorldMapReady = useCallback(() => {
+    worldMapReadyRef.current = true;
     if (!embedMode) return;
     window.parent.postMessage({
       source: 'm3tm-world',
@@ -1022,11 +1079,15 @@ export default function Dashboard() {
     lng: item.longitude,
   })), [embeddedNewsItems]);
 
-  const sdkDisplayData = useMemo(() => ({
-    ...data,
-    sdk_entities: sdkEntities,
-    ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
-  }), [data, embeddedLiveFeeds, sdkEntities]);
+  const sdkDisplayData = useMemo(() => (
+    embedMode && embedSurface === 'public'
+      ? { live_feeds: embeddedLiveFeeds, sdk_entities: [] }
+      : {
+          ...data,
+          sdk_entities: sdkEntities,
+          ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
+        }
+  ), [data, embedMode, embedSurface, embeddedLiveFeeds, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1238,7 +1299,7 @@ export default function Dashboard() {
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'} 
           onEntityClick={handleEntityClick} 
           onMouseCoords={handleMouseCoords} 
-          onRightClick={handleRightClick} 
+          onRightClick={embedMode ? undefined : handleRightClick}
           onViewStateChange={setMapView} 
           flyToLocation={flyToLocation}
           sweepData={sweepData}
@@ -1247,7 +1308,7 @@ export default function Dashboard() {
           theme={worldTheme}
           arcgisLayers={arcgisLayers.filter(l => l.visible).map(l => ({ id: l.id, title: l.title, geojson: l.geojson, color: l.color, opacity: l.opacity }))}
           onMapCenter={setMapCenter}
-          route={activeRoute}
+          route={embedMode ? embeddedRoute : activeRoute}
           userLocation={
             navSession && navProgress
               ? { lat: navProgress.snapped[1], lng: navProgress.snapped[0], accuracy: liveLocation?.accuracy, heading: liveLocation?.heading }
@@ -1330,7 +1391,7 @@ export default function Dashboard() {
 
 
       {/* ── FLIGHT WATCH ── */}
-      {watchedFlights.length > 0 && (
+      {!embedMode && watchedFlights.length > 0 && (
         <motion.div
           initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
           className="absolute top-3 z-[380] w-[min(92vw,290px)] pointer-events-auto
@@ -1350,7 +1411,7 @@ export default function Dashboard() {
       {/* ── MAP VIEW CONTROLS ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className="absolute bottom-[75px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none"
+        className={`absolute bottom-[75px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none ${embedMode ? 'hidden' : ''}`}
         style={{ left: isMobile ? '12px' : '120px', right: isMobile ? '12px' : 'auto' }}
       >
         {/* Unified Control Strip */}
@@ -1372,7 +1433,7 @@ export default function Dashboard() {
       </motion.div>
 
             {/* ── HEADER ── */}
-      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
+      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
         <div dir="ltr" className="flex items-center gap-3 w-fit">
           <img
                       dir="ltr"
@@ -1392,7 +1453,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── TOP-RIGHT STATUS (desktop) ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className="status-bar-desktop absolute top-4 right-6 z-[200] pointer-events-none flex items-center gap-3 text-[11px] font-mono tracking-widest text-[var(--text-secondary)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className={`status-bar-desktop absolute top-4 right-6 z-[200] pointer-events-none flex items-center gap-3 text-[11px] font-mono tracking-widest text-[var(--text-secondary)] ${embedMode ? 'hidden' : ''}`}>
 
         <span className="hidden lg:inline-flex items-center gap-1.5">
           <ZuluClock />
@@ -1423,7 +1484,7 @@ export default function Dashboard() {
       {/* ── MOBILE: Compact top status ── */}
       {/* The route planner claims the top of a phone screen; leaving this in
           place would put the support badge underneath the destination field. */}
-      {isMobile && !showDirections && !navSession && (
+      {!embedMode && isMobile && !showDirections && !navSession && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
             <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
@@ -1435,12 +1496,12 @@ export default function Dashboard() {
 
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
 
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
-      {!isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
+      {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
         <div className="relative group">
           <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="أدوات البحث والتحقق — بحث IP وفحص الشبكة وتحديد الموقع" aria-label="أدوات البحث والتحقق" aria-expanded={showIntel}>
             <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
@@ -1644,7 +1705,7 @@ export default function Dashboard() {
 
       {/* ── LIVE FEED VIEWER OVERLAY ── */}
       <AnimatePresence>
-        {liveFeedUrl && (
+        {!embedMode && liveFeedUrl && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1732,7 +1793,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* ═══ MOBILE UI ═══ */}
-      {isMobile && (
+      {!embedMode && isMobile && (
         <>
           {/* Mobile Bottom Navigation */}
           <div className="mobile-nav">
@@ -1851,7 +1912,7 @@ export default function Dashboard() {
       )}
 
       {/* ── BOTTOM CURSOR INFO (desktop) ── */}
-      {!isMobile && (
+      {!embedMode && !isMobile && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-8 z-[200] pointer-events-auto" style={{ left: '72px' }}>
           <div className="flex items-center gap-5 text-[9px] font-mono tracking-widest text-[var(--text-muted)] opacity-60">
             <div className="flex gap-2 items-center" title="إحداثيات المؤشر (مرّر فوق الخريطة)">
@@ -1873,7 +1934,7 @@ export default function Dashboard() {
       {/* Scale bar is now integrated into the map controls section above */}
 
       {/* ── Region Dossier ── */}
-      {(regionDossier || dossierLoading) && (
+      {!embedMode && (regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
           <div className="glass-panel p-5 world-glow">
             <div className="flex items-center justify-between mb-3">
@@ -1908,14 +1969,14 @@ export default function Dashboard() {
 
       {/* ── Camera Viewer ── */}
       <CameraViewer
-        camera={activeCamera}
+        camera={embedMode ? null : activeCamera}
         onClose={() => setActiveCamera(null)}
         onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
       />
 
       {/* ── Entity Graph Panel ── */}
       {/* Guidance belongs over the map, where the clicking happens. */}
-      {drawMode && (
+      {!embedMode && drawMode && (
         <DrawHud
           mode={drawMode}
           progress={drawProgress}
@@ -1925,7 +1986,7 @@ export default function Dashboard() {
         />
       )}
 
-      {showDrawing && (
+      {!embedMode && showDrawing && (
         <div className="absolute right-12 top-1/2 -translate-y-1/2 z-[400] w-80 pointer-events-auto">
           <DrawingToolbar
             drawMode={drawMode}
@@ -1948,10 +2009,10 @@ export default function Dashboard() {
       )}
 
       {/* ── OVERLAYS ── */}
-      <div className="vignette absolute inset-0 pointer-events-none z-[2]" />
-      <div className="crt-scanlines absolute inset-0 pointer-events-none z-[3] opacity-[0.02]" />
+      {!embedMode && <div className="vignette absolute inset-0 pointer-events-none z-[2]" />}
+      {!embedMode && <div className="crt-scanlines absolute inset-0 pointer-events-none z-[3] opacity-[0.02]" />}
       {/* Corner frames — using explicit classes for Tailwind JIT compatibility */}
-      {[
+      {!embedMode && [
         { pos: 'top-0 left-0', vAnchor: 'top-0', hAnchor: 'left-0', hGrad: 'bg-gradient-to-r', vGrad: 'bg-gradient-to-b' },
         { pos: 'top-0 right-0', vAnchor: 'top-0', hAnchor: 'right-0', hGrad: 'bg-gradient-to-l', vGrad: 'bg-gradient-to-b' },
         { pos: 'bottom-0 left-0', vAnchor: 'bottom-0', hAnchor: 'left-0', hGrad: 'bg-gradient-to-r', vGrad: 'bg-gradient-to-t' },
@@ -1964,15 +2025,15 @@ export default function Dashboard() {
       ))}
 
       {/* Keyboard Shortcuts Overlay */}
-      <KeyboardShortcuts />
+      {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      <GlobalStatusBar />
+      {!embedMode && <GlobalStatusBar />}
 
       {/* Shortcut hint — more visible */}
-      <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
+      {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
         اضغط <span className="text-[var(--gold-primary)]">؟</span> للاختصارات · <span className="text-[var(--gold-primary)]">F</span> ملء الشاشة · <span className="text-[var(--gold-primary)]">R</span> إعادة الضبط
-      </div>
+      </div>}
 
 
     </main>
