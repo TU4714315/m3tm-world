@@ -324,3 +324,30 @@ M3TM.WORLD
 
 آخر قاعدة: هذا الملف يصف الحقيقة التشغيلية فقط، وليس الوعود أو الصور التخيلية.
 
+
+
+## ملحق الإغلاق بعد تحسينات الحرب/المسارات وWebKit — 2026-09-25
+
+### M3TM.WORLD — PR #9
+- PR #9 `feat: restore public conflict routes and safe military activity` دُمج إلى `main`؛ feature SHA: `ac2fbaf07128f183116d13ed9968ac4e7501464f`، merge SHA: `349cdb602ef796fd61033b1e1e6ec9154ee87c28`.
+- Vercel status على merge SHA: `success` / `Deployment has completed`.
+- السطح العام يشغّل افتراضيًا: مناطق الحروب والنزاعات، مناطق/خطوط الجبهة المنشورة، مسارات الأحداث الموثقة، GDELT Material Conflict، والنشاط الجوي العسكري العام المجمّع.
+- `military_activity` عام وغير تشغيلي: خلايا تقريبية 6 درجات، حد أدنى مجموعتان، بلا identifiers وبلا exact tracks. يبقى `military_flights=[]` و`gps_jamming=[]` في العقد العام.
+- Production QA جديد على 390x844 أثبت: map=390x844، RTL، `scrollWidth=390`، والطبقات `military_activity/conflict_zones/frontlines/reported_routes/gdelt_events/global_incidents` موجودة ومفعلة.
+- Production data proof في آخر فحص: 2,805 رحلة تجارية، 27 خلية نشاط عسكري عام، 15 منطقة نزاع، 11 حدث نزاع حي، 125 feature جبهة منشورة، 124 حدث Material Conflict، 11,517 قمرًا عامًا، و46 خبرًا عربيًا فعليًا.
+- لا توجد bad HTTP responses أو console errors في QA؛ الطلبات الملغاة من MapLibre/CCTV بقيت `ERR_ABORTED` غير حاجبة ومفصولة عن core failures.
+
+### M3TM.APP — PR #285
+- PR #285 `fix(world): restore public routes and glass mobile card` دُمج إلى `main`؛ head SHA: `27954ca35caf65dd7a9f99fb4a100229d1aea17e`، merge SHA: `69fce370997b4742b9475ae5281058ead6b5790c`.
+- Required runs على head: CI `36086305092` SUCCESS، Build & Deploy to Production `36086305093` SUCCESS، Visual Preview `36086305094` SUCCESS، Production Health `36086305116` SUCCESS.
+- بطاقة `موقع الخبر المنشور` أصبحت glass فعلية عبر `--g-map-card-alpha` بقيمة افتراضية `.28`، مع `backdrop-filter` ودعم `-webkit-backdrop-filter` وتحكم جوال مستقل لشفافية البطاقة.
+- fallback 2D لا يخفي المسارات الموثقة الأخرى: يعرض المسار المختار بوضوح وما يصل إلى 48 مسارًا موثقًا سياقيًا بخفوت.
+- Safari/WebKit hardening أضاف sync burst موثوقًا بعد `m3tm:ready` عند الإرسال الفوري ثم 180ms و700ms، من دون تغيير origin/source/version checks أو مهلة fallback ذات 35 ثانية.
+- Live Chromium QA بعد الدمج: Desktop و390x844 كلاهما `mapMode=3D` و`hello/ready/sync/select` PASS؛ mobile iframe = 374x398 و`scrollWidth=390`. Forced iframe error أعاد 2D fallback وأزال iframe.
+- Live WebKit/iPhone probe على 390x844 بعد الدمج: iframe source = `https://m3tm-world.vercel.app/?embed=1&surface=public`، parent استقبل `m3tm:ready`، child استقبل `m3tm:hello` وأربع رسائل `m3tm:sync` موثوقة (91 خبرًا وقت الفحص)، وبقي `mapMode=3D` مع `scrollWidth=390`.
+- فشل سكربت WebKit الأقدم `No m3tm:sync observed inside WORLD` كان race داخل QA: كان يقرأ child messages فور التقاط `ready` قبل منح React/رسائل retry فرصة للوصول. الـprobe التفاعلي المؤخر أثبت وصول sync فعليًا؛ لا يُعامل ذلك الفشل القديم كفشل إنتاج.
+
+### قرار الإغلاق المحدث
+- شكوى الشفافية والمسارات وثراء طبقات الحرب أغلقت فعليًا عبر PR #285 وPR #9.
+- السطح العام يعرض نشاطًا عسكريًا عامًا منشورًا/مجمّعًا فقط، ولا يعرض مسارات عسكرية تشغيلية دقيقة أو معرفات أو GPS jamming؛ أي تفصيل تشغيلي أدق يبقى خلف سياق داخلي/gated وليس ضمن public WORLD.
+- آخر مصدر حقيقة للتنفيذ: WORLD `main=349cdb602ef796fd61033b1e1e6ec9154ee87c28` وAPP `main=69fce370997b4742b9475ae5281058ead6b5790c` قبل PR التوثيق هذا.
