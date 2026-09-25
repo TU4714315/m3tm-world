@@ -10,7 +10,7 @@
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
 [![License](https://img.shields.io/badge/License-MIT-D4AF37?style=for-the-badge)](LICENSE)
 
-**M3TM.WORLD تجمع طبقات جغرافية وبيانات تتبع ومصادر إعلامية وأدوات بحث وتحقق وعناصر تحكم بالخريطة في واجهة واحدة مسرعة بالرسوميات.**
+**M3TM.WORLD تجمع طبقات جغرافية وبيانات عامة ومصادر إعلامية وعناصر تحكم بالخريطة في واجهة واحدة مسرعة بالرسوميات. أدوات OSINT والتحقيق انتقلت إلى البوابة الداخلية في M3TM.APP وتبقى خلف المصادقة والصلاحيات.**
 
 [Production](https://m3tm-world.vercel.app) · [Source](https://github.com/TU4714315/m3tm-world)
 
@@ -30,7 +30,7 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 
 | Domain | Data Points | Sources |
 |--------|------------|---------|
-| **Aviation** | Commercial, Private, Military, Jets | OpenSky Network |
+| **Aviation** | Commercial + public/generalized military-activity indicators | OpenSky + published/generalized public data |
 | **Maritime** | 39 Global Ports, 10 Chokepoints | Static بيانات بحرية |
 | **CCTV** | 17,000+ Cameras | TfL, WSDOT, Caltrans, ODOT, MDOT, HK Transport Dept, Taiwan THB, NZTA + more |
 | **Seismic** | Real-time M2.5+ | USGS Earthquake API |
@@ -52,10 +52,10 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 ┌─────────────────────────────────────────────────┐
 │                M3TM.WORLD CLIENT                 │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────┐ │
-│  │ MapLibre  │  │  HUD     │  │  RECON Toolkit│ │
-│  │  GL (GPU) │  │ Panels   │  │  Port Scan    │ │
-│  │  WebGL    │  │ Layers   │  │  DNS / WHOIS  │ │
-│  │  Render   │  │ Controls │  │  Vuln Scanner │ │
+│  │ MapLibre  │  │  HUD     │  │ M3TM.APP Gate │ │
+│  │  GL (GPU) │  │ Panels   │  │ Internal OSINT│ │
+│  │  WebGL    │  │ Layers   │  │ Owner locks   │ │
+│  │  Render   │  │ Controls │  │ Server bridge │ │
 │  └──────────┘  └──────────┘  └───────────────┘ │
 ├─────────────────────────────────────────────────┤
 │               NEXT.JS API ROUTES                 │
@@ -65,8 +65,8 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 │  /api/gdelt           /api/satellites           │
 │  /api/weather         /api/scanner              │
 │  /api/sentinel        /api/telegram-feed        │
-│  /api/tools/*  (whois, dns, ip, cve, sanctions, │
-│                 crypto, sweep, threats, …)      │
+│  /api/tools/*  INTERNAL — auth token + enable   │
+│  /api/osint/*  INTERNAL — M3TM.APP portal only  │
 ├─────────────────────────────────────────────────┤
 │              EXTERNAL DATA SOURCES               │
 │  OpenSky · USGS · NASA · NOAA · TfL · NVD      │
@@ -86,7 +86,9 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 - **Progressive loading** — data fetched on-demand when layers are activated
 - **Viewport-aware** — only loads relevant data for the visible region
 
-### RECON Toolkit
+### OSINT / RECON — البوابة الداخلية
+المسارات `/api/tools/*` و`/api/osint/*` ليست واجهات عامة بعد الآن. في الإنتاج تُغلق افتراضيًا وتحتاج تمكينًا خادميًا ورمزًا داخليًا، ويكون الوصول التشغيلي من M3TM.APP بعد المصادقة والصلاحيات.
+
 - **Port Scanner** — TCP connect scan with service fingerprinting
 - **DNS Lookup** — Full record resolution (A, AAAA, MX, NS, TXT, CNAME)
 - **WHOIS** — Domain/IP registration data (auto-cross-checked against OFAC SDN)
@@ -192,8 +194,7 @@ N2YO_API_KEY=                 # N2YO satellites — n2yo.com (Profile → API ke
 AIS_API_KEY=                 # aisstream.io maritime
 ```
 
-> Without `SCANNER_URL`/`SCANNER_KEY` the RECON toolkit returns `503`; every
-> other layer works out of the box. `.env` is gitignored — only the template is committed.
+> أدوات التحقيق ليست جزءًا من السطح العام. حتى عند إعداد `SCANNER_URL`/`SCANNER_KEY` تبقى مسارات `/api/tools/*` و`/api/osint/*` خلف `M3TM_WORLD_INTERNAL_TOOLS_ENABLED` و`M3TM_WORLD_INTERNAL_TOOLS_TOKEN` وتُستهلك فقط من البوابة الداخلية المصرح بها. `.env` مهمل من Git؛ لا تُرفع الأسرار إلى المستودع.
 
 ---
 
