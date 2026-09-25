@@ -1581,7 +1581,7 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
           <a href='https://m3tm.app' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10" aria-label="الرجوع إلى M3TM.APP">
             <ExternalLink className="w-3 h-3 text-[var(--gold-primary)]" />
-            <span className="text-[var(--gold-primary)] font-bold">M3TM.APP</span>
+            <span className="text-[var(--gold-primary)] font-bold">رجوع M3TM.APP</span>
           </a>
         </motion.div>
       )}
