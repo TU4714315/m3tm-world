@@ -219,6 +219,40 @@ function classifyFlight(f: any) {
   };
 }
 
+const PUBLIC_MILITARY_CELL_DEG = 6;
+const PUBLIC_MILITARY_MIN_GROUP = 2;
+
+function buildPublicMilitaryActivity(flights: any[]) {
+  const buckets = new Map<string, { lat: number; lng: number; count: number }>();
+  for (const flight of flights) {
+    const lat = Number(flight?.lat);
+    const lng = Number(flight?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const latIndex = Math.floor((lat + 90) / PUBLIC_MILITARY_CELL_DEG);
+    const lngIndex = Math.floor((lng + 180) / PUBLIC_MILITARY_CELL_DEG);
+    const centerLat = Math.max(-87, Math.min(87, -90 + latIndex * PUBLIC_MILITARY_CELL_DEG + PUBLIC_MILITARY_CELL_DEG / 2));
+    const centerLng = Math.max(-177, Math.min(177, -180 + lngIndex * PUBLIC_MILITARY_CELL_DEG + PUBLIC_MILITARY_CELL_DEG / 2));
+    const key = `${latIndex}:${lngIndex}`;
+    const current = buckets.get(key);
+    if (current) current.count += 1;
+    else buckets.set(key, { lat: centerLat, lng: centerLng, count: 1 });
+  }
+  return Array.from(buckets.entries()).flatMap(([key, bucket]) => {
+    if (bucket.count < PUBLIC_MILITARY_MIN_GROUP) return [];
+    const level = bucket.count >= 10 ? 3 : bucket.count >= 5 ? 2 : 1;
+    return [{
+      id: `military-activity-${key}`,
+      lat: bucket.lat,
+      lng: bucket.lng,
+      level,
+      activity: level === 3 ? 'مرتفع' : level === 2 ? 'متوسط' : 'محدود',
+      approximate_count: bucket.count >= 10 ? '10+' : bucket.count >= 5 ? '5-9' : '2-4',
+      cell_degrees: PUBLIC_MILITARY_CELL_DEG,
+      precision: 'coarse-regional',
+    }];
+  });
+}
+
 let cachedData: any = null;
 let lastFetchTime = 0;
 // 90s TTL keeps us well within the authenticated OpenSky budget (4000 credits/day,
@@ -451,6 +485,8 @@ export async function GET() {
       }
     }
 
+    const militaryActivity = buildPublicMilitaryActivity(military);
+
     return {
       commercial_flights: commercial,
       private_flights:    privateFl,
@@ -458,6 +494,14 @@ export async function GET() {
       // Precise military tracks and live interference indicators are not part
       // of the public WORLD contract. Keep classification server-side only.
       military_flights:   [],
+      military_activity:  militaryActivity,
+      military_activity_meta: {
+        mode: 'coarse-regional-aggregate',
+        cell_degrees: PUBLIC_MILITARY_CELL_DEG,
+        minimum_group: PUBLIC_MILITARY_MIN_GROUP,
+        identifiers_exposed: false,
+        exact_tracks_exposed: false,
+      },
       gps_jamming:        [],
       total:              allRaw.length,
       source,

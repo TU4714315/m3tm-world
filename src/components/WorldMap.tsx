@@ -338,7 +338,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -366,7 +366,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createWarningIcon('warn-orange', '#E65100');
       createWarningIcon('warn-yellow', '#F9A825');
 
-      map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', layout: {
+      map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
+        'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
+        'circle-opacity': 0.12, 'circle-blur': 0.8,
+      }});
+      map.addLayer({ id: 'conflict-event-dots', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2.5, 5,4.5, 9,7],
+        'circle-color': '#FF5252', 'circle-opacity': 0.82,
+        'circle-stroke-width': 1, 'circle-stroke-color': '#FFD7D7', 'circle-stroke-opacity': 0.55,
+      }});
+      map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
         'icon-image': ['match', ['get','severity'], 'war','warn-icon', 'high','warn-orange', 'warn-yellow'],
         'icon-size': ['interpolate',['linear'],['zoom'], 1,0.6, 4,0.8, 8,1],
         'icon-allow-overlap': true,
@@ -378,6 +388,37 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       }, paint: {
         'text-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
         'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9,
+      }});
+
+      map.addLayer({ id: 'military-activity-halo', type: 'circle', source: 'military-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,18, 2,28, 3,42],
+        'circle-color': '#EF5350', 'circle-opacity': 0.12, 'circle-blur': 0.85,
+      }});
+      map.addLayer({ id: 'military-activity-dots', type: 'circle', source: 'military-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,5, 2,7, 3,9],
+        'circle-color': ['interpolate',['linear'],['get','level'], 1,'#FFB74D', 2,'#FF7043', 3,'#EF5350'],
+        'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#FFF3E0', 'circle-stroke-opacity': 0.6,
+      }});
+      map.addLayer({ id: 'military-activity-label', type: 'symbol', source: 'military-activity', minzoom: 3, layout: {
+        'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
+        'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
+      }, paint: { 'text-color':'#FFCCBC', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
+
+      map.addLayer({ id: 'reported-routes-halo', type: 'line', source: 'reported-routes', layout: { 'line-cap':'round', 'line-join':'round' }, paint: {
+        'line-color':'#D4AF37', 'line-width':5, 'line-opacity':0.12, 'line-blur':2,
+      }});
+      map.addLayer({ id: 'reported-routes-core', type: 'line', source: 'reported-routes', layout: { 'line-cap':'round', 'line-join':'round' }, paint: {
+        'line-color':'#FFD166', 'line-width':1.5, 'line-opacity':0.68, 'line-dasharray':[2,3],
+      }});
+
+      map.addLayer({ id: 'frontlines-fill', type: 'fill', source: 'frontlines', paint: {
+        'fill-color':'#E0A63A', 'fill-opacity':0.035,
+      }});
+      map.addLayer({ id: 'frontlines-line', type: 'line', source: 'frontlines', layout: { 'line-cap':'round', 'line-join':'round' }, paint: {
+        'line-color':'#FFD166',
+        'line-width':['interpolate',['linear'],['zoom'], 2,0.8, 6,1.5, 10,2.2],
+        'line-opacity':0.72,
+        'line-dasharray':[3,2],
       }});
 
 
@@ -708,17 +749,34 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
       // Flight layers (WebGL symbol — GPU rendered, handles 50K+ smooth)
       const flightLayers = [
-        { id: 'fl-commercial', src: 'flights', icon: 'plane-cyan' },
-        { id: 'fl-private', src: 'private-fl', icon: 'plane-green' },
-        { id: 'fl-jets', src: 'jets', icon: 'plane-pink' },
-        { id: 'fl-military', src: 'military', icon: 'plane-red' },
+        { id: 'fl-commercial', src: 'flights', icon: 'plane-cyan', color: flightCom },
+        { id: 'fl-private', src: 'private-fl', icon: 'plane-green', color: flightPriv },
+        { id: 'fl-jets', src: 'jets', icon: 'plane-pink', color: flightGov },
+        { id: 'fl-military', src: 'military', icon: 'plane-red', color: flightMil },
       ];
       flightLayers.forEach(l => {
+        map.addLayer({ id: `${l.id}-halo`, type: 'circle', source: l.src, paint: {
+          'circle-radius': ['interpolate',['linear'],['zoom'], 1,3, 5,5, 10,8],
+          'circle-color': l.color,
+          'circle-opacity': 0.10,
+          'circle-blur': 1,
+        }});
         map.addLayer({ id: l.id, type: 'symbol', source: l.src, layout: {
-          'icon-image': l.icon, 'icon-size': ['interpolate',['linear'],['zoom'], 1,0.4, 5,0.7, 10,1],
+          'icon-image': l.icon, 'icon-size': ['interpolate',['linear'],['zoom'], 1,0.46, 5,0.76, 10,1.08],
           'icon-rotate': ['get','heading'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-        }, paint: { 'icon-opacity': 0.85 }});
+        }, paint: { 'icon-opacity': 0.94 }});
       });
+
+      map.addLayer({ id: 'selected-flight-track-halo', type: 'line', source: 'selected-flight-track', layout: {
+        'line-cap':'round', 'line-join':'round',
+      }, paint: {
+        'line-color':'#7FE9FF', 'line-width':5, 'line-opacity':0.14, 'line-blur':2,
+      }});
+      map.addLayer({ id: 'selected-flight-track-line', type: 'line', source: 'selected-flight-track', layout: {
+        'line-cap':'round', 'line-join':'round',
+      }, paint: {
+        'line-color':'#D7F8FF', 'line-width':2, 'line-opacity':0.9,
+      }});
 
       // Route layers are added later (after setMapReady) so they render on top of everything.
 
@@ -910,6 +968,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         const p = e.features[0].properties as any;
         const coords = (e.features[0].geometry as any).coordinates;
         const cs = (p.callsign||'').trim();
+        const selectedTrackSource = map.getSource('selected-flight-track') as maplibregl.GeoJSONSource | undefined;
+        selectedTrackSource?.setData(EMPTY_FC as never);
 
         // Show initial popup immediately (without route data)
         const routeLoadingId = `route-info-${Date.now()}`;
@@ -950,6 +1010,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
               if (!el || !d || d.error) {
                 if (el) el.innerHTML = '<span style="color:#5C5A54;font-size:9px;">الطائرة غير موجودة في السجل المتاح</span>';
                 return;
+              }
+              const track = Array.isArray(d.track)
+                ? d.track.filter((point: unknown) => Array.isArray(point) && point.length >= 2 && Number.isFinite(Number(point[0])) && Number.isFinite(Number(point[1])))
+                : [];
+              if (track.length >= 2) {
+                selectedTrackSource?.setData({
+                  type: 'FeatureCollection',
+                  features: [{
+                    type: 'Feature',
+                    properties: { icao24: p.icao24 || '', callsign: cs || '' },
+                    geometry: { type: 'LineString', coordinates: track },
+                  }],
+                } as never);
               }
               const bits = [d.registration, d.typeCode, d.operator].filter(Boolean)
                 .map((x: string) => htmlEsc(String(x))).join(' · ');
@@ -1050,7 +1123,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','cctv-dots','eq-circles','fires-heat',
+    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
       'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
@@ -1305,7 +1378,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Global Event / Conflict Markers ──
-    map.on('click', 'conflict-icons', e => {
+    const onConflictClick = (e: any) => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
@@ -1319,7 +1392,40 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         </div>
         ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
       </div>`);
+    };
+    map.on('click', 'conflict-icons', onConflictClick);
+    map.on('click', 'conflict-event-dots', onConflictClick);
+
+    map.on('click', 'military-activity-dots', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const level = Number(p.level) || 1;
+      const color = level >= 3 ? '#EF5350' : level >= 2 ? '#FF7043' : '#FFB74D';
+      popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
+        <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط جوي عسكري عام</div>
+        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي واسع من بيانات عامة. لا تُعرض هوية الطائرات أو إحداثياتها الدقيقة أو مساراتها التشغيلية.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
+          <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
+          <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
+        </div>
+        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}°</div>
+      </div>`);
     });
+
+    const onFrontlineClick = (e: any) => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = e.lngLat;
+      popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid rgba(255,209,102,.28);">
+        <div style="color:#FFD166;font-size:12px;font-weight:700;margin-bottom:6px;">خط/منطقة جبهة منشورة</div>
+        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;">هندسة سياقية من لقطة منشورة للعامة، وليست موضعًا تكتيكيًا لحظيًا.</div>
+        <div style="font-size:9px;color:#A8AAA5;margin-top:7px;">المصدر: ${htmlEsc(p.source || 'DeepStateMap.Live')}</div>
+        ${p.source_label ? `<div style="font-size:8px;color:#7E817C;margin-top:3px;">وصف المصدر: ${htmlEsc(p.source_label)}</div>` : ''}
+      </div>`);
+    };
+    map.on('click', 'frontlines-fill', onFrontlineClick);
+    map.on('click', 'frontlines-line', onFrontlineClick);
 
 
     // ── M3TM.WORLD SDK link click ──
@@ -1385,7 +1491,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -1677,7 +1783,20 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights, 2) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets, 2) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
-  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military]);
+    setGeo('military-activity', (activeLayers as any).military_activity && data.military_activity
+      ? data.military_activity.map((cell: any) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [cell.lng, cell.lat] },
+          properties: {
+            level: cell.level,
+            activity: cell.activity,
+            approximate_count: cell.approximate_count,
+            cell_degrees: cell.cell_degrees,
+            precision: cell.precision,
+          },
+        }))
+      : []);
+  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, data.military_activity, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
 
   /**
    * Pull the palette out of the document whenever it can have changed.
@@ -2138,6 +2257,33 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('live-news', activeLayers.live_news && data.live_feeds ? data.live_feeds.map((f: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] }, properties: { bridge_id: f.bridge_id || '', name: f.name, city: f.city, country: f.country, url: f.url, category: f.category, embed_allowed: f.embed_allowed !== false } })) : []);
   }, [mapReady, data.live_feeds, activeLayers.live_news, setGeo]);
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const routes = (activeLayers as any).reported_routes && data.live_feeds
+      ? data.live_feeds.flatMap((f: any) => {
+          const originLat = Number(f.origin_lat);
+          const originLng = Number(f.origin_lng);
+          const targetLat = Number(f.lat);
+          const targetLng = Number(f.lng);
+          if (f.route_status !== 'verified' || ![originLat, originLng, targetLat, targetLng].every(Number.isFinite)) return [];
+          return [{
+            type: 'Feature' as const,
+            geometry: { type: 'LineString' as const, coordinates: [[originLng, originLat], [targetLng, targetLat]] },
+            properties: { bridge_id: f.bridge_id || '', name: f.name || 'مسار حدث منشور', source: f.country || '', route_status: 'verified' },
+          }];
+        })
+      : [];
+    setGeo('reported-routes', routes);
+  }, [mapReady, data.live_feeds, (activeLayers as any).reported_routes, setGeo]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const safeCollection = data.frontlines?.type === 'FeatureCollection' && Array.isArray(data.frontlines.features)
+      ? data.frontlines
+      : EMPTY_FC;
+    setGeo('frontlines', (activeLayers as any).frontlines ? safeCollection : EMPTY_FC);
+  }, [mapReady, data.frontlines, (activeLayers as any).frontlines, setGeo]);
+
 
   useEffect(() => {
     if (!mapReady) return;
@@ -2156,6 +2302,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
           properties: {
+            kind: 'zone',
             label: z.labelAr || z.label,
             severity: z.severity,
             description: `${z.descriptionAr || z.description}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
@@ -2171,9 +2318,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             type: 'Feature' as const,
             geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
             properties: {
+              kind: 'event',
               label: 'بلاغ نزاع مرصود',
               severity: 'war',
-              description: 'بلاغ عام مرتبط بمنطقة نزاع. افتح المصدر للاطلاع على النص الأصلي.',
+              description: e.title || 'بلاغ عام مرتبط بمنطقة نزاع. افتح المصدر للاطلاع على النص الأصلي.',
               sourceUrl: e.url || '',
             },
           }));
@@ -2192,13 +2340,39 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         const fallbackFeatures = FALLBACK_ZONES.map(z => ({
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
-          properties: { label: z.label, severity: z.severity, description: z.description, sourceUrl: z.sourceUrl },
+          properties: { kind: 'zone', label: z.label, severity: z.severity, description: z.description, sourceUrl: z.sourceUrl },
         }));
         setGeo('conflict-zones', fallbackFeatures);
       }
     })();
     return () => { cancelled = true; };
   }, [mapReady, setGeo]);
+
+  // Page-level polling keeps the same conflict source fresh after initial map
+  // load. The map's own request above remains the cold-load fallback.
+  useEffect(() => {
+    if (!mapReady || !Array.isArray(data.conflict_zones)) return;
+    const zones = data.conflict_zones.map((z: any) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
+      properties: {
+        kind: 'zone',
+        label: z.labelAr || z.label,
+        severity: z.severity,
+        description: `${z.descriptionAr || z.description || ''}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
+        sourceUrl: z.sourceUrl || '',
+        eventCount: z.eventCount || 0,
+      },
+    }));
+    const events = (data.conflict_live_events || [])
+      .filter((e: any) => Number.isFinite(Number(e.lat)) && Number.isFinite(Number(e.lng)))
+      .map((e: any) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [Number(e.lng), Number(e.lat)] },
+        properties: { kind: 'event', label: 'بلاغ نزاع مرصود', severity: 'war', description: e.title || 'بلاغ عام مرتبط بمنطقة نزاع.', sourceUrl: e.url || '' },
+      }));
+    setGeo('conflict-zones', [...zones, ...events]);
+  }, [mapReady, data.conflict_zones, data.conflict_live_events, setGeo]);
 
 
   // Visibility
@@ -2221,10 +2395,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
     setVis(['cyber-arcs-atmo','cyber-arcs-glow','cyber-arcs-core','cyber-arcs-flow','cyber-heads','cyber-impacts','cyber-labels'], (activeLayers as any).cyber_attacks);
     setVis(['day-night-fill'], activeLayers.day_night);
-    setVis(['fl-commercial'], activeLayers.flights);
-    setVis(['fl-private'], activeLayers.private);
-    setVis(['fl-jets'], activeLayers.jets);
-    setVis(['fl-military'], activeLayers.military);
+    setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights);
+    setVis(['fl-private-halo','fl-private'], activeLayers.private);
+    setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
+    setVis(['fl-military-halo','fl-military'], activeLayers.military);
+    setVis(['military-activity-halo','military-activity-dots','military-activity-label'], (activeLayers as any).military_activity);
     setVis(['cctv-glow','cctv-dots','cctv-label'], activeLayers.cctv);
     setVis(['fires-heat'], activeLayers.fires);
     setVis(['weather-glow','weather-dots','weather-label'], activeLayers.weather);
@@ -2233,7 +2408,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
-    setVis(['conflict-icons'], activeLayers.conflict_zones !== false);
+    setVis(['conflict-zone-halo','conflict-event-dots','conflict-icons'], activeLayers.conflict_zones !== false);
+    setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
+    setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);
 
     setVis(['balloon-dots','balloon-label'], activeLayers.balloons);
     setVis(['rad-glow','rad-dots','rad-label'], activeLayers.radiation);

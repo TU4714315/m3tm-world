@@ -78,11 +78,11 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: true, private: false, jets: false, military: false, maritime: true,
+  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, war_alerts: false, day_night: true,
+  infrastructure: false, global_incidents: true, conflict_zones: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
   cf_outages: false, cf_attacks: false,
@@ -92,8 +92,8 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [
     key,
     [
-      'live_news', 'global_incidents', 'conflict_zones', 'gdelt_events',
-      'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      'live_news', 'global_incidents', 'conflict_zones', 'frontlines', 'gdelt_events',
+      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
     ].includes(key),
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
@@ -811,7 +811,7 @@ export default function Dashboard() {
   useEffect(() => {
 
     // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
+    if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
       if (!layerFetchedRef.current.has('flights')) {
         fetchEndpoint('/api/flights');
         layerFetchedRef.current.add('flights');
@@ -903,9 +903,33 @@ export default function Dashboard() {
       });
     };
 
-    // GDELT 2.0 geocoded events
+    // GDELT 2.0 material-conflict events only.
     if ((activeLayers as any).gdelt_events) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?limit=600', d => ({ gdelt_events: d.events }));
+      loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({ gdelt_events: d.events ?? [] }));
+    }
+    if ((activeLayers as any).conflict_zones) {
+      loadLayerOnce('conflicts', '/api/conflicts', d => ({
+        conflict_zones: d.zones ?? [],
+        conflict_live_events: d.liveEvents ?? [],
+        conflict_summary: {
+          totalZones: d.totalZones ?? 0,
+          totalLiveEvents: d.totalLiveEvents ?? 0,
+          activeWarzones: d.activeWarzones ?? 0,
+          timestamp: d.timestamp ?? null,
+        },
+      }));
+    }
+    if ((activeLayers as any).frontlines) {
+      loadLayerOnce('frontlines', '/api/frontlines', d => ({
+        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines_meta: {
+          total: d.total ?? 0,
+          status: d.status ?? 'unavailable',
+          source: d.source ?? 'DeepStateMap.Live',
+          sourceMode: d.sourceMode ?? 'published-snapshot',
+          timestamp: d.timestamp ?? null,
+        },
+      }));
     }
 
     // Cloudflare Radar — one request backs both layers
@@ -923,7 +947,7 @@ export default function Dashboard() {
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
+    if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
     }
 
@@ -946,6 +970,33 @@ export default function Dashboard() {
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
+    }
+    if ((activeLayers as any).gdelt_events) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({ gdelt_events: d.events ?? [] })), 300000));
+    }
+    if ((activeLayers as any).conflict_zones) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
+        conflict_zones: d.zones ?? [],
+        conflict_live_events: d.liveEvents ?? [],
+        conflict_summary: {
+          totalZones: d.totalZones ?? 0,
+          totalLiveEvents: d.totalLiveEvents ?? 0,
+          activeWarzones: d.activeWarzones ?? 0,
+          timestamp: d.timestamp ?? null,
+        },
+      })), 300000));
+    }
+    if ((activeLayers as any).frontlines) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
+        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines_meta: {
+          total: d.total ?? 0,
+          status: d.status ?? 'unavailable',
+          source: d.source ?? 'DeepStateMap.Live',
+          sourceMode: d.sourceMode ?? 'published-snapshot',
+          timestamp: d.timestamp ?? null,
+        },
+      })), 1800000));
     }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
@@ -1087,17 +1138,33 @@ export default function Dashboard() {
     embed_allowed: true,
     lat: item.latitude,
     lng: item.longitude,
+    ...(item.routeStatus === 'verified'
+      && item.originLatitude !== undefined
+      && item.originLongitude !== undefined
+      ? {
+          route_status: 'verified',
+          origin_lat: item.originLatitude,
+          origin_lng: item.originLongitude,
+        }
+      : {}),
   })), [embeddedNewsItems]);
 
   const sdkDisplayData = useMemo(() => (
     embedSurface === 'public'
       ? {
-          live_feeds: embeddedLiveFeeds,
+          live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : (data.live_feeds || []),
           commercial_flights: data.commercial_flights || [],
+          military_activity: data.military_activity || [],
+          military_activity_meta: data.military_activity_meta || null,
           satellites: data.satellites || [],
           category_counts: data.category_counts || {},
           gdelt: data.gdelt || [],
           gdelt_events: data.gdelt_events || [],
+          conflict_zones: data.conflict_zones || [],
+          conflict_live_events: data.conflict_live_events || [],
+          conflict_summary: data.conflict_summary || null,
+          frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
+          frontlines_meta: data.frontlines_meta || null,
           earthquakes: data.earthquakes || [],
           sdk_entities: [],
         }
