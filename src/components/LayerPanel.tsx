@@ -64,6 +64,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Plane,
     layers: [
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
+      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'تجميع إقليمي واسع بلا هوية أو مسار تشغيلي دقيق' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
     ],
@@ -110,13 +111,15 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'التهديدات',
-    fullLabel: 'الأحداث والبلاغات العامة',
+    fullLabel: 'الحروب والأحداث العامة',
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'conflict_zones', label: 'مناطق النزاع المعلنة', description: 'مؤشرات مرجعية وبلاغات من مصادر عامة', dataKey: '' },
+      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق عامة مع بلاغات منشورة وتحديث دوري', dataKey: 'conflict_zones,conflict_live_events' },
+      { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
+      { key: 'reported_routes', label: 'مسارات أحداث موثقة', description: 'مسارات منشورة بين مصدر وهدف موثقين؛ ليست مسارات عسكرية تشغيلية', dataKey: '' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'أحداث وضربات منشورة', description: 'بلاغات من مصادر عامة؛ ليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
+      { key: 'gdelt_events', label: 'أحداث صراع وضربات منشورة', description: 'GDELT Material Conflict من مصادر عامة؛ ليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
     ],
   },
   {
@@ -255,8 +258,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     let total = 0;
     let found = false;
     for (const k of dk.split(',')) {
-      if (data[k] && Array.isArray(data[k])) {
-        total += data[k].length;
+      const value = k.split('.').reduce((current: any, part) => current?.[part], data);
+      if (Array.isArray(value)) {
+        total += value.length;
         found = true;
       }
     }
