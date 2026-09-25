@@ -117,6 +117,20 @@ export interface GdeltEvent {
   date: string;
 }
 
+export type PublicGdeltEvent = Omit<GdeltEvent,
+  'actor1_geo_type' | 'actor1_name' | 'actor1_country' | 'actor1_lat' | 'actor1_lng'
+>;
+
+export function toPublicGdeltEvent(event: GdeltEvent): PublicGdeltEvent {
+  const publicEvent: Partial<GdeltEvent> = { ...event };
+  delete publicEvent.actor1_geo_type;
+  delete publicEvent.actor1_name;
+  delete publicEvent.actor1_country;
+  delete publicEvent.actor1_lat;
+  delete publicEvent.actor1_lng;
+  return publicEvent as PublicGdeltEvent;
+}
+
 export interface GdeltReportedRoute {
   id: string;
   origin_lat: number;
@@ -144,6 +158,11 @@ const isValidCoordinatePair = (lat: unknown, lng: unknown) => (
 
 const generalizeQuarterDegree = (value: number) => Math.round(value * 4) / 4;
 
+const wrappedLongitudeDelta = (a: number, b: number) => {
+  const raw = Math.abs(a - b) % 360;
+  return Math.min(raw, 360 - raw);
+};
+
 export function buildGdeltReportedRoutes(events: GdeltEvent[], limit = 240): GdeltReportedRoute[] {
   const output: GdeltReportedRoute[] = [];
   const seen = new Set<string>();
@@ -159,7 +178,7 @@ export function buildGdeltReportedRoutes(events: GdeltEvent[], limit = 240): Gde
     const targetLat = generalizeQuarterDegree(event.lat);
     const targetLng = generalizeQuarterDegree(event.lng);
     const deltaLat = originLat - targetLat;
-    const deltaLng = originLng - targetLng;
+    const deltaLng = wrappedLongitudeDelta(originLng, targetLng);
     if ((deltaLat * deltaLat) + (deltaLng * deltaLng) < 0.25) continue;
 
     const key = `${originLat}:${originLng}>${targetLat}:${targetLng}:${event.url}`;
@@ -172,7 +191,7 @@ export function buildGdeltReportedRoutes(events: GdeltEvent[], limit = 240): Gde
       origin_lng: originLng,
       target_lat: targetLat,
       target_lng: targetLng,
-      origin_label: event.actor1_name || event.actor1_country || 'موقع الفاعل المنشور',
+      origin_label: 'موقع الفاعل المنشور',
       target_label: event.name || event.country || 'موقع الحدث المنشور',
       source_url: event.url,
       date: event.date,
