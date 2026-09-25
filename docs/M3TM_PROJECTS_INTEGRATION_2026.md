@@ -10,12 +10,11 @@
 ## M3TM.WORLD
 - المستودع: TU4714315/m3tm-world
 - مساحة العمل الحالية: /m3tm-world
-- فرع التوثيق النهائي الحالي: docs/final-integration-20260924، مبني مباشرة على origin/main.
-- origin/main المؤكد: 180c636b12f3132e1f11755d4fe35be952d85fb7 — Merge pull request #7 from TU4714315/fix/public-live-feeds-20260924.
+- origin/main المؤكد: fd8b6b0fd74323b8a0bd3ed567af3800bcc78893 — Merge PR #12 `fix: harden public reported routes`.
 - النشر: https://m3tm-world.vercel.app
 - ملف الحالة: /m3tm-world/M3TM_WORLD_STATE.md
 - Checkpoint سابق: /m3tm-world/outputs/recovery/20260917-182538-executive/CHECKPOINT.md
-- الحالة: WORLD منشور ويعمل كمحرك 3D الحقيقي لـ M3TM.APP عبر عقد embed hardened. أغلقت PRs #4/#5 الواجهة العامة العربية والجوال والسلامة والـpublic surface، وأغلقت #6/#7 استعادة fallback الطيران المدني العام. النشر الحي الحالي مطابق لـ origin/main أعلاه.
+- الحالة: WORLD منشور ويعمل كمحرك 3D الحقيقي لـ M3TM.APP عبر عقد embed hardened. أغلقت PRs #4–#7 السطح العام والجوال والطيران المدني، وPR #9 طبقات النزاع/الجبهات والنشاط العسكري العام، وPR #11 تغذية روابط الأحداث العامة، وPR #12 خصوصية payload وتحديث الطبقة وعبور خط 180°. آخر build/deploy status على خط #12 ناجح.
 
 ## M3TM.APP
 - المستودع: TU4714315/m3tm-app
@@ -24,7 +23,7 @@
 - نسخة العمل الحالية المعتمدة داخل Workspace Core: /m3tm-world/scratch/m3tm-app-live
 - Worktree تاريخي معروف: C:\Users\DELL\.codex\worktrees\m3tm-app-finalize-20260919
 - نسخة محلية قديمة لا تستخدم كأساس: C:\Users\DELL\Documents\Codex\2026-06-21\new-chat\work\m3tm-app
-- origin/main المؤكد: 937b71b9deee813eb775f724a77e34c6d5308153 — Open full M3TM.WORLD from mobile map navigation (#284).
+- origin/main المؤكد: 69fce370997b4742b9475ae5281058ead6b5790c — PR #285 `fix(world): restore public routes and glass mobile card`.
 - الدمج الحالي: production live iframe bridge فعلي إلى M3TM.WORLD الحقيقي في وضع 3D، مع 2D fallback محلي. هذا ليس direct in-process Adapter النهائي؛ الـAdapter المباشر دين معماري مستقبلي وليس عطلًا في bridge الحالي.
 
 ## المشاريع والخدمات المساندة
@@ -332,7 +331,7 @@ M3TM.WORLD
 - PR #9 `feat: restore public conflict routes and safe military activity` دُمج إلى `main`؛ feature SHA: `ac2fbaf07128f183116d13ed9968ac4e7501464f`، merge SHA: `349cdb602ef796fd61033b1e1e6ec9154ee87c28`.
 - Vercel status على merge SHA: `success` / `Deployment has completed`.
 - السطح العام يشغّل افتراضيًا: مناطق الحروب والنزاعات، مناطق/خطوط الجبهة المنشورة، مسارات الأحداث الموثقة، GDELT Material Conflict، والنشاط الجوي العسكري العام المجمّع.
-- `military_activity` عام وغير تشغيلي: خلايا تقريبية 6 درجات، حد أدنى مجموعتان، بلا identifiers وبلا exact tracks. يبقى `military_flights=[]` و`gps_jamming=[]` في العقد العام.
+- `military_activity` عام وغير تشغيلي: خلايا تقريبية 6 درجات، حد أدنى مجموعتان، بلا معرفات طائرات فعلية وبلا exact tracks. تبقى معرفات خلايا تجميع اصطناعية مثل `military-activity-...` فقط لأغراض العرض، ويظل `military_flights=[]` و`gps_jamming=[]` في العقد العام.
 - Production QA جديد على 390x844 أثبت: map=390x844، RTL، `scrollWidth=390`، والطبقات `military_activity/conflict_zones/frontlines/reported_routes/gdelt_events/global_incidents` موجودة ومفعلة.
 - Production data proof في آخر فحص: 2,805 رحلة تجارية، 27 خلية نشاط عسكري عام، 15 منطقة نزاع، 11 حدث نزاع حي، 125 feature جبهة منشورة، 124 حدث Material Conflict، 11,517 قمرًا عامًا، و46 خبرًا عربيًا فعليًا.
 - لا توجد bad HTTP responses أو console errors في QA؛ الطلبات الملغاة من MapLibre/CCTV بقيت `ERR_ABORTED` غير حاجبة ومفصولة عن core failures.
@@ -350,4 +349,15 @@ M3TM.WORLD
 ### قرار الإغلاق المحدث
 - شكوى الشفافية والمسارات وثراء طبقات الحرب أغلقت فعليًا عبر PR #285 وPR #9.
 - السطح العام يعرض نشاطًا عسكريًا عامًا منشورًا/مجمّعًا فقط، ولا يعرض مسارات عسكرية تشغيلية دقيقة أو معرفات أو GPS jamming؛ أي تفصيل تشغيلي أدق يبقى خلف سياق داخلي/gated وليس ضمن public WORLD.
-- آخر مصدر حقيقة للتنفيذ: WORLD `main=349cdb602ef796fd61033b1e1e6ec9154ee87c28` وAPP `main=69fce370997b4742b9475ae5281058ead6b5790c` قبل PR التوثيق هذا.
+- آخر مصدر حقيقة للتنفيذ: WORLD `main=fd8b6b0fd74323b8a0bd3ed567af3800bcc78893` بعد PR #12، وAPP `main=69fce370997b4742b9475ae5281058ead6b5790c` بعد PR #285.
+
+## تصحيح ما بعد PR #11 — PR #12 (2026-09-25)
+- PR #11 أضاف `reported_routes` الحية من GDELT لكنه ترك مراجعات مفتوحة مرتبطة بخصوصية Actor1 وتشغيل الطبقة منفردة وعبور خط 180°.
+- PR #12 `fix: harden public reported routes` دُمج إلى `main`؛ merge SHA: `fd8b6b0fd74323b8a0bd3ed567af3800bcc78893`.
+- الاستجابة العامة `/api/gdelt-events` لا تسلسل حقول Actor1 الخام: لا `actor1_lat/lng` ولا `actor1_name/country` ولا `actor1_geo_type`.
+- إنشاء الروابط داخليًا ما زال يستخدم المصدر الخام، ثم يخرج فقط نقاطًا معممة إلى 0.25° مع تسمية أصل عامة `موقع الفاعل المنشور`.
+- `reported_routes` تُحمّل وتُحدّث عندما تكون طبقتها مفعلة حتى لو كانت `gdelt_events` مطفأة.
+- حساب قرب النقاط يلف فرق longitude حول خط التاريخ، ورسم المسار يقسم الهندسة عند ±180° بدل إنشاء خط مضلل يقطع العالم.
+- أضيفت اختبارات لفلترة payload العامة، نقاط خط التاريخ المتجاورة، والانقسام شرقًا وغربًا عند antimeridian.
+- Vercel check على head الخاص بـPR #12 = success قبل الدمج، ولم تظهر review threads جديدة على PR #12 وقت الإغلاق.
+
