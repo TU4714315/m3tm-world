@@ -363,9 +363,9 @@ export const API_GROUPS: ApiGroup[] = [
   },
   {
     id: 'tools',
-    title: 'Public Data Tools',
+    title: 'Internal OSINT Tools',
     blurb:
-      'The lookup tools behind the RECON panel. Every route takes a single subject and returns a normalised result, so they compose well in scripts.',
+      'Internal lookup routes used by the authorized M3TM.APP portal. Production fails closed unless the internal-tools bridge is explicitly enabled and the server-to-server token is present; these routes are not public browser APIs.',
     endpoints: [
       {
         path: '/api/tools/dns',
