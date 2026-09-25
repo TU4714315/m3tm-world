@@ -25,11 +25,11 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldRemote from '@/components/WorldRemote';
 import ArcGISPanel from '@/components/ArcGISPanel';
+import M3tmApexBrand from '@/components/M3tmApexBrand';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
 const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
-const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
 const DrawingToolbar = dynamic(() => import('@/components/DrawingToolbar'), { ssr: false });
 const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 // The measurement helpers are pure functions — importing them directly keeps
@@ -1288,11 +1288,10 @@ export default function Dashboard() {
             </div>
 
                         {/* ── M3TM.WORLD logo — transparent alpha version, original colors preserved ── */}
-                                    <img
-                                      dir="ltr"
-                                      src="/branding/m3tm-world-logo-transparent.png"
-                                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                                      className="w-64 md:w-80 h-auto object-contain rounded-md mb-3 z-[2]"
+                                    <M3tmApexBrand
+                                      className="mb-3 z-[2]"
+                                      markClassName="h-[78px] w-[132px] md:h-[92px] md:w-[156px]"
+                                      subtitle="خريطة عالمية للبيانات الحية"
                                     />
 
             {/* ── Subtitle — typewriter reveal ── */}
@@ -1531,11 +1530,9 @@ export default function Dashboard() {
             {/* ── HEADER ── */}
       <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
         <div dir="ltr" className="flex items-center gap-3 w-fit">
-          <img
-                      dir="ltr"
-                      src="/branding/m3tm-world-logo-transparent.png"
-                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                      className="w-[110px] md:w-[150px] max-w-full h-auto object-contain shrink-0 rounded-[5px]"
+          <M3tmApexBrand
+                      className="shrink-0"
+                      markClassName="h-[46px] w-[78px] md:h-[54px] md:w-[92px]"
                     />
           <div dir="rtl" className="hidden sm:flex flex-col items-start gap-0.5 pr-1">
             <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">بيانات عامة · مصادر منشورة · عرض مباشر</span>
@@ -1571,9 +1568,9 @@ export default function Dashboard() {
 
         <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
 
-        <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 ml-3 shadow-[0_0_10px_rgba(255,215,0,0.1)]">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
-          <span className="text-[var(--gold-primary)] font-bold">دعم</span>
+        <a href='https://m3tm.app' className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 ml-3 shadow-[0_0_10px_rgba(255,215,0,0.1)]" aria-label="الرجوع إلى M3TM.APP">
+          <ExternalLink className="w-3 h-3 text-[var(--gold-primary)]" />
+          <span className="text-[var(--gold-primary)] font-bold">الرجوع إلى M3TM.APP</span>
         </a>
       </motion.div>
 
@@ -1582,9 +1579,9 @@ export default function Dashboard() {
           place would put the support badge underneath the destination field. */}
       {!embedMode && isMobile && !showDirections && !navSession && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
-          <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
-            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
-            <span className="text-[var(--gold-primary)] font-bold">دعم</span>
+          <a href='https://m3tm.app' className="glass-panel px-2.5 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10" aria-label="الرجوع إلى M3TM.APP">
+            <ExternalLink className="w-3 h-3 text-[var(--gold-primary)]" />
+            <span className="text-[var(--gold-primary)] font-bold">رجوع M3TM.APP</span>
           </a>
         </motion.div>
       )}
@@ -1599,26 +1596,21 @@ export default function Dashboard() {
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
         <div className="relative group">
-          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="أدوات البحث والتحقق — بحث IP وفحص الشبكة وتحديد الموقع" aria-label="أدوات البحث والتحقق" aria-expanded={showIntel}>
-            <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
-            {showIntel && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]"
-              />
-            )}
+          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--gold-primary)]/15' : 'hover:bg-white/10'}`} title="بوابة OSINT الداخلية — تتطلب صلاحية" aria-label="بوابة OSINT الداخلية" aria-expanded={showIntel}>
+            <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
+            {showIntel && <span aria-hidden="true" className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--gold-primary)]" />}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">أدوات</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">بوابة OSINT</span>
           <AnimatePresence>
             {showIntel && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target, data) => {
-                  setScanTargets(prev => {
-                    const existing = prev.filter(t => t.id !== target);
-                    return [{ id: target, timestamp: Date.now(), ...data }, ...existing].slice(0, 10);
-                  });
-                  setFlyToLocation({ lat: data.lat, lng: data.lng, ts: Date.now() });
-                }} />
+                <div className="glass-panel p-4 space-y-3 text-right" dir="rtl">
+                  <div className="flex items-center gap-2 text-[var(--gold-primary)]"><Radar className="w-4 h-4" /><strong className="text-[12px]">OSINT داخلي ومقفل</strong></div>
+                  <p className="text-[11px] leading-5 text-[var(--text-secondary)]">أدوات التحقيق لم تعد تعمل من السطح العام لـ M3TM.WORLD. التشغيل متاح فقط داخل M3TM.APP بعد تسجيل الدخول واجتياز صلاحيات المالك.</p>
+                  <a href="https://m3tm.app/login?next=%2Fdashboard%2Fm3tm-1%2Fosint" className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-[var(--gold-primary)]/35 bg-[var(--gold-primary)]/10 px-3 text-[11px] font-bold text-[var(--gold-light)]">
+                    <ExternalLink className="w-3.5 h-3.5" /> فتح البوابة الداخلية
+                  </a>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1898,7 +1890,7 @@ export default function Dashboard() {
                 { id: 'layers' as const, icon: Layers, label: 'الطبقات' },
                 { id: 'markets' as const, icon: BarChart3, label: 'الأسواق' },
                 { id: 'intel' as const, icon: Newspaper, label: 'الأخبار' },
-                { id: 'recon' as const, icon: Radar, label: 'أدوات' },
+                { id: 'recon' as const, icon: Radar, label: 'بوابة' },
                 { id: 'search' as const, icon: Search, label: 'بحث' },
                 // Routing was reachable only from the desktop tool rail, so a
                 // phone could not open it at all. It sits next to SEARCH
@@ -1955,7 +1947,7 @@ export default function Dashboard() {
                 <div className="px-3 pb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="hud-text text-[12px] text-[var(--text-primary)]">
-                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والبيانات' : mobilePanel === 'intel' ? 'موجز الأخبار' : mobilePanel === 'recon' ? 'أدوات البحث والتحقق' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
+                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والبيانات' : mobilePanel === 'intel' ? 'موجز الأخبار' : mobilePanel === 'recon' ? 'بوابة OSINT الداخلية' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
                     </span>
                     <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
                   </div>
@@ -1986,7 +1978,13 @@ export default function Dashboard() {
                   )}
                   {mobilePanel === 'recon' && (
                     <div className="space-y-2">
-                      <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
+                      <div className="glass-panel p-4 space-y-3 text-right" dir="rtl">
+                        <div className="flex items-center gap-2 text-[var(--gold-primary)]"><Radar className="w-4 h-4" /><strong className="text-[12px]">بوابة OSINT الداخلية</strong></div>
+                        <p className="text-[11px] leading-5 text-[var(--text-secondary)]">التشغيل والتحليل بالأدوات محصوران في البوابة الداخلية وبحسب صلاحية حسابك وقرار المالك.</p>
+                        <a href="https://m3tm.app/login?next=%2Fdashboard%2Fm3tm-1%2Fosint" className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--gold-primary)]/35 bg-[var(--gold-primary)]/10 px-3 text-[11px] font-bold text-[var(--gold-light)]">
+                          <ExternalLink className="w-3.5 h-3.5" /> الانتقال إلى M3TM.APP
+                        </a>
+                      </div>
                     </div>
                   )}
                   {mobilePanel === 'remote' && (

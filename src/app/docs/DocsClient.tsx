@@ -332,8 +332,8 @@ export default function DocsClient() {
 
           <Section id="quickstart" eyebrow="Guide" title="Quick Start">
             <p>
-              Every read endpoint is a plain <Code>GET</Code> returning JSON. Nothing below needs authentication —
-              paste any of it into a terminal.
+              Public map feeds remain plain <Code>GET</Code> endpoints returning JSON. Internal OSINT lookup routes are different:
+              <Code>/api/tools/*</Code> and <Code>/api/osint/*</Code> fail closed unless called through the authorized internal bridge.
             </p>
             <CodeBlock
               label="Fetch live aircraft"
@@ -364,8 +364,9 @@ print(len(data["commercial_flights"]), "commercial")`,
 # { "stats": { "flights": 9241, "sats": 2043, "cctv": 2117,
 #              "weather": 58, "nuclear": 191, "incidents": 412 },
 #   "timestamp": "2026-07-29T12:00:00Z" }`}</Pre>
-            <p>The public-data lookup tools each take one subject, so they compose cleanly in a pipeline:</p>
-            <Pre label="Passive subdomain enumeration" lang="bash">{`curl -s "${origin}/api/tools/certs?domain=example.com" | jq -r '.subdomains[]'`}</Pre>
+            <Callout tone="warn" title="OSINT is internal">
+              Lookup and investigation tools are no longer callable from the public WORLD surface. Open the authenticated M3TM.APP internal portal; the server bridge supplies authorization without exposing its token to the browser.
+            </Callout>
             <Callout tone="info" title="Try before you write code">
               Every GET endpoint in the reference below has a <strong>Send request</strong> button that runs it against
               this instance and shows the live response.
@@ -405,6 +406,10 @@ docker compose up -d`}</Pre>
                 {
                   k: 'SCANNER_URL / SCANNER_KEY',
                   v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s backend shared key. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
+                },
+                {
+                  k: 'M3TM_WORLD_INTERNAL_TOOLS_ENABLED / M3TM_WORLD_INTERNAL_TOOLS_TOKEN',
+                  v: 'Fail-closed gate for /api/tools/* and /api/osint/*. Keep disabled on the public surface; when enabled, the token is supplied only by the authorized server bridge and never by browser UI.',
                 },
                 {
                   k: 'SDK_INGEST_KEY',
@@ -454,8 +459,8 @@ docker compose up -d`}</Pre>
                   v: 'The left rail. Switches individual feeds on and off, and carries the theme selector.',
                 },
                 {
-                  k: 'RECON Toolkit',
-                  v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, breach checks, sanctions, CVE lookup, port scanning.',
+                  k: 'Internal OSINT Gate',
+                  v: 'WORLD exposes only a locked hand-off to M3TM.APP. DNS, WHOIS, certificate, enrichment and scanner tools run behind authenticated internal routes.',
                 },
                 {
                   k: 'موجز الأخبار',
@@ -519,9 +524,9 @@ docker compose up -d`}</Pre>
           {/* ── API REFERENCE ── */}
           <Section id="api" eyebrow="API Reference" title="Conventions">
             <p>
-              All routes live under <Code>/api</Code> on whatever origin serves the application. Reads are{' '}
-              <Code>GET</Code>, writes are <Code>POST</Code> with a JSON body. Nothing requires authentication except{' '}
-              <Code>/api/sdk/ingest</Code> and <Code>/api/github-webhook</Code>.
+              All routes live under <Code>/api</Code> on whatever origin serves the application. Public map-feed reads are{' '}
+              <Code>GET</Code>. The OSINT namespaces <Code>/api/tools/*</Code> and <Code>/api/osint/*</Code> are internal-only,
+              while <Code>/api/sdk/ingest</Code> and <Code>/api/github-webhook</Code> also require their dedicated authorization.
             </p>
             <div className="space-y-2.5">
               {[
