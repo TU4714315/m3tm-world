@@ -15,6 +15,7 @@ import LiveNewsPreviews, { type PreviewFeed } from '@/components/LiveNewsPreview
 import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 
 import { applyMapProjection } from '@/lib/map-projection';
+import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -2268,7 +2269,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           if (f.route_status !== 'verified' || ![originLat, originLng, targetLat, targetLng].every(Number.isFinite)) return [];
           return [{
             type: 'Feature' as const,
-            geometry: { type: 'LineString' as const, coordinates: [[originLng, originLat], [targetLng, targetLat]] },
+            geometry: buildAntimeridianSafeLine(originLng, originLat, targetLng, targetLat),
             properties: { bridge_id: f.bridge_id || '', name: f.name || 'مسار حدث منشور', source: f.country || '', route_status: 'verified', route_kind: 'published-evidence-route', not_trajectory: true },
           }];
         })
@@ -2282,7 +2283,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           if (![originLat, originLng, targetLat, targetLng].every(Number.isFinite)) return [];
           return [{
             type: 'Feature' as const,
-            geometry: { type: 'LineString' as const, coordinates: [[originLng, originLat], [targetLng, targetLat]] },
+            geometry: buildAntimeridianSafeLine(originLng, originLat, targetLng, targetLat),
             properties: {
               bridge_id: route.id || '',
               name: `${route.origin_label || 'موقع منشور'} ← ${route.target_label || 'حدث منشور'}`,
