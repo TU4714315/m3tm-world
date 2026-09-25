@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildGdeltReportedRoutes, fetchGdeltEvents } from '@/lib/gdeltEvents';
+import { buildGdeltReportedRoutes, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 
 export const maxDuration = 60;
 
@@ -32,10 +32,11 @@ export async function GET(req: Request) {
   try {
     const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit });
     const reportedRoutes = buildGdeltReportedRoutes(events);
+    const publicEvents = events.map(toPublicGdeltEvent);
 
     return NextResponse.json(
       {
-        events,
+        events: publicEvents,
         reported_routes: reportedRoutes,
         reported_routes_meta: {
           mode: 'public-event-link',
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
           not_trajectory: true,
           source: 'GDELT Actor1Geo → ActionGeo',
         },
-        total: events.length,
+        total: publicEvents.length,
         reported_routes_total: reportedRoutes.length,
         scanned,
         window,
