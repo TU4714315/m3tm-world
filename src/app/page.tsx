@@ -25,6 +25,7 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldRemote from '@/components/WorldRemote';
 import ArcGISPanel from '@/components/ArcGISPanel';
+import M3tmApexBrand from '@/components/M3tmApexBrand';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -1287,11 +1288,10 @@ export default function Dashboard() {
             </div>
 
                         {/* ── M3TM.WORLD logo — transparent alpha version, original colors preserved ── */}
-                                    <img
-                                      dir="ltr"
-                                      src="/branding/m3tm-world-logo-transparent.png"
-                                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                                      className="w-64 md:w-80 h-auto object-contain rounded-md mb-3 z-[2]"
+                                    <M3tmApexBrand
+                                      className="mb-3 z-[2]"
+                                      markClassName="h-[78px] w-[132px] md:h-[92px] md:w-[156px]"
+                                      subtitle="خريطة عالمية للبيانات الحية"
                                     />
 
             {/* ── Subtitle — typewriter reveal ── */}
@@ -1530,11 +1530,9 @@ export default function Dashboard() {
             {/* ── HEADER ── */}
       <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
         <div dir="ltr" className="flex items-center gap-3 w-fit">
-          <img
-                      dir="ltr"
-                      src="/branding/m3tm-world-logo-transparent.png"
-                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                      className="w-[110px] md:w-[150px] max-w-full h-auto object-contain shrink-0 rounded-[5px]"
+          <M3tmApexBrand
+                      className="shrink-0"
+                      markClassName="h-[46px] w-[78px] md:h-[54px] md:w-[92px]"
                     />
           <div dir="rtl" className="hidden sm:flex flex-col items-start gap-0.5 pr-1">
             <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">بيانات عامة · مصادر منشورة · عرض مباشر</span>
