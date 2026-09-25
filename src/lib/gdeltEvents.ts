@@ -71,6 +71,11 @@ const COL = {
   numSources: 32,
   numArticles: 33,
   avgTone: 34,
+  actor1GeoType: 35,
+  actor1GeoFullName: 36,
+  actor1GeoCountry: 37,
+  actor1GeoLat: 40,
+  actor1GeoLong: 41,
   actionGeoFullName: 52,
   actionGeoCountry: 53,
   actionGeoLat: 56,
@@ -93,6 +98,11 @@ export interface GdeltEvent {
   lng: number;
   name: string;
   country: string;
+  actor1_geo_type?: number;
+  actor1_name?: string;
+  actor1_country?: string;
+  actor1_lat?: number;
+  actor1_lng?: number;
   event_code: string;
   root_code: string;
   quad: number;
@@ -105,6 +115,76 @@ export interface GdeltEvent {
   sources: number;
   url: string;
   date: string;
+}
+
+export interface GdeltReportedRoute {
+  id: string;
+  origin_lat: number;
+  origin_lng: number;
+  target_lat: number;
+  target_lng: number;
+  origin_label: string;
+  target_label: string;
+  source_url: string;
+  date: string;
+  articles: number;
+  sources: number;
+  route_kind: 'public-event-link';
+  precision: 'generalized-0.25deg';
+  not_trajectory: true;
+}
+
+const isValidCoordinatePair = (lat: unknown, lng: unknown) => (
+  Number.isFinite(Number(lat))
+  && Number.isFinite(Number(lng))
+  && Math.abs(Number(lat)) <= 90
+  && Math.abs(Number(lng)) <= 180
+  && !(Number(lat) === 0 && Number(lng) === 0)
+);
+
+const generalizeQuarterDegree = (value: number) => Math.round(value * 4) / 4;
+
+export function buildGdeltReportedRoutes(events: GdeltEvent[], limit = 240): GdeltReportedRoute[] {
+  const output: GdeltReportedRoute[] = [];
+  const seen = new Set<string>();
+
+  for (const event of events) {
+    if (output.length >= limit) break;
+    if (event.quad !== 4 || !event.url) continue;
+    if (!isValidCoordinatePair(event.actor1_lat, event.actor1_lng)) continue;
+    if (!isValidCoordinatePair(event.lat, event.lng)) continue;
+
+    const originLat = generalizeQuarterDegree(Number(event.actor1_lat));
+    const originLng = generalizeQuarterDegree(Number(event.actor1_lng));
+    const targetLat = generalizeQuarterDegree(event.lat);
+    const targetLng = generalizeQuarterDegree(event.lng);
+    const deltaLat = originLat - targetLat;
+    const deltaLng = originLng - targetLng;
+    if ((deltaLat * deltaLat) + (deltaLng * deltaLng) < 0.25) continue;
+
+    const key = `${originLat}:${originLng}>${targetLat}:${targetLng}:${event.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    output.push({
+      id: `gdelt-route-${event.id}`,
+      origin_lat: originLat,
+      origin_lng: originLng,
+      target_lat: targetLat,
+      target_lng: targetLng,
+      origin_label: event.actor1_name || event.actor1_country || 'موقع الفاعل المنشور',
+      target_label: event.name || event.country || 'موقع الحدث المنشور',
+      source_url: event.url,
+      date: event.date,
+      articles: event.articles,
+      sources: event.sources,
+      route_kind: 'public-event-link',
+      precision: 'generalized-0.25deg',
+      not_trajectory: true,
+    });
+  }
+
+  return output;
 }
 
 /** Extracts the single deflated entry from a ZIP buffer. */
@@ -233,12 +313,22 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     const quad = Number(c[COL.quadClass]) || 0;
     if (quads.length > 0 && !quads.includes(quad)) continue;
 
+    const actor1Lat = Number(c[COL.actor1GeoLat]);
+    const actor1Lng = Number(c[COL.actor1GeoLong]);
+
     events.push({
       id: c[COL.globalEventId],
       lat,
       lng,
       name: c[COL.actionGeoFullName] || 'Unknown location',
       country: c[COL.actionGeoCountry] || '',
+      ...(isValidCoordinatePair(actor1Lat, actor1Lng) ? {
+        actor1_geo_type: Number(c[COL.actor1GeoType]) || undefined,
+        actor1_name: c[COL.actor1GeoFullName] || undefined,
+        actor1_country: c[COL.actor1GeoCountry] || undefined,
+        actor1_lat: actor1Lat,
+        actor1_lng: actor1Lng,
+      } : {}),
       event_code: c[COL.eventCode] || '',
       root_code: c[COL.eventRootCode] || '',
       quad,

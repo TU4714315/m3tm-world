@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchGdeltEvents } from '@/lib/gdeltEvents';
+import { buildGdeltReportedRoutes, fetchGdeltEvents } from '@/lib/gdeltEvents';
 
 export const maxDuration = 60;
 
@@ -31,11 +31,20 @@ export async function GET(req: Request) {
 
   try {
     const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit });
+    const reportedRoutes = buildGdeltReportedRoutes(events);
 
     return NextResponse.json(
       {
         events,
+        reported_routes: reportedRoutes,
+        reported_routes_meta: {
+          mode: 'public-event-link',
+          precision: 'generalized-0.25deg',
+          not_trajectory: true,
+          source: 'GDELT Actor1Geo → ActionGeo',
+        },
         total: events.length,
+        reported_routes_total: reportedRoutes.length,
         scanned,
         window,
         source: 'GDELT 2.0 Events',
@@ -50,7 +59,7 @@ export async function GET(req: Request) {
   } catch (error) {
     console.error('[OSIRIS] GDELT events fetch failed:', error);
     return NextResponse.json(
-      { events: [], total: 0, error: 'Failed to fetch GDELT events' },
+      { events: [], reported_routes: [], total: 0, reported_routes_total: 0, error: 'Failed to fetch GDELT events' },
       { status: 502 }
     );
   }

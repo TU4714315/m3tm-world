@@ -2259,7 +2259,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
   useEffect(() => {
     if (!mapReady) return;
-    const routes = (activeLayers as any).reported_routes && data.live_feeds
+    const bridgeRoutes = (activeLayers as any).reported_routes && data.live_feeds
       ? data.live_feeds.flatMap((f: any) => {
           const originLat = Number(f.origin_lat);
           const originLng = Number(f.origin_lng);
@@ -2269,12 +2269,35 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           return [{
             type: 'Feature' as const,
             geometry: { type: 'LineString' as const, coordinates: [[originLng, originLat], [targetLng, targetLat]] },
-            properties: { bridge_id: f.bridge_id || '', name: f.name || 'مسار حدث منشور', source: f.country || '', route_status: 'verified' },
+            properties: { bridge_id: f.bridge_id || '', name: f.name || 'مسار حدث منشور', source: f.country || '', route_status: 'verified', route_kind: 'published-evidence-route', not_trajectory: true },
           }];
         })
       : [];
-    setGeo('reported-routes', routes);
-  }, [mapReady, data.live_feeds, (activeLayers as any).reported_routes, setGeo]);
+    const gdeltRoutes = (activeLayers as any).reported_routes && Array.isArray(data.reported_routes)
+      ? data.reported_routes.flatMap((route: Record<string, unknown>) => {
+          const originLat = Number(route.origin_lat);
+          const originLng = Number(route.origin_lng);
+          const targetLat = Number(route.target_lat);
+          const targetLng = Number(route.target_lng);
+          if (![originLat, originLng, targetLat, targetLng].every(Number.isFinite)) return [];
+          return [{
+            type: 'Feature' as const,
+            geometry: { type: 'LineString' as const, coordinates: [[originLng, originLat], [targetLng, targetLat]] },
+            properties: {
+              bridge_id: route.id || '',
+              name: `${route.origin_label || 'موقع منشور'} ← ${route.target_label || 'حدث منشور'}`,
+              source: 'GDELT',
+              source_url: route.source_url || '',
+              route_status: 'reported',
+              route_kind: route.route_kind || 'public-event-link',
+              precision: route.precision || 'generalized-0.25deg',
+              not_trajectory: true,
+            },
+          }];
+        })
+      : [];
+    setGeo('reported-routes', [...bridgeRoutes, ...gdeltRoutes]);
+  }, [mapReady, data.live_feeds, data.reported_routes, (activeLayers as any).reported_routes, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
