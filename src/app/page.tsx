@@ -904,7 +904,7 @@ export default function Dashboard() {
     };
 
     // GDELT 2.0 material-conflict events only.
-    if ((activeLayers as any).gdelt_events) {
+    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes) {
       loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
         gdelt_events: d.events ?? [],
         reported_routes: d.reported_routes ?? [],
@@ -975,7 +975,7 @@ export default function Dashboard() {
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
     }
-    if ((activeLayers as any).gdelt_events) {
+    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
         gdelt_events: d.events ?? [],
         reported_routes: d.reported_routes ?? [],
