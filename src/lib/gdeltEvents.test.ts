@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fetchGdeltEvents, QUAD_LABELS } from './gdeltEvents';
+import { buildGdeltReportedRoutes, fetchGdeltEvents, QUAD_LABELS, type GdeltEvent } from './gdeltEvents';
 
 /**
  * Live integration test — opt in with RUN_LIVE_TESTS=1 (hits the real GDELT
@@ -15,6 +15,31 @@ import { fetchGdeltEvents, QUAD_LABELS } from './gdeltEvents';
 const liveIt = process.env.RUN_LIVE_TESTS === '1' ? it : it.skip;
 
 describe('fetchGdeltEvents', () => {
+  it('builds generalized public event links without representing a movement trajectory', () => {
+    const event: GdeltEvent = {
+      id: '123', lat: 24.7136, lng: 46.6753, name: 'Riyadh, Saudi Arabia', country: 'SA',
+      actor1_geo_type: 1, actor1_name: 'Yemen', actor1_country: 'YM', actor1_lat: 15.5527, actor1_lng: 48.5164,
+      event_code: '190', root_code: '19', quad: 4, quad_label: QUAD_LABELS[4], goldstein: -10, tone: -8,
+      articles: 5, sources: 3, url: 'https://example.com/public-report', date: '2026-09-25T00:00:00.000Z',
+    };
+    const routes = buildGdeltReportedRoutes([event]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0]).toMatchObject({ route_kind: 'public-event-link', precision: 'generalized-0.25deg', not_trajectory: true, source_url: event.url, origin_label: 'Yemen', target_label: 'Riyadh, Saudi Arabia' });
+    expect(routes[0].origin_lat * 4).toBe(Math.round(routes[0].origin_lat * 4));
+    expect(routes[0].origin_lng * 4).toBe(Math.round(routes[0].origin_lng * 4));
+    expect(routes[0].target_lat * 4).toBe(Math.round(routes[0].target_lat * 4));
+    expect(routes[0].target_lng * 4).toBe(Math.round(routes[0].target_lng * 4));
+  });
+
+  it('drops same-place and non-conflict links', () => {
+    const base: GdeltEvent = {
+      id: 'same', lat: 24.7, lng: 46.7, name: 'Riyadh', country: 'SA', actor1_lat: 24.7, actor1_lng: 46.7,
+      event_code: '190', root_code: '19', quad: 4, quad_label: QUAD_LABELS[4], goldstein: -10, tone: -8,
+      articles: 3, sources: 2, url: 'https://example.com/report', date: '2026-09-25T00:00:00.000Z',
+    };
+    expect(buildGdeltReportedRoutes([base])).toEqual([]);
+    expect(buildGdeltReportedRoutes([{ ...base, id: 'cooperate', quad: 2, quad_label: QUAD_LABELS[2], actor1_lat: 15 }])).toEqual([]);
+  });
   liveIt('follows the http -> https redirect and returns geocoded events', async () => {
     const { events, window, scanned } = await fetchGdeltEvents({ limit: 50 });
 

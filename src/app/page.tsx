@@ -905,7 +905,11 @@ export default function Dashboard() {
 
     // GDELT 2.0 material-conflict events only.
     if ((activeLayers as any).gdelt_events) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({ gdelt_events: d.events ?? [] }));
+      loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
+        gdelt_events: d.events ?? [],
+        reported_routes: d.reported_routes ?? [],
+        reported_routes_meta: d.reported_routes_meta ?? null,
+      }));
     }
     if ((activeLayers as any).conflict_zones) {
       loadLayerOnce('conflicts', '/api/conflicts', d => ({
@@ -972,7 +976,11 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
     }
     if ((activeLayers as any).gdelt_events) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({ gdelt_events: d.events ?? [] })), 300000));
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
+        gdelt_events: d.events ?? [],
+        reported_routes: d.reported_routes ?? [],
+        reported_routes_meta: d.reported_routes_meta ?? null,
+      })), 300000));
     }
     if ((activeLayers as any).conflict_zones) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
@@ -1160,6 +1168,8 @@ export default function Dashboard() {
           category_counts: data.category_counts || {},
           gdelt: data.gdelt || [],
           gdelt_events: data.gdelt_events || [],
+          reported_routes: data.reported_routes || [],
+          reported_routes_meta: data.reported_routes_meta || null,
           conflict_zones: data.conflict_zones || [],
           conflict_live_events: data.conflict_live_events || [],
           conflict_summary: data.conflict_summary || null,
