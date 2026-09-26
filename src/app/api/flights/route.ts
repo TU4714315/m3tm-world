@@ -221,8 +221,12 @@ function classifyFlight(f: any) {
 
 const PUBLIC_MILITARY_CELL_DEG = 6;
 const PUBLIC_MILITARY_MIN_GROUP = 2;
+const PUBLIC_MILITARY_TIME_BUCKET_MS = 30 * 60 * 1000;
 
 function buildPublicMilitaryActivity(flights: any[]) {
+  const observedAtBucket = new Date(
+    Math.floor(Date.now() / PUBLIC_MILITARY_TIME_BUCKET_MS) * PUBLIC_MILITARY_TIME_BUCKET_MS
+  ).toISOString();
   const buckets = new Map<string, { lat: number; lng: number; count: number }>();
   for (const flight of flights) {
     const lat = Number(flight?.lat);
@@ -249,6 +253,9 @@ function buildPublicMilitaryActivity(flights: any[]) {
       approximate_count: bucket.count >= 10 ? '10+' : bucket.count >= 5 ? '5-9' : '2-4',
       cell_degrees: PUBLIC_MILITARY_CELL_DEG,
       precision: 'coarse-regional',
+      time_precision: '30-minute-bucket',
+      observed_at_bucket: observedAtBucket,
+      reporting_mode: 'public-adsb-aggregate',
     }];
   });
 }
@@ -497,10 +504,13 @@ export async function GET() {
       military_activity:  militaryActivity,
       military_activity_meta: {
         mode: 'coarse-regional-aggregate',
+        source_mode: 'public-adsb-observations',
         cell_degrees: PUBLIC_MILITARY_CELL_DEG,
         minimum_group: PUBLIC_MILITARY_MIN_GROUP,
+        time_precision: '30-minute-bucket',
         identifiers_exposed: false,
         exact_tracks_exposed: false,
+        unobserved_aircraft_inferred: false,
       },
       gps_jamming:        [],
       total:              allRaw.length,
