@@ -368,7 +368,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createWarningIcon('warn-yellow', '#F9A825');
 
       map.addLayer({ id: 'conflict-density-heat', type: 'heatmap', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], maxzoom: 8, paint: {
-        'heatmap-weight': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1],
+        'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['interpolate',['linear'],['coalesce',['get','ageHours'],24], 0,1, 24,0.9, 72,0.6, 168,0.25]],
         'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
         'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
         'heatmap-opacity': ['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18],
@@ -385,8 +385,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-opacity': 0.12, 'circle-blur': 0.8,
       }});
       map.addLayer({ id: 'conflict-event-dots', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2.5, 5,4.5, 9,7],
-        'circle-color': '#FF5252', 'circle-opacity': 0.82,
+        'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,2.5, 45,4.5, 75,6, 100,8],
+        'circle-color': ['match',['get','eventCategory'],
+          'aerial_attack','#FF1744',
+          'heavy_weapons','#FF6D00',
+          'bombing','#FF3D3D',
+          'armed_clash','#F4511E',
+          'mass_violence','#C62828',
+          'assault','#E53935',
+          '#FF5252'],
+        'circle-opacity': ['interpolate',['linear'],['coalesce',['get','ageHours'],24], 0,0.92, 24,0.82, 72,0.58, 168,0.28],
         'circle-stroke-width': 1, 'circle-stroke-color': '#FFD7D7', 'circle-stroke-opacity': 0.55,
       }});
       map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
