@@ -82,7 +82,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, frontlines: true, reported_routes: true, day_night: true,
+  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
   cf_outages: false, cf_attacks: false,
@@ -92,7 +92,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [
     key,
     [
-      'live_news', 'global_incidents', 'conflict_zones', 'frontlines', 'gdelt_events',
+      'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
       'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
     ].includes(key),
   ]),
