@@ -5,14 +5,11 @@ import { fetchAcledPublicEvents } from '@/lib/acled';
 export const dynamic = 'force-dynamic';
 
 /**
- * OSIRIS — Live Conflict Zone Intelligence API
- * 
- * Aggregates real-time conflict data from:
- * 1. GDELT GEO 2.0 API — real-time geo-located conflict events
- * 2. GDELT DOC API — article-level conflict reporting with coordinates
- * 3. Known active conflict zones — enriched with live event counts
- * 
- * All sources are free, no auth required.
+ * OSIRIS — Public Conflict Intelligence API.
+ *
+ * Primary source: GDELT 2.0 Events (15-minute event exports).
+ * Optional curated source: ACLED when server-side credentials are configured.
+ * Coordinates exposed to the public surface are generalized to 0.25°.
  */
 
 interface ConflictZone {
@@ -326,12 +323,19 @@ export async function GET() {
       };
     });
 
+    const categoryCounts = liveEvents.reduce<Record<string, number>>((acc, event) => {
+      acc[event.type] = (acc[event.type] || 0) + 1;
+      return acc;
+    }, {});
+
     return NextResponse.json({
       zones,
       liveEvents: liveEvents.slice(0, 800),
       totalZones: zones.length,
       totalLiveEvents: liveEvents.length,
+      activeWarzones: zones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: zones.filter(zone => zone.eventCount > 0).length,
+      categoryCounts,
       timestamp: new Date().toISOString(),
       source: 'GDELT 2.0 + optional ACLED fusion',
       sourceWindow: gdeltWindow,
@@ -371,7 +375,9 @@ export async function GET() {
       liveEvents: [],
       totalZones: fallbackZones.length,
       totalLiveEvents: 0,
+      activeWarzones: fallbackZones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: 0,
+      categoryCounts: {},
       timestamp: new Date().toISOString(),
       source: 'context-only-fallback',
       sourceMode: 'no-live-events',
