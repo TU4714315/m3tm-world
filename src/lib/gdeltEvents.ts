@@ -108,7 +108,7 @@ export interface PublicEventSemantics {
   event_category: PublicConflictCategory;
   event_label_ar: string;
   corroboration: PublicCorroboration;
-  precision: 'gdelt-actiongeo-reported' | 'generalized-0.25deg';
+  precision: 'gdelt-actiongeo-reported';
 }
 
 /**
@@ -191,22 +191,24 @@ export interface GdeltEvent {
 }
 
 export type PublicGdeltEvent = Omit<GdeltEvent,
-  'actor1_geo_type' | 'actor1_name' | 'actor1_country' | 'actor1_lat' | 'actor1_lng'
->;
+  'actor1_geo_type' | 'actor1_name' | 'actor1_country' | 'actor1_lat' | 'actor1_lng' | 'precision'
+> & {
+  precision: 'generalized-0.25deg';
+};
 
 export function toPublicGdeltEvent(event: GdeltEvent): PublicGdeltEvent {
-  const publicEvent: Partial<GdeltEvent> = {
+  const publicEvent = {
     ...event,
     lat: generalizeQuarterDegree(event.lat),
     lng: generalizeQuarterDegree(event.lng),
-    precision: 'generalized-0.25deg',
+    precision: 'generalized-0.25deg' as const,
   };
   delete publicEvent.actor1_geo_type;
   delete publicEvent.actor1_name;
   delete publicEvent.actor1_country;
   delete publicEvent.actor1_lat;
   delete publicEvent.actor1_lng;
-  return publicEvent as PublicGdeltEvent;
+  return publicEvent;
 }
 
 export interface GdeltReportedRoute {
