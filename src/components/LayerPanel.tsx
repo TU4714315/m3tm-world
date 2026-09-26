@@ -64,7 +64,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Plane,
     layers: [
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
-      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع إقليميًا وزمنيًا؛ بلا هوية أو مسار تشغيلي دقيق' },
+      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع؛ عدم الظهور لا يعني عدم وجود طائرة، ولا تُستنتج مواقع غير مرصودة' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
     ],
