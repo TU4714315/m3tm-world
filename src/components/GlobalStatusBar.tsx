@@ -7,6 +7,17 @@ import { motion } from 'framer-motion';
 interface CryptoPrice { symbol: string; price: number; change24h?: number; }
 interface Earthquake { id: string; magnitude: number; place: string; time: number; depth: number; }
 
+interface SourceHealth {
+  status: 'operational' | 'degraded';
+  timestamp: string;
+  sources?: Record<string, {
+    status?: string;
+    configured?: boolean;
+    authMode?: string;
+    detail?: string;
+  }>;
+}
+
 /* ─── Inline SVG Icons ─── */
 const DiscordIcon = () => (
   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -75,6 +86,7 @@ export default function GlobalStatusBar() {
   const [crypto, setCrypto] = useState<CryptoPrice[]>([]);
   const [quakes, setQuakes] = useState<Earthquake[]>([]);
   const [hoveredQuake, setHoveredQuake] = useState<Earthquake | null>(null);
+  const [sourceHealth, setSourceHealth] = useState<SourceHealth | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -129,6 +141,42 @@ export default function GlobalStatusBar() {
     const iv = setInterval(fetchData, 60000);
     return () => clearInterval(iv);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSourceHealth = async () => {
+      try {
+        const res = await fetch('/api/health?deep=1', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`health HTTP ${res.status}`);
+        const health = await res.json();
+        if (!cancelled) setSourceHealth(health);
+      } catch {
+        if (!cancelled) {
+          setSourceHealth({
+            status: 'degraded',
+            timestamp: new Date().toISOString(),
+            sources: {},
+          });
+        }
+      }
+    };
+
+    fetchSourceHealth();
+    const iv = setInterval(fetchSourceHealth, 300000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, []);
+
+  const sourceTitle = sourceHealth?.sources
+    ? Object.entries(sourceHealth.sources)
+        .map(([name, meta]) => `${name.toUpperCase()}: ${meta.status || 'unknown'}${meta.authMode ? ` (${meta.authMode})` : ''}`)
+        .join(' · ')
+    : 'جارٍ التحقق من المصادر';
+
+  const sourceStatus = sourceHealth?.status ?? 'operational';
 
   // Keep the bar mounted even with no feed data — the left-hand community and
   // docs links must stay reachable when CoinGecko/USGS are rate-limited or down.
@@ -209,10 +257,14 @@ export default function GlobalStatusBar() {
         {/* ── RIGHT: Live SOL Price + Links ── */}
         <div className="flex-shrink-0 h-full flex items-center pointer-events-auto border-l border-white/[0.04]">
 
-          {/* Status indicator */}
-          <div className="h-full px-3 flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#00E676] animate-pulse" />
-            <span className="text-[#00E676]/70 text-[9px] tracking-[0.2em]">متصل</span>
+          {/* Source health indicator — reflects the actual server-side probes. */}
+          <div className="h-full px-3 flex items-center gap-1.5" title={sourceTitle}>
+            <div
+              className={`w-1.5 h-1.5 rounded-full animate-pulse ${sourceStatus === 'operational' ? 'bg-[#00E676]' : 'bg-[#FF9500]'}`}
+            />
+            <span className={`text-[9px] tracking-[0.14em] ${sourceStatus === 'operational' ? 'text-[#00E676]/70' : 'text-[#FF9500]/80'}`}>
+              {sourceHealth ? (sourceStatus === 'operational' ? 'المصادر سليمة' : 'مصدر متدهور') : 'فحص المصادر'}
+            </span>
           </div>
         </div>
       </div>
