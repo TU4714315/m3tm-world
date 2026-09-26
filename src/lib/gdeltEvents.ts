@@ -92,6 +92,74 @@ export const QUAD_LABELS: Record<number, string> = {
   4: 'Material Conflict',
 };
 
+export type PublicConflictCategory =
+  | 'aerial_attack'
+  | 'heavy_weapons'
+  | 'bombing'
+  | 'armed_clash'
+  | 'mass_violence'
+  | 'assault'
+  | 'material_conflict'
+  | 'other';
+
+export type PublicCorroboration = 'single-source-report' | 'multi-source-report';
+
+export interface PublicEventSemantics {
+  event_category: PublicConflictCategory;
+  event_label_ar: string;
+  corroboration: PublicCorroboration;
+  precision: 'gdelt-actiongeo-reported';
+}
+
+/**
+ * Convert CAMEO codes into a small set of map-facing labels.
+ *
+ * These labels describe what the source record reports; they do not assert
+ * independent verification by M3TM.WORLD. CAMEO 195* is aerial weapons,
+ * 194* heavy weapons/artillery/tanks/rockets, 183* bombing/explosives,
+ * root 19 fighting, root 20 mass violence and root 18 assault.
+ */
+export function classifyPublicEvent(
+  eventCode: string,
+  rootCode: string,
+  quad: number,
+  sources: number,
+  articles: number,
+): PublicEventSemantics {
+  let event_category: PublicConflictCategory = 'other';
+  let event_label_ar = 'حدث دولي مُبلّغ عنه';
+
+  if (eventCode.startsWith('195')) {
+    event_category = 'aerial_attack';
+    event_label_ar = 'استخدام أسلحة جوية مُبلّغ عنه';
+  } else if (eventCode.startsWith('194')) {
+    event_category = 'heavy_weapons';
+    event_label_ar = 'قصف أو اشتباك بأسلحة ثقيلة مُبلّغ عنه';
+  } else if (eventCode.startsWith('183')) {
+    event_category = 'bombing';
+    event_label_ar = 'تفجير مُبلّغ عنه';
+  } else if (rootCode === '19') {
+    event_category = 'armed_clash';
+    event_label_ar = 'اشتباك مسلح مُبلّغ عنه';
+  } else if (rootCode === '20') {
+    event_category = 'mass_violence';
+    event_label_ar = 'عنف جماعي مُبلّغ عنه';
+  } else if (rootCode === '18') {
+    event_category = 'assault';
+    event_label_ar = 'اعتداء مسلح مُبلّغ عنه';
+  } else if (quad === 4) {
+    event_category = 'material_conflict';
+    event_label_ar = 'حدث نزاع مادي مُبلّغ عنه';
+  }
+
+  return {
+    event_category,
+    event_label_ar,
+    corroboration: sources >= 2 || articles >= 3 ? 'multi-source-report' : 'single-source-report',
+    precision: 'gdelt-actiongeo-reported',
+  };
+}
+
 export interface GdeltEvent {
   id: string;
   lat: number;
@@ -107,6 +175,11 @@ export interface GdeltEvent {
   root_code: string;
   quad: number;
   quad_label: string;
+  /** Public map semantics derived from the CAMEO code; descriptive, not an independent verification claim. */
+  event_category: PublicConflictCategory;
+  event_label_ar: string;
+  corroboration: PublicCorroboration;
+  precision: 'gdelt-actiongeo-reported';
   /** −10 (most conflictual) … +10 (most cooperative) */
   goldstein: number;
   /** Average document tone, roughly −100…+100 but usually −20…+20 */
@@ -334,6 +407,10 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
 
     const actor1Lat = Number(c[COL.actor1GeoLat]);
     const actor1Lng = Number(c[COL.actor1GeoLong]);
+    const eventCode = c[COL.eventCode] || '';
+    const rootCode = c[COL.eventRootCode] || '';
+    const sources = Number(c[COL.numSources]) || 0;
+    const semantics = classifyPublicEvent(eventCode, rootCode, quad, sources, articles);
 
     events.push({
       id: c[COL.globalEventId],
@@ -348,14 +425,15 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
         actor1_lat: actor1Lat,
         actor1_lng: actor1Lng,
       } : {}),
-      event_code: c[COL.eventCode] || '',
-      root_code: c[COL.eventRootCode] || '',
+      event_code: eventCode,
+      root_code: rootCode,
       quad,
       quad_label: QUAD_LABELS[quad] || 'Unclassified',
+      ...semantics,
       goldstein: Number(c[COL.goldstein]) || 0,
       tone: Number(Number(c[COL.avgTone]).toFixed(2)) || 0,
       articles,
-      sources: Number(c[COL.numSources]) || 0,
+      sources,
       url: c[COL.sourceUrl]?.trim() || '',
       date: parseGdeltDate(c[COL.dateAdded], c[COL.sqlDate]),
     });
