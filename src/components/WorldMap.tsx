@@ -559,11 +559,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
          conflict are separable at a glance, sized by article volume. ── */
       map.addLayer({ id: 'gdelt-events-dots', type: 'circle', source: 'gdelt-events', paint: {
         'circle-radius': ['interpolate',['linear'],['get','articles'], 1,3, 10,5, 50,8, 200,12],
-        'circle-color': ['match',['get','quad'],
-          1,'#00E676',   // verbal cooperation
-          2,'#00E5FF',   // material cooperation
-          3,'#FF9500',   // verbal conflict
-          4,'#FF3D3D',   // material conflict
+        'circle-color': ['match',['get','event_category'],
+          'aerial_attack','#FF1744',
+          'heavy_weapons','#FF6D00',
+          'bombing','#FF3D3D',
+          'armed_clash','#F4511E',
+          'mass_violence','#C62828',
+          'assault','#E53935',
+          'material_conflict','#FF5252',
           '#9B978E'],
         'circle-opacity': 0.75,
         'circle-stroke-width': 1,
@@ -1269,29 +1272,40 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
 
     // ── GDELT 2.0 Events ──
-    const QUAD_COLOR: Record<string, string> = { '1': '#00E676', '2': '#00E5FF', '3': '#FF9500', '4': '#FF3D3D' };
+    const EVENT_COLOR: Record<string, string> = {
+      aerial_attack: '#FF1744',
+      heavy_weapons: '#FF6D00',
+      bombing: '#FF3D3D',
+      armed_clash: '#F4511E',
+      mass_violence: '#C62828',
+      assault: '#E53935',
+      material_conflict: '#FF5252',
+    };
     map.on('click', 'gdelt-events-dots', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
-      const accent = QUAD_COLOR[String(p.quad)] ?? '#9B978E';
+      const accent = EVENT_COLOR[String(p.event_category)] ?? '#9B978E';
       const src = urlSafe(p.url);
       const tone = Number(p.tone);
+      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية من عدة مصادر' : 'بلاغ من مصدر واحد';
+      const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
-      <div style="${pStyle}border:1px solid ${accent}66;min-width:250px;">
+      <div style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
-          <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.15em;">${({ '1': 'تعاون لفظي', '2': 'تعاون مادي', '3': 'نزاع لفظي', '4': 'نزاع مادي' } as Record<string,string>)[String(p.quad)] || 'حدث دولي'}</span>
+          <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'حدث نزاع مُبلّغ عنه')}</span>
         </div>
-        <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name)}</div>
+        <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">مؤشر Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
+          <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
+          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
+          <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
           <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
-          <span style="opacity:0.6;">المقالات</span><span style="color:#E8E6E0;">${htmlEsc(p.articles)}</span>
-          <span style="opacity:0.6;">الدولة</span><span style="color:#E8E6E0;">${htmlEsc(p.country || '—')}</span>
+          <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
-        <div style="margin-top:8px;font-size:9px;color:#5C5A54;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z</div>
-        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">المصدر المنشور</a>` : ''}
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
       </div>`);
     });
 
@@ -1969,7 +1983,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
       properties: {
         name: e.name, country: e.country, quad: e.quad, quad_label: e.quad_label,
-        tone: e.tone, goldstein: e.goldstein, articles: e.articles, url: e.url, date: e.date,
+        event_code: e.event_code, root_code: e.root_code, event_category: e.event_category,
+        event_label_ar: e.event_label_ar, corroboration: e.corroboration, precision: e.precision,
+        tone: e.tone, goldstein: e.goldstein, articles: e.articles, sources: e.sources, url: e.url, date: e.date,
       },
     })) : []);
   }, [mapReady, data.gdelt_events, (activeLayers as any).gdelt_events, setGeo]);
@@ -2343,10 +2359,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
             properties: {
               kind: 'event',
-              label: 'بلاغ نزاع مرصود',
-              severity: 'war',
-              description: e.title || 'بلاغ عام مرتبط بمنطقة نزاع. افتح المصدر للاطلاع على النص الأصلي.',
+              label: e.title || 'حدث نزاع مُبلّغ عنه',
+              severity: e.type === 'aerial_attack' || e.type === 'mass_violence' ? 'war' : 'high',
+              description: `${e.location || 'موقع منشور'} · ${e.sources || 0} مصادر · ${e.articles || 0} مقالات · ${e.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم' : 'موقع منشور'}`,
               sourceUrl: e.url || '',
+              eventCategory: e.type || 'material_conflict',
+              corroboration: e.corroboration || 'single-source-report',
+              eventCode: e.eventCode || '',
             },
           }));
 
@@ -2393,7 +2412,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       .map((e: any) => ({
         type: 'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: [Number(e.lng), Number(e.lat)] },
-        properties: { kind: 'event', label: 'بلاغ نزاع مرصود', severity: 'war', description: e.title || 'بلاغ عام مرتبط بمنطقة نزاع.', sourceUrl: e.url || '' },
+        properties: {
+          kind: 'event',
+          label: e.title || 'حدث نزاع مُبلّغ عنه',
+          severity: e.type === 'aerial_attack' || e.type === 'mass_violence' ? 'war' : 'high',
+          description: `${e.location || 'موقع منشور'} · ${e.sources || 0} مصادر · ${e.articles || 0} مقالات · ${e.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم' : 'موقع منشور'}`,
+          sourceUrl: e.url || '',
+          eventCategory: e.type || 'material_conflict',
+          corroboration: e.corroboration || 'single-source-report',
+          eventCode: e.eventCode || '',
+        },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
   }, [mapReady, data.conflict_zones, data.conflict_live_events, setGeo]);
