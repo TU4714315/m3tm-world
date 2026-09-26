@@ -47,6 +47,9 @@ interface ConflictEvent {
   fatalities: number;
   reportingStrength: number;
   ageHours: number | null;
+  ageDays: number | null;
+  timePrecision: number | null;
+  recencyWeight: number;
 }
 
 // Known active conflict zones (anchors — enriched with live data)
@@ -154,6 +157,30 @@ function eventAgeHours(timestamp: string): number | null {
   return Math.max(0, Math.round(((Date.now() - ms) / 3600000) * 10) / 10);
 }
 
+function eventAgeDays(dateOnly: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+  const eventDay = Date.parse(`${dateOnly}T00:00:00Z`);
+  if (!Number.isFinite(eventDay)) return null;
+  const today = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+  return Math.max(0, Math.floor((today - eventDay) / 86400000));
+}
+
+function gdeltRecencyWeight(ageHours: number | null): number {
+  if (ageHours === null) return 0.45;
+  if (ageHours <= 6) return 1;
+  if (ageHours <= 24) return 0.9;
+  if (ageHours <= 72) return 0.65;
+  if (ageHours <= 168) return 0.35;
+  return 0.2;
+}
+
+function acledRecencyWeight(ageDays: number | null, timePrecision: number | null): number {
+  const precisionFactor = timePrecision === 1 ? 1 : timePrecision === 2 ? 0.72 : timePrecision === 3 ? 0.5 : 0.65;
+  if (ageDays === null) return 0.35 * precisionFactor;
+  const ageFactor = ageDays <= 0 ? 1 : ageDays <= 1 ? 0.9 : ageDays <= 3 ? 0.7 : ageDays <= 7 ? 0.45 : 0.25;
+  return Math.round(ageFactor * precisionFactor * 100) / 100;
+}
+
 function reportingStrength(providerCount: number, sources: number, articles: number): number {
   // Coverage strength only — not a truth probability.
   return Math.min(100, providerCount * 24 + Math.min(6, sources) * 8 + Math.min(14, articles) * 2);
@@ -231,7 +258,14 @@ function fuseConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
         ? 'multi-source-report'
         : 'single-source-report',
       reportingStrength: reportingStrength(providerCount, sources, articles),
-      ageHours: eventAgeHours(timestamp),
+      ageHours: current.ageHours !== null || event.ageHours !== null
+        ? Math.min(...[current.ageHours, event.ageHours].filter((value): value is number => value !== null))
+        : null,
+      ageDays: current.ageDays !== null || event.ageDays !== null
+        ? Math.min(...[current.ageDays, event.ageDays].filter((value): value is number => value !== null))
+        : null,
+      timePrecision: current.timePrecision === null ? event.timePrecision : current.timePrecision,
+      recencyWeight: Math.max(current.recencyWeight, event.recencyWeight),
     });
   }
 
@@ -276,6 +310,9 @@ async function fetchAllLiveConflictData(): Promise<{
       fatalities: 0,
       reportingStrength: reportingStrength(1, event.sources, event.articles),
       ageHours: eventAgeHours(event.date),
+      ageDays: eventAgeHours(event.date) === null ? null : Math.floor((eventAgeHours(event.date) as number) / 24),
+      timePrecision: null,
+      recencyWeight: gdeltRecencyWeight(eventAgeHours(event.date)),
     }));
 
   const acledEvents: ConflictEvent[] = acledResult.events.map(event => ({
@@ -298,7 +335,10 @@ async function fetchAllLiveConflictData(): Promise<{
     sourceLabel: event.sourceLabel || 'ACLED',
     fatalities: event.fatalities,
     reportingStrength: reportingStrength(1, event.sources, 0),
-    ageHours: eventAgeHours(event.eventDate ? `${event.eventDate}T00:00:00Z` : (event.sourceUpdatedAt || '')),
+    ageHours: null,
+    ageDays: eventAgeDays(event.eventDate),
+    timePrecision: event.timePrecision,
+    recencyWeight: acledRecencyWeight(eventAgeDays(event.eventDate), event.timePrecision),
   }));
 
   const events = fuseConflictEvents([...gdeltEvents, ...acledEvents]);
