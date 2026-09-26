@@ -159,12 +159,29 @@ function reportingStrength(providerCount: number, sources: number, articles: num
   return Math.min(100, providerCount * 24 + Math.min(6, sources) * 8 + Math.min(14, articles) * 2);
 }
 
+function fusionFamily(type: string): string {
+  if (['aerial_attack', 'heavy_weapons', 'bombing', 'material_conflict'].includes(type)) return 'remote_violence';
+  if (['assault', 'mass_violence'].includes(type)) return 'violence_against_people';
+  return type;
+}
+
+const CATEGORY_SPECIFICITY: Record<string, number> = {
+  aerial_attack: 7,
+  heavy_weapons: 6,
+  bombing: 5,
+  armed_clash: 4,
+  mass_violence: 3,
+  assault: 3,
+  material_conflict: 1,
+  other: 0,
+};
+
 function fuseConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
   const merged = new Map<string, ConflictEvent>();
 
   for (const event of events) {
     const day = String(event.timestamp || '').slice(0, 10);
-    const key = `${event.lat.toFixed(2)}:${event.lng.toFixed(2)}:${event.type}:${day}`;
+    const key = `${event.lat.toFixed(2)}:${event.lng.toFixed(2)}:${fusionFamily(event.type)}:${day}`;
     const current = merged.get(key);
     if (!current) {
       merged.set(key, event);
@@ -184,12 +201,27 @@ function fuseConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
       ? event.timestamp
       : current.timestamp;
 
+    const preferIncoming =
+      (CATEGORY_SPECIFICITY[event.type] || 0) > (CATEGORY_SPECIFICITY[current.type] || 0);
+    const sourceLabels = [...new Set(
+      [current.sourceLabel, event.sourceLabel]
+        .flatMap(value => String(value || '').split(' · '))
+        .map(value => value.trim())
+        .filter(Boolean),
+    )];
+
     merged.set(key, {
       ...current,
+      ...(preferIncoming ? {
+        title: event.title,
+        type: event.type,
+        eventCode: event.eventCode,
+        rootCode: event.rootCode,
+      } : {}),
       provider,
       providerCount,
       url: current.url || event.url,
-      sourceLabel: [current.sourceLabel, event.sourceLabel].filter(Boolean).join(' · '),
+      sourceLabel: sourceLabels.join(' · '),
       location: current.location.length >= event.location.length ? current.location : event.location,
       timestamp,
       articles,
