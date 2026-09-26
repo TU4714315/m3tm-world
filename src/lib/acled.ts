@@ -183,7 +183,7 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
 
       const eventType = String(row?.event_type || '');
       const subEventType = String(row?.sub_event_type || '');
-      const relevant = ['battles', 'explosions/remote violence', 'violence against civilians'].includes(eventType.toLowerCase());
+      const relevant = ['battles', 'explosions/remote violence', 'violence against civilians'].includes(eventType.toLowerCase()) || subEventType.toLowerCase().includes('mob violence');
       if (!relevant) return [];
 
       const { category, labelAr } = classifyAcledEvent(eventType, subEventType);
