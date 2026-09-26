@@ -147,11 +147,14 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
 
   const end = new Date();
   const start = new Date(end.getTime() - Math.max(1, days - 1) * 86400000);
+  const pageSize = Math.max(100, Math.min(1000, limit));
   const params = new URLSearchParams({
     _format: 'json',
     event_date: `${isoDateOnly(start)}|${isoDateOnly(end)}`,
     event_date_where: 'BETWEEN',
-    limit: String(Math.max(1, Math.min(5000, limit))),
+    event_type: 'Battles:OR:event_type=Explosions/Remote violence:OR:event_type=Violence against civilians:OR:sub_event_type=Mob violence',
+    limit: String(pageSize),
+    with_total: 'true',
     fields: [
       'event_id_cnty','event_date','time_precision','event_type','sub_event_type',
       'country','admin1','location','latitude','longitude','geo_precision',
@@ -160,22 +163,36 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
   });
 
   try {
-    const res = await fetch(`https://acleddata.com/api/acled/read?${params.toString()}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(25000),
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(`ACLED API returned ${res.status}`);
+    const rows: any[] = [];
+    let cursor = '0';
+    let lastUpdateHours: number | null = null;
 
-    const json = await res.json();
-    if (json?.success === false || (json?.status && Number(json.status) >= 400)) {
-      throw new Error(`ACLED API status ${json?.status ?? 'unknown'}`);
+    for (let page = 0; page < 6 && rows.length < 5000; page += 1) {
+      params.set('cursor', cursor);
+      const res = await fetch(`https://acleddata.com/api/acled/read?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(25000),
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`ACLED API returned ${res.status}`);
+
+      const json = await res.json();
+      if (json?.success === false || (json?.status && Number(json.status) >= 400)) {
+        throw new Error(`ACLED API status ${json?.status ?? 'unknown'}`);
+      }
+
+      if (Number.isFinite(Number(json?.last_update))) lastUpdateHours = Number(json.last_update);
+      const pageRows = Array.isArray(json?.data) ? json.data : [];
+      rows.push(...pageRows);
+
+      const nextCursor = json?.next_cursor;
+      if (!nextCursor || pageRows.length < pageSize) break;
+      cursor = String(nextCursor);
     }
 
-    const rows = Array.isArray(json?.data) ? json.data : [];
     const events: AcledPublicEvent[] = rows.flatMap((row: any) => {
       const lat = Number(row?.latitude);
       const lng = Number(row?.longitude);
@@ -219,7 +236,7 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
     return {
       status: 'ok',
       events,
-      lastUpdateHours: Number.isFinite(Number(json?.last_update)) ? Number(json.last_update) : null,
+      lastUpdateHours,
     };
   } catch (error) {
     return {
