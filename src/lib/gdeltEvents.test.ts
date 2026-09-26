@@ -68,7 +68,7 @@ describe('fetchGdeltEvents', () => {
     expect(publicEvent).not.toHaveProperty('actor1_country');
     expect(publicEvent).not.toHaveProperty('actor1_lat');
     expect(publicEvent).not.toHaveProperty('actor1_lng');
-    expect(publicEvent).toMatchObject({ id: 'public', lat: 24.7, lng: 46.7, name: 'Riyadh' });
+    expect(publicEvent).toMatchObject({ id: 'public', lat: 24.75, lng: 46.75, name: 'Riyadh', precision: 'generalized-0.25deg' });
   });
   liveIt('follows the http -> https redirect and returns geocoded events', async () => {
     const { events, window, scanned } = await fetchGdeltEvents({ limit: 50 });
