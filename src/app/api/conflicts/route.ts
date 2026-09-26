@@ -186,90 +186,18 @@ function reportingStrength(providerCount: number, sources: number, articles: num
   return Math.min(100, providerCount * 24 + Math.min(6, sources) * 8 + Math.min(14, articles) * 2);
 }
 
-function fusionFamily(type: string): string {
-  if (['aerial_attack', 'heavy_weapons', 'bombing', 'material_conflict'].includes(type)) return 'remote_violence';
-  if (['assault', 'mass_violence'].includes(type)) return 'violence_against_people';
-  return type;
-}
-
-const CATEGORY_SPECIFICITY: Record<string, number> = {
-  aerial_attack: 7,
-  heavy_weapons: 6,
-  bombing: 5,
-  armed_clash: 4,
-  mass_violence: 3,
-  assault: 3,
-  material_conflict: 1,
-  other: 0,
-};
-
-function fuseConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
-  const merged = new Map<string, ConflictEvent>();
-
-  for (const event of events) {
-    const day = String(event.timestamp || '').slice(0, 10);
-    const key = `${event.lat.toFixed(2)}:${event.lng.toFixed(2)}:${fusionFamily(event.type)}:${day}`;
-    const current = merged.get(key);
-    if (!current) {
-      merged.set(key, event);
-      continue;
-    }
-
-    const providers = new Set(
-      [current.provider, event.provider]
-        .flatMap(value => String(value).split('+'))
-        .filter(Boolean),
-    );
-    const provider = providers.size > 1 ? 'GDELT+ACLED' : current.provider;
-    const sources = Math.max(current.sources, event.sources);
-    const articles = Math.max(current.articles, event.articles);
-    const providerCount = providers.size;
-    const timestamp = Date.parse(event.timestamp) > Date.parse(current.timestamp)
-      ? event.timestamp
-      : current.timestamp;
-
-    const preferIncoming =
-      (CATEGORY_SPECIFICITY[event.type] || 0) > (CATEGORY_SPECIFICITY[current.type] || 0);
-    const sourceLabels = [...new Set(
-      [current.sourceLabel, event.sourceLabel]
-        .flatMap(value => String(value || '').split(' · '))
-        .map(value => value.trim())
-        .filter(Boolean),
-    )];
-
-    merged.set(key, {
-      ...current,
-      ...(preferIncoming ? {
-        title: event.title,
-        type: event.type,
-        eventCode: event.eventCode,
-        rootCode: event.rootCode,
-      } : {}),
-      provider,
-      providerCount,
-      url: current.url || event.url,
-      sourceLabel: sourceLabels.join(' · '),
-      location: current.location.length >= event.location.length ? current.location : event.location,
-      timestamp,
-      articles,
-      sources,
-      fatalities: Math.max(current.fatalities, event.fatalities),
-      corroboration: providerCount > 1 || sources >= 2 || articles >= 3
-        ? 'multi-source-report'
-        : 'single-source-report',
-      reportingStrength: reportingStrength(providerCount, sources, articles),
-      ageHours: current.ageHours !== null || event.ageHours !== null
-        ? Math.min(...[current.ageHours, event.ageHours].filter((value): value is number => value !== null))
-        : null,
-      ageDays: current.ageDays !== null || event.ageDays !== null
-        ? Math.min(...[current.ageDays, event.ageDays].filter((value): value is number => value !== null))
-        : null,
-      timePrecision: current.timePrecision === null ? event.timePrecision : current.timePrecision,
-      recencyWeight: Math.max(current.recencyWeight, event.recencyWeight),
-    });
-  }
-
-  return [...merged.values()]
+function combineConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
+  // Do not infer that records from different providers describe the same event
+  // merely because they share a generalized cell/category/day. Preserve event
+  // identity unless the provider itself supplies stronger corroboration.
+  const seen = new Set<string>();
+  return events
+    .filter(event => {
+      const key = `${event.provider}:${event.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
     .slice(0, 1000);
 }
@@ -281,9 +209,18 @@ async function fetchAllLiveConflictData(): Promise<{
   gdeltScanned: number;
   sourceStatus: Record<string, unknown>;
 }> {
+  const acledTimeout = new Promise<Awaited<ReturnType<typeof fetchAcledPublicEvents>>>(resolve => {
+    setTimeout(() => resolve({
+      status: 'unavailable',
+      events: [],
+      lastUpdateHours: null,
+      message: 'Optional ACLED source exceeded the 5s response budget.',
+    }), 5000);
+  });
+
   const [gdeltResult, acledResult] = await Promise.all([
     fetchGdeltEvents({ quads: [4], minArticles: 2, limit: 1400 }),
-    fetchAcledPublicEvents(7, 1200),
+    Promise.race([fetchAcledPublicEvents(7, 1200), acledTimeout]),
   ]);
 
   const gdeltEvents: ConflictEvent[] = gdeltResult.events
@@ -341,7 +278,7 @@ async function fetchAllLiveConflictData(): Promise<{
     recencyWeight: acledRecencyWeight(eventAgeDays(event.eventDate), event.timePrecision),
   }));
 
-  const events = fuseConflictEvents([...gdeltEvents, ...acledEvents]);
+  const events = combineConflictEvents([...gdeltEvents, ...acledEvents]);
 
   const eventsByRegion: Record<string, number> = {};
   for (const zone of KNOWN_CONFLICTS) {
@@ -413,7 +350,7 @@ export async function GET() {
       sourceWindow: gdeltWindow,
       sourceRowsScanned: gdeltScanned,
       sourceStatus,
-      sourceMode: 'multi-source-public-conflict-fusion',
+      sourceMode: 'multi-source-public-conflict-layer',
       coordinatePrecision: 'generalized-0.25deg',
       refreshInterval: 300,
     }, {
