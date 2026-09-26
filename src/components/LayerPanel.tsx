@@ -64,7 +64,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Plane,
     layers: [
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
-      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'تجميع إقليمي واسع بلا هوية أو مسار تشغيلي دقيق' },
+      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع إقليميًا وزمنيًا؛ بلا هوية أو مسار تشغيلي دقيق' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
     ],
@@ -115,11 +115,11 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق عامة مع بلاغات منشورة وتحديث دوري', dataKey: 'conflict_zones,conflict_live_events' },
+      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
       { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'أحداث صراع وضربات منشورة', description: 'GDELT Material Conflict من مصادر عامة؛ ليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
+      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO: أسلحة جوية/ثقيلة/تفجيرات/اشتباكات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
     ],
   },
   {
