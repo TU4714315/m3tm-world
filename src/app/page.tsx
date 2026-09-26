@@ -911,14 +911,17 @@ export default function Dashboard() {
         reported_routes_meta: d.reported_routes_meta ?? null,
       }));
     }
-    if ((activeLayers as any).conflict_zones) {
+    if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       loadLayerOnce('conflicts', '/api/conflicts', d => ({
         conflict_zones: d.zones ?? [],
         conflict_live_events: d.liveEvents ?? [],
+        conflict_source_status: d.sourceStatus ?? null,
+        conflict_category_counts: d.categoryCounts ?? {},
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
           activeWarzones: d.activeWarzones ?? 0,
+          zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
       }));
@@ -982,14 +985,17 @@ export default function Dashboard() {
         reported_routes_meta: d.reported_routes_meta ?? null,
       })), 300000));
     }
-    if ((activeLayers as any).conflict_zones) {
+    if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
         conflict_zones: d.zones ?? [],
         conflict_live_events: d.liveEvents ?? [],
+        conflict_source_status: d.sourceStatus ?? null,
+        conflict_category_counts: d.categoryCounts ?? {},
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
           activeWarzones: d.activeWarzones ?? 0,
+          zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
       })), 300000));
