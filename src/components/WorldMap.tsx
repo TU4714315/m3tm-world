@@ -367,14 +367,34 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createWarningIcon('warn-orange', '#E65100');
       createWarningIcon('warn-yellow', '#F9A825');
 
+      map.addLayer({ id: 'conflict-density-heat', type: 'heatmap', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], maxzoom: 8, paint: {
+        'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['coalesce',['get','recencyWeight'],0.45]],
+        'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
+        'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
+        'heatmap-opacity': ['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18],
+        'heatmap-color': ['interpolate',['linear'],['heatmap-density'],
+          0,'rgba(0,0,0,0)',
+          0.2,'rgba(255,193,7,0.18)',
+          0.45,'rgba(255,112,67,0.38)',
+          0.7,'rgba(244,67,54,0.58)',
+          1,'rgba(183,28,28,0.78)'],
+      }});
       map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
         'circle-opacity': 0.12, 'circle-blur': 0.8,
       }});
       map.addLayer({ id: 'conflict-event-dots', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,2.5, 5,4.5, 9,7],
-        'circle-color': '#FF5252', 'circle-opacity': 0.82,
+        'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,2.5, 45,4.5, 75,6, 100,8],
+        'circle-color': ['match',['get','eventCategory'],
+          'aerial_attack','#FF1744',
+          'heavy_weapons','#FF6D00',
+          'bombing','#FF3D3D',
+          'armed_clash','#F4511E',
+          'mass_violence','#C62828',
+          'assault','#E53935',
+          '#FF5252'],
+        'circle-opacity': ['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.22, 0.35,0.45, 0.65,0.68, 1,0.92],
         'circle-stroke-width': 1, 'circle-stroke-color': '#FFD7D7', 'circle-stroke-opacity': 0.55,
       }});
       map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
@@ -1398,14 +1418,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
+      const isEvent = p.kind === 'event';
+      const sourceLine = isEvent
+        ? `${htmlEsc(p.sourceLabel || p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
+        : 'منطقة سياقية';
+      const strength = Math.max(0, Math.min(100, Number(p.reportingStrength) || 0));
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${color};">${arEnum(p.severity)}</span></div>
-          <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
+          <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
+          <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
+          ${isEvent ? `<div><span style="color:#5C5A54;">قوة التغطية</span><br/><span style="color:#E8E6E0;">${strength}/100</span></div>` : ''}
+          ${isEvent && p.ageHours !== null && p.ageHours !== undefined ? `<div><span style="color:#5C5A54;">عمر البلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageHours))} ساعة</span></div>` : ''}
+          ${isEvent && (p.ageHours === null || p.ageHours === undefined) && p.ageDays !== null && p.ageDays !== undefined ? `<div><span style="color:#5C5A54;">عمر الحدث</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageDays))} يوم · دقة زمنية ${htmlEsc(String(p.timePrecision || '—'))}</span></div>` : ''}
+          ${isEvent && Number(p.fatalities || 0) > 0 ? `<div><span style="color:#5C5A54;">وفيات مبلّغ عنها</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.fatalities))}</span></div>` : ''}
+          <div><span style="color:#5C5A54;">الموقع العام</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
         </div>
-        ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
+        ${isEvent ? '<div style="font-size:8px;color:#7E817C;margin-bottom:6px;">قوة التغطية مقياس لكثرة/تنوع التقارير وليست احتمالًا للحقيقة. الإحداثيات العامة معمّمة إلى 0.25°.</div>' : ''}
+        ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
       </div>`);
     };
     map.on('click', 'conflict-icons', onConflictClick);
@@ -2369,6 +2400,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
               eventCategory: e.type || 'material_conflict',
               corroboration: e.corroboration || 'single-source-report',
               eventCode: e.eventCode || '',
+              provider: e.provider || 'GDELT',
+              providerCount: e.providerCount || 1,
+              sourceLabel: e.sourceLabel || '',
+              fatalities: e.fatalities || 0,
+              reportingStrength: e.reportingStrength || 0,
+              ageHours: e.ageHours ?? null,
+              ageDays: e.ageDays ?? null,
+              timePrecision: e.timePrecision ?? null,
+              recencyWeight: e.recencyWeight ?? 0.45,
             },
           }));
 
@@ -2424,6 +2464,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           eventCategory: e.type || 'material_conflict',
           corroboration: e.corroboration || 'single-source-report',
           eventCode: e.eventCode || '',
+          provider: e.provider || 'GDELT',
+          providerCount: e.providerCount || 1,
+          sourceLabel: e.sourceLabel || '',
+          fatalities: e.fatalities || 0,
+          reportingStrength: e.reportingStrength || 0,
+          ageHours: e.ageHours ?? null,
+          ageDays: e.ageDays ?? null,
+          timePrecision: e.timePrecision ?? null,
+          recencyWeight: e.recencyWeight ?? 0.45,
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
@@ -2463,6 +2512,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
+    setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-dots','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
     setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);

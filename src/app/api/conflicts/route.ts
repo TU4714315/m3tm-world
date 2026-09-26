@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
 import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
+import { fetchAcledPublicEvents } from '@/lib/acled';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * OSIRIS — Live Conflict Zone Intelligence API
- * 
- * Aggregates real-time conflict data from:
- * 1. GDELT GEO 2.0 API — real-time geo-located conflict events
- * 2. GDELT DOC API — article-level conflict reporting with coordinates
- * 3. Known active conflict zones — enriched with live event counts
- * 
- * All sources are free, no auth required.
+ * OSIRIS — Public Conflict Intelligence API.
+ *
+ * Primary source: GDELT 2.0 Events (15-minute event exports).
+ * Optional curated source: ACLED when server-side credentials are configured.
+ * Coordinates exposed to the public surface are generalized to 0.25°.
  */
 
 interface ConflictZone {
@@ -43,6 +41,15 @@ interface ConflictEvent {
   sources: number;
   corroboration: 'single-source-report' | 'multi-source-report';
   precision: 'generalized-0.25deg';
+  provider: 'GDELT' | 'ACLED' | 'GDELT+ACLED';
+  providerCount: number;
+  sourceLabel: string;
+  fatalities: number;
+  reportingStrength: number;
+  ageHours: number | null;
+  ageDays: number | null;
+  timePrecision: number | null;
+  recencyWeight: number;
 }
 
 // Known active conflict zones (anchors — enriched with live data)
@@ -142,40 +149,136 @@ const CONFLICT_ARABIC: Record<string, { label: string; description: string }> = 
   ethiopia: { label: 'إثيوبيا', description: 'توترات ونزاعات إقليمية متفرقة في إثيوبيا وفق المصادر العامة.' },
 };
 
-// GDELT 2.0 publishes geocoded event records every 15 minutes. Public map
-// output is generalized by toPublicGdeltEvent() before it reaches this route.
+// GDELT updates every 15 minutes. ACLED is an optional curated second source.
+// Public coordinates are generalized to 0.25° before this route exposes them.
+function eventAgeHours(timestamp: string): number | null {
+  const ms = Date.parse(timestamp);
+  if (!Number.isFinite(ms)) return null;
+  return Math.max(0, Math.round(((Date.now() - ms) / 3600000) * 10) / 10);
+}
+
+function eventAgeDays(dateOnly: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+  const eventDay = Date.parse(`${dateOnly}T00:00:00Z`);
+  if (!Number.isFinite(eventDay)) return null;
+  const today = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+  return Math.max(0, Math.floor((today - eventDay) / 86400000));
+}
+
+function gdeltRecencyWeight(ageHours: number | null): number {
+  if (ageHours === null) return 0.45;
+  if (ageHours <= 6) return 1;
+  if (ageHours <= 24) return 0.9;
+  if (ageHours <= 72) return 0.65;
+  if (ageHours <= 168) return 0.35;
+  return 0.2;
+}
+
+function acledRecencyWeight(ageDays: number | null, timePrecision: number | null): number {
+  const precisionFactor = timePrecision === 1 ? 1 : timePrecision === 2 ? 0.72 : timePrecision === 3 ? 0.5 : 0.65;
+  if (ageDays === null) return 0.35 * precisionFactor;
+  const ageFactor = ageDays <= 0 ? 1 : ageDays <= 1 ? 0.9 : ageDays <= 3 ? 0.7 : ageDays <= 7 ? 0.45 : 0.25;
+  return Math.round(ageFactor * precisionFactor * 100) / 100;
+}
+
+function reportingStrength(providerCount: number, sources: number, articles: number): number {
+  // Coverage strength only — not a truth probability.
+  return Math.min(100, providerCount * 24 + Math.min(6, sources) * 8 + Math.min(14, articles) * 2);
+}
+
+function combineConflictEvents(events: ConflictEvent[]): ConflictEvent[] {
+  // Do not infer that records from different providers describe the same event
+  // merely because they share a generalized cell/category/day. Preserve event
+  // identity unless the provider itself supplies stronger corroboration.
+  const seen = new Set<string>();
+  return events
+    .filter(event => {
+      const key = `${event.provider}:${event.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, 1000);
+}
+
 async function fetchAllLiveConflictData(): Promise<{
   events: ConflictEvent[];
   eventsByRegion: Record<string, number>;
-  window: string;
-  scanned: number;
+  gdeltWindow: string;
+  gdeltScanned: number;
+  sourceStatus: Record<string, unknown>;
 }> {
-  const { events: rawEvents, window, scanned } = await fetchGdeltEvents({
-    quads: [4],
-    minArticles: 2,
-    limit: 1200,
+  const acledTimeout = new Promise<Awaited<ReturnType<typeof fetchAcledPublicEvents>>>(resolve => {
+    setTimeout(() => resolve({
+      status: 'unavailable',
+      events: [],
+      lastUpdateHours: null,
+      message: 'Optional ACLED source exceeded the 5s response budget.',
+    }), 5000);
   });
 
-  const publicEvents = rawEvents
-    .map(toPublicGdeltEvent)
-    .filter(event => event.url && Number.isFinite(event.lat) && Number.isFinite(event.lng));
+  const [gdeltResult, acledResult] = await Promise.all([
+    fetchGdeltEvents({ quads: [4], minArticles: 2, limit: 1400 }),
+    Promise.race([fetchAcledPublicEvents(7, 1200), acledTimeout]),
+  ]);
 
-  const events: ConflictEvent[] = publicEvents.map(event => ({
-    id: `gdelt-${event.id}`,
+  const gdeltEvents: ConflictEvent[] = gdeltResult.events
+    .map(toPublicGdeltEvent)
+    .filter(event => event.url && Number.isFinite(event.lat) && Number.isFinite(event.lng))
+    .map(event => ({
+      id: `gdelt-${event.id}`,
+      lat: event.lat,
+      lng: event.lng,
+      title: event.event_label_ar,
+      location: event.name || event.country || 'موقع منشور',
+      url: event.url,
+      type: event.event_category,
+      eventCode: event.event_code,
+      rootCode: event.root_code,
+      timestamp: event.date,
+      articles: event.articles,
+      sources: event.sources,
+      corroboration: event.corroboration,
+      precision: 'generalized-0.25deg',
+      provider: 'GDELT',
+      providerCount: 1,
+      sourceLabel: 'GDELT 2.0',
+      fatalities: 0,
+      reportingStrength: reportingStrength(1, event.sources, event.articles),
+      ageHours: eventAgeHours(event.date),
+      ageDays: eventAgeHours(event.date) === null ? null : Math.floor((eventAgeHours(event.date) as number) / 24),
+      timePrecision: null,
+      recencyWeight: gdeltRecencyWeight(eventAgeHours(event.date)),
+    }));
+
+  const acledEvents: ConflictEvent[] = acledResult.events.map(event => ({
+    id: event.id,
     lat: event.lat,
     lng: event.lng,
-    title: event.event_label_ar,
-    location: event.name || event.country || 'موقع منشور',
-    url: event.url,
-    type: event.event_category,
-    eventCode: event.event_code,
-    rootCode: event.root_code,
-    timestamp: event.date,
-    articles: event.articles,
+    title: event.labelAr,
+    location: event.location,
+    url: 'https://acleddata.com/',
+    type: event.category,
+    eventCode: event.subEventType,
+    rootCode: event.eventType,
+    timestamp: event.eventDate ? `${event.eventDate}T00:00:00Z` : (event.sourceUpdatedAt || new Date().toISOString()),
+    articles: 0,
     sources: event.sources,
-    corroboration: event.corroboration,
+    corroboration: event.sources >= 2 ? 'multi-source-report' : 'single-source-report',
     precision: 'generalized-0.25deg',
+    provider: 'ACLED',
+    providerCount: 1,
+    sourceLabel: event.sourceLabel || 'ACLED',
+    fatalities: event.fatalities,
+    reportingStrength: reportingStrength(1, event.sources, 0),
+    ageHours: null,
+    ageDays: eventAgeDays(event.eventDate),
+    timePrecision: event.timePrecision,
+    recencyWeight: acledRecencyWeight(eventAgeDays(event.eventDate), event.timePrecision),
   }));
+
+  const events = combineConflictEvents([...gdeltEvents, ...acledEvents]);
 
   const eventsByRegion: Record<string, number> = {};
   for (const zone of KNOWN_CONFLICTS) {
@@ -185,12 +288,26 @@ async function fetchAllLiveConflictData(): Promise<{
     ).length;
   }
 
-  return { events, eventsByRegion, window, scanned };
+  return {
+    events,
+    eventsByRegion,
+    gdeltWindow: gdeltResult.window,
+    gdeltScanned: gdeltResult.scanned,
+    sourceStatus: {
+      gdelt: { status: 'ok', window: gdeltResult.window, scanned: gdeltResult.scanned },
+      acled: {
+        status: acledResult.status,
+        events: acledResult.events.length,
+        lastUpdateHours: acledResult.lastUpdateHours,
+        message: acledResult.message ?? null,
+      },
+    },
+  };
 }
 
 export async function GET() {
   try {
-    const { events: liveEvents, eventsByRegion, window, scanned } = await fetchAllLiveConflictData();
+    const { events: liveEvents, eventsByRegion, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
 
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
       const zoneEvents = liveEvents.filter(event =>
@@ -215,17 +332,25 @@ export async function GET() {
       };
     });
 
+    const categoryCounts = liveEvents.reduce<Record<string, number>>((acc, event) => {
+      acc[event.type] = (acc[event.type] || 0) + 1;
+      return acc;
+    }, {});
+
     return NextResponse.json({
       zones,
       liveEvents: liveEvents.slice(0, 800),
       totalZones: zones.length,
       totalLiveEvents: liveEvents.length,
+      activeWarzones: zones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: zones.filter(zone => zone.eventCount > 0).length,
+      categoryCounts,
       timestamp: new Date().toISOString(),
-      source: 'GDELT 2.0 Events',
-      sourceWindow: window,
-      sourceRowsScanned: scanned,
-      sourceMode: 'reported-geocoded-material-conflict',
+      source: 'GDELT 2.0 + optional ACLED fusion',
+      sourceWindow: gdeltWindow,
+      sourceRowsScanned: gdeltScanned,
+      sourceStatus,
+      sourceMode: 'multi-source-public-conflict-layer',
       coordinatePrecision: 'generalized-0.25deg',
       refreshInterval: 300,
     }, {
@@ -259,7 +384,9 @@ export async function GET() {
       liveEvents: [],
       totalZones: fallbackZones.length,
       totalLiveEvents: 0,
+      activeWarzones: fallbackZones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: 0,
+      categoryCounts: {},
       timestamp: new Date().toISOString(),
       source: 'context-only-fallback',
       sourceMode: 'no-live-events',

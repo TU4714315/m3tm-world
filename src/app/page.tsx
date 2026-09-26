@@ -82,7 +82,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, frontlines: true, reported_routes: true, day_night: true,
+  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
   cf_outages: false, cf_attacks: false,
@@ -92,7 +92,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [
     key,
     [
-      'live_news', 'global_incidents', 'conflict_zones', 'frontlines', 'gdelt_events',
+      'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
       'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
     ].includes(key),
   ]),
@@ -911,14 +911,17 @@ export default function Dashboard() {
         reported_routes_meta: d.reported_routes_meta ?? null,
       }));
     }
-    if ((activeLayers as any).conflict_zones) {
+    if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       loadLayerOnce('conflicts', '/api/conflicts', d => ({
         conflict_zones: d.zones ?? [],
         conflict_live_events: d.liveEvents ?? [],
+        conflict_source_status: d.sourceStatus ?? null,
+        conflict_category_counts: d.categoryCounts ?? {},
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
           activeWarzones: d.activeWarzones ?? 0,
+          zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
       }));
@@ -982,14 +985,17 @@ export default function Dashboard() {
         reported_routes_meta: d.reported_routes_meta ?? null,
       })), 300000));
     }
-    if ((activeLayers as any).conflict_zones) {
+    if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
         conflict_zones: d.zones ?? [],
         conflict_live_events: d.liveEvents ?? [],
+        conflict_source_status: d.sourceStatus ?? null,
+        conflict_category_counts: d.categoryCounts ?? {},
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
           activeWarzones: d.activeWarzones ?? 0,
+          zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
       })), 300000));
