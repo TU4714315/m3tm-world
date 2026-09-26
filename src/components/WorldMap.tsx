@@ -368,7 +368,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createWarningIcon('warn-yellow', '#F9A825');
 
       map.addLayer({ id: 'conflict-density-heat', type: 'heatmap', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], maxzoom: 8, paint: {
-        'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['interpolate',['linear'],['coalesce',['get','ageHours'],24], 0,1, 24,0.9, 72,0.6, 168,0.25]],
+        'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['coalesce',['get','recencyWeight'],0.45]],
         'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
         'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
         'heatmap-opacity': ['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18],
@@ -394,7 +394,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'mass_violence','#C62828',
           'assault','#E53935',
           '#FF5252'],
-        'circle-opacity': ['interpolate',['linear'],['coalesce',['get','ageHours'],24], 0,0.92, 24,0.82, 72,0.58, 168,0.28],
+        'circle-opacity': ['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.22, 0.35,0.45, 0.65,0.68, 1,0.92],
         'circle-stroke-width': 1, 'circle-stroke-color': '#FFD7D7', 'circle-stroke-opacity': 0.55,
       }});
       map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
@@ -1431,6 +1431,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
           ${isEvent ? `<div><span style="color:#5C5A54;">قوة التغطية</span><br/><span style="color:#E8E6E0;">${strength}/100</span></div>` : ''}
           ${isEvent && p.ageHours !== null && p.ageHours !== undefined ? `<div><span style="color:#5C5A54;">عمر البلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageHours))} ساعة</span></div>` : ''}
+          ${isEvent && (p.ageHours === null || p.ageHours === undefined) && p.ageDays !== null && p.ageDays !== undefined ? `<div><span style="color:#5C5A54;">عمر الحدث</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageDays))} يوم · دقة زمنية ${htmlEsc(String(p.timePrecision || '—'))}</span></div>` : ''}
           ${isEvent && Number(p.fatalities || 0) > 0 ? `<div><span style="color:#5C5A54;">وفيات مبلّغ عنها</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.fatalities))}</span></div>` : ''}
           <div><span style="color:#5C5A54;">الموقع العام</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
         </div>
@@ -2405,6 +2406,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
               fatalities: e.fatalities || 0,
               reportingStrength: e.reportingStrength || 0,
               ageHours: e.ageHours ?? null,
+              ageDays: e.ageDays ?? null,
+              timePrecision: e.timePrecision ?? null,
+              recencyWeight: e.recencyWeight ?? 0.45,
             },
           }));
 
@@ -2466,6 +2470,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           fatalities: e.fatalities || 0,
           reportingStrength: e.reportingStrength || 0,
           ageHours: e.ageHours ?? null,
+          ageDays: e.ageDays ?? null,
+          timePrecision: e.timePrecision ?? null,
+          recencyWeight: e.recencyWeight ?? 0.45,
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
