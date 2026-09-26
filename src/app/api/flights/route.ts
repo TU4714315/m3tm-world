@@ -511,6 +511,13 @@ export async function GET() {
         identifiers_exposed: false,
         exact_tracks_exposed: false,
         unobserved_aircraft_inferred: false,
+        observation_model: 'observed-only',
+        absence_semantics: 'not-observed-does-not-mean-absent',
+        known_limitations: [
+          'receiver-coverage-gap',
+          'mode-s-without-position',
+          'transponder-off-or-unavailable',
+        ],
       },
       gps_jamming:        [],
       total:              allRaw.length,
