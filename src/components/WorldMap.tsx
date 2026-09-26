@@ -1418,14 +1418,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
+      const isEvent = p.kind === 'event';
+      const sourceLine = isEvent
+        ? `${htmlEsc(p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
+        : 'منطقة سياقية';
+      const strength = Math.max(0, Math.min(100, Number(p.reportingStrength) || 0));
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
-          <div><span style="color:#5C5A54;">الدرجة</span><br/><span style="color:${color};">${arEnum(p.severity)}</span></div>
-          <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
+          <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
+          <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
+          ${isEvent ? `<div><span style="color:#5C5A54;">قوة التغطية</span><br/><span style="color:#E8E6E0;">${strength}/100</span></div>` : ''}
+          ${isEvent && p.ageHours !== null && p.ageHours !== undefined ? `<div><span style="color:#5C5A54;">عمر البلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageHours))} ساعة</span></div>` : ''}
+          ${isEvent && Number(p.fatalities || 0) > 0 ? `<div><span style="color:#5C5A54;">وفيات مبلّغ عنها</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.fatalities))}</span></div>` : ''}
+          <div><span style="color:#5C5A54;">الموقع العام</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
         </div>
-        ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
+        ${isEvent ? '<div style="font-size:8px;color:#7E817C;margin-bottom:6px;">قوة التغطية مقياس لكثرة/تنوع التقارير وليست احتمالًا للحقيقة. الإحداثيات العامة معمّمة إلى 0.25°.</div>' : ''}
+        ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
       </div>`);
     };
     map.on('click', 'conflict-icons', onConflictClick);
