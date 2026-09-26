@@ -194,7 +194,7 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
       const updatedUnix = Number(row?.timestamp);
 
       return [{
-        id: `acled-${String(row?.event_id_cnty || '').trim() || Math.random().toString(36).slice(2)}`,
+        id: `acled-${String(row?.event_id_cnty || '').trim() || `${quarterDegree(lat)}-${quarterDegree(lng)}-${String(row?.event_date || 'unknown')}-${category}`}`,
         provider: 'ACLED' as const,
         lat: quarterDegree(lat),
         lng: quarterDegree(lng),
