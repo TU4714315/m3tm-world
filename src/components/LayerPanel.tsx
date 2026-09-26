@@ -115,7 +115,8 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },\n      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
+      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
+      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
       { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
