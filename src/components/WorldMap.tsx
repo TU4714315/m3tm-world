@@ -1424,7 +1424,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
-        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}°</div>
+        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · الزمن: نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
       </div>`);
     });
 
@@ -1808,6 +1808,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             approximate_count: cell.approximate_count,
             cell_degrees: cell.cell_degrees,
             precision: cell.precision,
+            time_precision: cell.time_precision,
+            observed_at_bucket: cell.observed_at_bucket,
+            reporting_mode: cell.reporting_mode,
           },
         }))
       : []);
