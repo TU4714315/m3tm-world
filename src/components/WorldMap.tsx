@@ -367,6 +367,18 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createWarningIcon('warn-orange', '#E65100');
       createWarningIcon('warn-yellow', '#F9A825');
 
+      map.addLayer({ id: 'conflict-density-heat', type: 'heatmap', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], maxzoom: 8, paint: {
+        'heatmap-weight': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1],
+        'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
+        'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
+        'heatmap-opacity': ['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18],
+        'heatmap-color': ['interpolate',['linear'],['heatmap-density'],
+          0,'rgba(0,0,0,0)',
+          0.2,'rgba(255,193,7,0.18)',
+          0.45,'rgba(255,112,67,0.38)',
+          0.7,'rgba(244,67,54,0.58)',
+          1,'rgba(183,28,28,0.78)'],
+      }});
       map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
@@ -2369,6 +2381,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
               eventCategory: e.type || 'material_conflict',
               corroboration: e.corroboration || 'single-source-report',
               eventCode: e.eventCode || '',
+              provider: e.provider || 'GDELT',
+              providerCount: e.providerCount || 1,
+              sourceLabel: e.sourceLabel || '',
+              fatalities: e.fatalities || 0,
+              reportingStrength: e.reportingStrength || 0,
+              ageHours: e.ageHours ?? null,
             },
           }));
 
@@ -2424,6 +2442,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           eventCategory: e.type || 'material_conflict',
           corroboration: e.corroboration || 'single-source-report',
           eventCode: e.eventCode || '',
+          provider: e.provider || 'GDELT',
+          providerCount: e.providerCount || 1,
+          sourceLabel: e.sourceLabel || '',
+          fatalities: e.fatalities || 0,
+          reportingStrength: e.reportingStrength || 0,
+          ageHours: e.ageHours ?? null,
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
@@ -2463,6 +2487,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
+    setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-dots','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
     setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);
