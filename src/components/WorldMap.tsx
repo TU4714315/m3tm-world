@@ -1420,7 +1420,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
       const isEvent = p.kind === 'event';
       const sourceLine = isEvent
-        ? `${htmlEsc(p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
+        ? `${htmlEsc(p.sourceLabel || p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
         : 'منطقة سياقية';
       const strength = Math.max(0, Math.min(100, Number(p.reportingStrength) || 0));
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
