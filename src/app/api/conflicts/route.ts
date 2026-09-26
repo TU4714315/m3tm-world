@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { stealthFetch } from '@/lib/stealthFetch';
+import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,9 +33,16 @@ interface ConflictEvent {
   lat: number;
   lng: number;
   title: string;
+  location: string;
   url: string;
   type: string;
+  eventCode: string;
+  rootCode: string;
   timestamp: string;
+  articles: number;
+  sources: number;
+  corroboration: 'single-source-report' | 'multi-source-report';
+  precision: 'generalized-0.25deg';
 }
 
 // Known active conflict zones (anchors — enriched with live data)
@@ -135,170 +142,60 @@ const CONFLICT_ARABIC: Record<string, { label: string; description: string }> = 
   ethiopia: { label: 'إثيوبيا', description: 'توترات ونزاعات إقليمية متفرقة في إثيوبيا وفق المصادر العامة.' },
 };
 
-// Parse GDELT DOC pointdata CSV response into events
-function parsePointDataCSV(csv: string): ConflictEvent[] {
-  const events: ConflictEvent[] = [];
-  const lines = csv.trim().split('\n');
-  // CSV format: lat\tlng\tname\turl (tab-separated)
-  for (const line of lines) {
-    const parts = line.split('\t');
-    if (parts.length < 3) continue;
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
-    
-    const name = (parts[2] || 'Conflict Event').replace(/<[^>]*>/g, '').trim();
-    const url = parts[3] || '';
-    
-    events.push({
-      id: `gdelt-pt-${events.length}`,
-      lat, lng,
-      title: name.substring(0, 150),
-      url,
-      type: 'conflict',
-      timestamp: new Date().toISOString(),
-    });
-  }
-  return events;
-}
+// GDELT 2.0 publishes geocoded event records every 15 minutes. Public map
+// output is generalized by toPublicGdeltEvent() before it reaches this route.
+async function fetchAllLiveConflictData(): Promise<{
+  events: ConflictEvent[];
+  eventsByRegion: Record<string, number>;
+  window: string;
+  scanned: number;
+}> {
+  const { events: rawEvents, window, scanned } = await fetchGdeltEvents({
+    quads: [4],
+    minArticles: 2,
+    limit: 1200,
+  });
 
-async function fetchAllLiveConflictData(): Promise<{ events: ConflictEvent[]; eventsByRegion: Record<string, number> }> {
-  const allEvents: ConflictEvent[] = [];
+  const publicEvents = rawEvents
+    .map(toPublicGdeltEvent)
+    .filter(event => event.url && Number.isFinite(event.lat) && Number.isFinite(event.lng));
+
+  const events: ConflictEvent[] = publicEvents.map(event => ({
+    id: `gdelt-${event.id}`,
+    lat: event.lat,
+    lng: event.lng,
+    title: event.event_label_ar,
+    location: event.name || event.country || 'موقع منشور',
+    url: event.url,
+    type: event.event_category,
+    eventCode: event.event_code,
+    rootCode: event.root_code,
+    timestamp: event.date,
+    articles: event.articles,
+    sources: event.sources,
+    corroboration: event.corroboration,
+    precision: 'generalized-0.25deg',
+  }));
+
   const eventsByRegion: Record<string, number> = {};
-
-  const RSS_FEEDS = [
-    'http://feeds.bbci.co.uk/news/world/rss.xml',
-    'https://www.aljazeera.com/xml/rss/all.xml',
-    'https://rss.nytimes.com/services/xml/rss/nyt/World.xml'
-  ];
-
-  try {
-    const https = require('https');
-    const http = require('http');
-
-    const fetchRSS = (url: string): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const client = url.startsWith('https') ? https : http;
-        const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, family: 4 }, (res: any) => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-             return fetchRSS(url.startsWith('https') && res.headers.location.startsWith('/') ? `https://${new URL(url).host}${res.headers.location}` : res.headers.location).then(resolve).catch(reject);
-          }
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            return reject(new Error(`Status: ${res.statusCode}`));
-          }
-          let data = '';
-          res.on('data', (chunk: string) => data += chunk);
-          res.on('end', () => resolve(data));
-        });
-        req.on('error', reject);
-        req.setTimeout(5000, () => {
-          req.destroy();
-          reject(new Error('Timeout'));
-        });
-      });
-    };
-
-    const feedPromises = RSS_FEEDS.map(async (url) => {
-      try {
-        const res = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5'
-          },
-          signal: AbortSignal.timeout(8000),
-          cache: 'no-store'
-        });
-        
-        if (!res.ok) {
-          console.log(`[OSIRIS] RSS Fetch Failed for ${url}: ${res.status}`);
-          return [];
-        }
-        
-        const xml = await res.text();
-        const rawItems = xml.split(/<item>/i).slice(1);
-        console.log(`[OSIRIS] RSS ${url} returned ${rawItems.length} items`);
-        
-        return rawItems.map(rawItem => {
-          const item = rawItem.split(/<\/item>/i)[0];
-          const titleMatch = item.match(/<title>(.*?)<\/title>/i) || item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/i);
-          const linkMatch = item.match(/<link>(.*?)<\/link>/i);
-          const descMatch = item.match(/<description>(.*?)<\/description>/i) || item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/i);
-          
-          if (!titleMatch) return null;
-          return {
-            title: titleMatch[1].replace(/<[^>]*>/g, '').trim(),
-            link: linkMatch ? linkMatch[1] : '',
-            desc: descMatch ? descMatch[1].replace(/<[^>]*>/g, '').trim() : ''
-          };
-        }).filter(Boolean);
-      } catch (err) {
-        console.log(`[OSIRIS] RSS Fetch Error for ${url}:`, (err as Error).message);
-        return [];
-      }
-    });
-
-    const feedResults = await Promise.all(feedPromises);
-    const combinedItems = feedResults.flat();
-
-    // Map RSS items to known conflict zones
-    let eventId = 0;
-    for (const item of combinedItems) {
-      if (!item) continue;
-      
-      const searchText = `${item.title} ${item.desc}`.toLowerCase();
-      
-      for (const zone of KNOWN_CONFLICTS) {
-        // Check if any query keywords match
-        const matchesZone = zone.queries.some(q => {
-          const terms = q.toLowerCase().split(' ');
-          return terms.every(term => searchText.includes(term)) || searchText.includes(zone.region);
-        });
-
-        if (matchesZone) {
-          eventsByRegion[zone.id] = (eventsByRegion[zone.id] || 0) + 1;
-          
-          // Deterministic tiny offset based on eventId so dots don't exactly overlap the anchor
-          const offsetLat = (eventId % 5 - 2) * 0.1;
-          const offsetLng = ((eventId * 3) % 5 - 2) * 0.1;
-
-          // Deduplicate by title to avoid multiple feeds reporting the same event
-          const isDupe = allEvents.some(e => e.title === item.title.substring(0, 150));
-          if (isDupe) break;
-
-          allEvents.push({
-            id: `osint-live-${eventId++}`,
-            lat: zone.lat + offsetLat,
-            lng: zone.lng + offsetLng,
-            title: item.title.substring(0, 150),
-            url: item.link,
-            type: 'conflict',
-            timestamp: new Date().toISOString(),
-          });
-          
-          break; // Match only one zone per news item
-        }
-      }
-    }
-    console.log(`[OSIRIS] Mapped ${allEvents.length} conflict events from RSS.`);
-  } catch (e) {
-    console.error('OSINT Conflict Fetch Error:', e);
+  for (const zone of KNOWN_CONFLICTS) {
+    eventsByRegion[zone.id] = events.filter(event =>
+      event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
+      event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
+    ).length;
   }
 
-  return { events: allEvents, eventsByRegion };
+  return { events, eventsByRegion, window, scanned };
 }
 
 export async function GET() {
   try {
-    // Fetch live conflict data from GDELT
-    const { events: liveEvents, eventsByRegion } = await fetchAllLiveConflictData();
+    const { events: liveEvents, eventsByRegion, window, scanned } = await fetchAllLiveConflictData();
 
-    // Build enriched conflict zones
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
-      // Find live events within this zone's bounds
-      const zoneEvents = liveEvents.filter(e =>
-        e.lat >= zone.bounds.minLat && e.lat <= zone.bounds.maxLat &&
-        e.lng >= zone.bounds.minLng && e.lng <= zone.bounds.maxLng
+      const zoneEvents = liveEvents.filter(event =>
+        event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
+        event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
       );
 
       return {
@@ -310,23 +207,27 @@ export async function GET() {
         lng: zone.lng,
         description: zone.description,
         descriptionAr: CONFLICT_ARABIC[zone.id]?.description ?? zone.description,
-        sourceUrl: zone.sourceUrl,
+        sourceUrl: 'https://www.gdeltproject.org/',
         region: zone.region,
-        events: zoneEvents.slice(0, 20),
-        eventCount: eventsByRegion[zone.id] || zoneEvents.length,
+        events: zoneEvents.slice(0, 40),
+        eventCount: eventsByRegion[zone.id] || 0,
         lastUpdated: new Date().toISOString(),
       };
     });
 
     return NextResponse.json({
       zones,
-      liveEvents: liveEvents.slice(0, 500),
+      liveEvents: liveEvents.slice(0, 800),
       totalZones: zones.length,
       totalLiveEvents: liveEvents.length,
-      activeWarzones: zones.filter(z => z.severity === 'war').length,
+      zonesWithRecentReports: zones.filter(zone => zone.eventCount > 0).length,
       timestamp: new Date().toISOString(),
-      sources: ['OSINT RSS News'],
-      refreshInterval: 300, // suggest 5 min refresh
+      source: 'GDELT 2.0 Events',
+      sourceWindow: window,
+      sourceRowsScanned: scanned,
+      sourceMode: 'reported-geocoded-material-conflict',
+      coordinatePrecision: 'generalized-0.25deg',
+      refreshInterval: 300,
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
@@ -334,8 +235,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error('[OSIRIS] Conflict API error:', error);
-    
-    // Fallback: return known zones without live enrichment
+
+    // Keep contextual zones visible if GDELT is temporarily unavailable, but do
+    // not manufacture "live" events or synthetic coordinates.
     const fallbackZones = KNOWN_CONFLICTS.map(zone => ({
       id: zone.id,
       label: zone.label,
@@ -357,12 +259,14 @@ export async function GET() {
       liveEvents: [],
       totalZones: fallbackZones.length,
       totalLiveEvents: 0,
-      activeWarzones: fallbackZones.filter(z => z.severity === 'war').length,
+      zonesWithRecentReports: 0,
       timestamp: new Date().toISOString(),
-      sources: ['fallback'],
-      refreshInterval: 60,
+      source: 'context-only-fallback',
+      sourceMode: 'no-live-events',
+      coordinatePrecision: 'none',
+      refreshInterval: 300,
     }, {
-      headers: { 'Cache-Control': 'no-cache' },
+      headers: { 'Cache-Control': 'no-store' },
     });
   }
 }
