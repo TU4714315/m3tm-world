@@ -63,7 +63,7 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 │  /api/cctv            /api/news                 │
 │  /api/fires           /api/maritime             │
 │  /api/gdelt           /api/satellites           │
-│  /api/weather         /api/scanner              │
+│  /api/weather         /api/scanner INTERNAL     │
 │  /api/sentinel        /api/telegram-feed        │
 │  /api/tools/*  INTERNAL — auth token + enable   │
 │  /api/osint/*  INTERNAL — M3TM.APP portal only  │
@@ -194,7 +194,7 @@ N2YO_API_KEY=                 # N2YO satellites — n2yo.com (Profile → API ke
 AIS_API_KEY=                 # aisstream.io maritime
 ```
 
-> أدوات التحقيق ليست جزءًا من السطح العام. حتى عند إعداد `SCANNER_URL`/`SCANNER_KEY` تبقى مسارات `/api/tools/*` و`/api/osint/*` خلف `M3TM_WORLD_INTERNAL_TOOLS_ENABLED` و`M3TM_WORLD_INTERNAL_TOOLS_TOKEN`. لا يُرسل الرمز إلى المتصفح العام. `.env` مهمل من Git.
+> أدوات التحقيق والمسح ليست جزءًا من السطح العام. حتى عند إعداد `SCANNER_URL`/`SCANNER_KEY` تبقى مسارات `/api/tools/*` و`/api/osint/*` و`/api/scanner` خلف `M3TM_WORLD_INTERNAL_TOOLS_ENABLED` و`M3TM_WORLD_INTERNAL_TOOLS_TOKEN`. لا يُرسل الرمز إلى المتصفح العام. `.env` مهمل من Git.
 
 ---
 

@@ -51,6 +51,7 @@ describe('public OSINT boundary', () => {
   it('registers the private tool API paths with middleware', () => {
     expect(config.matcher).toContain('/api/osint/:path*');
     expect(config.matcher).toContain('/api/tools/:path*');
+    expect(config.matcher).toContain('/api/scanner');
   });
 
   it('fails closed when the internal tool bridge is not explicitly enabled', async () => {
@@ -65,6 +66,35 @@ describe('public OSINT boundary', () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
     expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+
+
+  it('fails closed for the active scanner route too', async () => {
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
+
+    const response = middleware(
+      new NextRequest('https://m3tm-world.vercel.app/api/scanner?target=example.com&type=headers'),
+      { waitUntil: vi.fn() } as never,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
+  });
+
+  it('allows an explicitly enabled internal route only with the matching server token', () => {
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
+
+    const response = middleware(
+      new NextRequest('https://m3tm-world.vercel.app/api/scanner?target=example.com&type=headers', {
+        headers: { 'x-m3tm-internal-token': 'owner-only-token' },
+      }),
+      { waitUntil: vi.fn() } as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
   it('requires the server token even when the bridge flag is enabled', async () => {

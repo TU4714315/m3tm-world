@@ -4,7 +4,7 @@ import type { NextRequest, NextFetchEvent } from 'next/server';
 export function middleware(request: NextRequest, event: NextFetchEvent) {
   const url = request.nextUrl.pathname;
   
-  const protectedOsint = url.startsWith('/api/osint/') || url.startsWith('/api/tools/');
+  const protectedOsint = url === '/api/scanner' || url.startsWith('/api/osint/') || url.startsWith('/api/tools/');
   if (protectedOsint) {
     const expectedToken = process.env.M3TM_WORLD_INTERNAL_TOOLS_TOKEN;
     const explicitlyEnabled = process.env.M3TM_WORLD_INTERNAL_TOOLS_ENABLED === 'true';
@@ -79,6 +79,7 @@ export const config = {
   matcher: [
     '/api/osint/:path*',
     '/api/tools/:path*',
+    '/api/scanner',
     '/((?!api|_next/static|_next/image|vendor|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mjs|js|css|json|pbf|mvt|woff|woff2|ico|txt)$).*)',
   ],
 }

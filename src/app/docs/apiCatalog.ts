@@ -370,6 +370,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/dns',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Resolves A, AAAA, MX, NS, TXT, and SOA records.',
         params: [{ name: 'domain', required: true, desc: 'Domain to resolve.', example: 'example.com' }],
         returns: ['…record sets'],
@@ -377,6 +378,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/whois',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Registration and registrar detail for a domain.',
         params: [{ name: 'domain', required: true, desc: 'Domain to look up.', example: 'example.com' }],
         returns: ['…registration record'],
@@ -384,6 +386,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/certs',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Certificate transparency search — an effective passive subdomain enumerator.',
         params: [{ name: 'domain', required: true, desc: 'Apex domain to search.', example: 'example.com' }],
         returns: ['certificates', 'subdomains', 'total_certs', 'unique_subdomains', 'timestamp'],
@@ -391,6 +394,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/ip',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Geolocation, ASN, and network ownership for an address.',
         params: [{ name: 'ip', required: true, desc: 'IPv4 or IPv6 address.', example: '8.8.8.8' }],
         returns: ['…address record'],
@@ -398,6 +402,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/shodan',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Exposed services, banners, and known vulnerabilities for a host.',
         params: [{ name: 'ip', required: true, desc: 'Address to query.', example: '8.8.8.8' }],
         returns: ['status', 'ports', 'hostnames', 'cpes', 'vulns', 'tags', 'detail'],
@@ -405,6 +410,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/bgp',
         method: 'GET',
+        requiresAuth: true,
         summary: 'ASN, prefix, and peering relationships.',
         params: [{ name: 'query', required: true, desc: 'ASN, prefix, or IP.', example: 'AS15169' }],
         returns: ['…routing record'],
@@ -412,6 +418,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/mac',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Resolves a MAC address or OUI prefix to its hardware vendor.',
         params: [{ name: 'mac', required: true, desc: 'MAC address or OUI prefix.', example: '00:1A:2B:3C:4D:5E' }],
         returns: ['mac', 'prefix', 'vendor', 'address', 'detail'],
@@ -419,6 +426,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/phone',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Validates and classifies a phone number in E.164 form.',
         params: [{ name: 'number', required: true, desc: 'Number in international format.', example: '+442071234567' }],
         returns: [
@@ -436,6 +444,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/github',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Public profile metadata for a GitHub account.',
         params: [{ name: 'user', required: true, desc: 'GitHub username.', example: 'torvalds' }],
         returns: ['username', 'name', 'bio', 'company', 'location', 'blog', 'email', 'twitter', 'public_repos'],
@@ -443,6 +452,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/leaks',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Checks an address against known breach corpora.',
         params: [{ name: 'email', required: true, desc: 'Email address to check.' }],
         returns: ['breached', 'breaches', 'data_exposed', 'detail'],
@@ -450,6 +460,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/hudsonrock',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Reports whether an asset appears in Hudson Rock\'s infostealer corpus — machines compromised by credential-stealing malware.',
         params: [
           { name: 'query', required: true, desc: 'Email, domain, username or phone number.', example: 'tesla.com' },
@@ -460,6 +471,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/cve',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Full NVD record for a single CVE identifier.',
         params: [{ name: 'cve', required: true, desc: 'CVE ID.', example: 'CVE-2021-44228' }],
         returns: ['id', 'description', 'cvss', 'cvss_vector', 'severity', 'published', 'references', 'source'],
@@ -467,6 +479,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/sanctions',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Searches the OpenSanctions mirror of the US OFAC SDN list.',
         params: [
           { name: 'query', required: true, desc: 'Name of a person, organisation, or vessel.' },
@@ -478,6 +491,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/threats',
         method: 'GET',
+        requiresAuth: true,
         summary: 'إثراء السمعة وبيانات التهديد للمؤشر.',
         params: [{ name: 'query', required: true, desc: 'IP, domain, or file hash.' }],
         returns: ['…enrichment record'],
@@ -485,6 +499,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/tools/sweep',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Sweeps a single address or a CIDR range for reachable hosts.',
         params: [
           { name: 'ip', desc: 'Single address to sweep.' },
@@ -498,11 +513,12 @@ export const API_GROUPS: ApiGroup[] = [
   {
     id: 'recon',
     title: 'Recon Scanner',
-    blurb: 'Active scanning, delegated to a separate backend so the web tier never runs scans itself.',
+    blurb: 'Internal active scanning delegated to a separate backend. The public WORLD surface cannot invoke it; access requires the authorized M3TM.APP server bridge.',
     endpoints: [
       {
         path: '/api/scanner',
         method: 'GET',
+        requiresAuth: true,
         summary: 'Runs a scan against a target via the scanner backend.',
         params: [
           {
@@ -516,7 +532,7 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['detail', 'hint', 'failed', 'error'],
         env: ['SCANNER_URL', 'SCANNER_KEY'],
         notes:
-          'Returns 503 when `SCANNER_URL` / `SCANNER_KEY` are unset — that is the supported way to disable RECON. `SCANNER_KEY` must equal the backend’s `backend shared key`.',
+          'Internal-only. The WORLD middleware requires the internal bridge flag and server token before this route can reach the scanner backend. Missing scanner backend configuration still returns 503.',
       },
     ],
   },

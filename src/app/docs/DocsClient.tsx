@@ -247,8 +247,8 @@ export default function DocsClient() {
 
           <div className="mt-8 mx-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
             <div className="text-[11px] font-mono text-[var(--text-secondary)] leading-relaxed">
-              <span className="text-[var(--gold-primary)] font-bold">{ENDPOINT_COUNT}</span> endpoints, no key
-              required.
+              <span className="text-[var(--gold-primary)] font-bold">{ENDPOINT_COUNT}</span> documented endpoints ·
+              public feeds + gated internal tools.
             </div>
           </div>
         </nav>
@@ -274,8 +274,8 @@ export default function DocsClient() {
 
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)] max-w-[42rem]">
               M3TM.WORLD aggregates aviation, maritime, seismic, conflict, cyber, and public data feeds onto a single
-              GPU-rendered map — and exposes every one of them as a plain HTTP endpoint. This is the same API the
-              dashboard runs on. There is no separate, privileged internal tier.
+              GPU-rendered map. Public map feeds remain plain HTTP endpoints; investigation and scanner routes are a
+              separate internal tier that is available only through the authenticated M3TM.APP server bridge.
             </p>
 
             <div className="flex flex-wrap gap-3 mt-8">
@@ -300,7 +300,7 @@ export default function DocsClient() {
               {[
                 { n: String(ENDPOINT_COUNT), l: 'Endpoints' },
                 { n: '20+', l: 'Live feeds' },
-                { n: '0', l: 'Keys required' },
+                { n: 'GATED', l: 'Internal tools' },
               ].map(s => (
                 <div key={s.l} className="rounded-xl border border-white/[0.07] bg-white/[0.015] px-4 py-3">
                   <div className="text-[24px] font-bold text-[var(--gold-primary)] font-mono leading-none">{s.n}</div>
@@ -324,9 +324,9 @@ export default function DocsClient() {
               That boundary is deliberate. Upstream sources disagree about formats, rate limits, and CORS policy, so
               the API layer absorbs those differences and hands back consistent JSON.
             </p>
-            <Callout tone="good" title="No credentials needed">
-              Aviation, maritime, satellites, fires, earthquakes, weather, news, and CVE data all come from public
-              keyless feeds. Keys only matter for the optional RECON scanner and for raising rate limits.
+            <Callout tone="good" title="Public feeds stay simple">
+              Aviation, maritime, satellites, fires, earthquakes, weather, and news remain public feed surfaces.
+              Investigation lookups and active scanning are intentionally separated behind the authenticated internal bridge.
             </Callout>
           </Section>
 
@@ -367,9 +367,9 @@ print(len(data["commercial_flights"]), "commercial")`,
             <Callout tone="warn" title="OSINT is internal">
               Lookup and investigation tools are not callable from the public WORLD surface. Open the authenticated M3TM.APP portal; the server bridge supplies authorization without exposing its token to the browser.
             </Callout>
-            <Callout tone="info" title="Try before you write code">
-              Every GET endpoint in the reference below has a <strong>Send request</strong> button that runs it against
-              this instance and shows the live response.
+            <Callout tone="info" title="Try public feeds before you write code">
+              Public GET endpoints in the reference below expose a <strong>Send request</strong> action. Internal OSINT
+              and scanner endpoints intentionally show no runnable public request or token-bearing example.
             </Callout>
           </Section>
 
@@ -405,11 +405,11 @@ docker compose up -d`}</Pre>
               {[
                 {
                   k: 'SCANNER_URL / SCANNER_KEY',
-                  v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s backend shared key. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
+                  v: 'Points at the separate RECON scanner backend. /api/scanner is also protected by the internal-tools gate; the backend key never makes the route public. Leave scanner settings empty to disable the backend entirely.',
                 },
                 {
                   k: 'M3TM_WORLD_INTERNAL_TOOLS_ENABLED / M3TM_WORLD_INTERNAL_TOOLS_TOKEN',
-                  v: 'Fail-closed gate for /api/tools/* and /api/osint/*. Keep disabled on the public surface; when enabled, the token is supplied only by the authorized server bridge and never by browser UI.',
+                  v: 'Fail-closed gate for /api/tools/*, /api/osint/* and /api/scanner. Keep disabled on the public surface; when enabled, the token is supplied only by the authorized server bridge and never by browser UI.',
                 },
                 {
                   k: 'SDK_INGEST_KEY',
