@@ -29,7 +29,6 @@ const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
 const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
-const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
 const DrawingToolbar = dynamic(() => import('@/components/DrawingToolbar'), { ssr: false });
 const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 // The measurement helpers are pure functions — importing them directly keeps
@@ -1605,26 +1604,21 @@ export default function Dashboard() {
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
         <div className="relative group">
-          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="أدوات البحث والتحقق — بحث IP وفحص الشبكة وتحديد الموقع" aria-label="أدوات البحث والتحقق" aria-expanded={showIntel}>
-            <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
-            {showIntel && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]"
-              />
-            )}
+          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--gold-primary)]/15' : 'hover:bg-white/10'}`} title="بوابة OSINT الداخلية — تتطلب صلاحية" aria-label="بوابة OSINT الداخلية" aria-expanded={showIntel}>
+            <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
+            {showIntel && <span aria-hidden="true" className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--gold-primary)]" />}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">أدوات</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">بوابة OSINT</span>
           <AnimatePresence>
             {showIntel && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target, data) => {
-                  setScanTargets(prev => {
-                    const existing = prev.filter(t => t.id !== target);
-                    return [{ id: target, timestamp: Date.now(), ...data }, ...existing].slice(0, 10);
-                  });
-                  setFlyToLocation({ lat: data.lat, lng: data.lng, ts: Date.now() });
-                }} />
+                <div className="glass-panel p-4 space-y-3 text-right" dir="rtl">
+                  <div className="flex items-center gap-2 text-[var(--gold-primary)]"><Radar className="w-4 h-4" /><strong className="text-[12px]">OSINT داخلي ومقفل</strong></div>
+                  <p className="text-[11px] leading-5 text-[var(--text-secondary)]">أدوات التحقيق لم تعد تعمل من السطح العام لـ M3TM.WORLD. التشغيل متاح فقط داخل M3TM.APP بعد تسجيل الدخول واجتياز صلاحيات المالك.</p>
+                  <a href="https://m3tm.app/login?next=%2Fdashboard%2Fm3tm-1%2Fosint" className="flex min-h-9 items-center justify-center gap-2 rounded-md border border-[var(--gold-primary)]/35 bg-[var(--gold-primary)]/10 px-3 text-[11px] font-bold text-[var(--gold-light)]">
+                    <ExternalLink className="w-3.5 h-3.5" /> فتح البوابة الداخلية
+                  </a>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1904,7 +1898,7 @@ export default function Dashboard() {
                 { id: 'layers' as const, icon: Layers, label: 'الطبقات' },
                 { id: 'markets' as const, icon: BarChart3, label: 'الأسواق' },
                 { id: 'intel' as const, icon: Newspaper, label: 'الأخبار' },
-                { id: 'recon' as const, icon: Radar, label: 'أدوات' },
+                { id: 'recon' as const, icon: Radar, label: 'بوابة' },
                 { id: 'search' as const, icon: Search, label: 'بحث' },
                 // Routing was reachable only from the desktop tool rail, so a
                 // phone could not open it at all. It sits next to SEARCH
@@ -1961,7 +1955,7 @@ export default function Dashboard() {
                 <div className="px-3 pb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="hud-text text-[12px] text-[var(--text-primary)]">
-                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والبيانات' : mobilePanel === 'intel' ? 'موجز الأخبار' : mobilePanel === 'recon' ? 'أدوات البحث والتحقق' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
+                      {mobilePanel === 'layers' ? 'الطبقات والإحصائيات' : mobilePanel === 'markets' ? 'الأسواق والبيانات' : mobilePanel === 'intel' ? 'موجز الأخبار' : mobilePanel === 'recon' ? 'بوابة OSINT الداخلية' : mobilePanel === 'remote' ? 'التحكم العالمي' : 'بحث'}
                     </span>
                     <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
                   </div>
@@ -1991,8 +1985,14 @@ export default function Dashboard() {
                     </div>
                   )}
                   {mobilePanel === 'recon' && (
-                    <div className="space-y-2">
-                      <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
+                    <div className="space-y-3 text-right" dir="rtl">
+                      <div className="glass-panel-sm p-4 space-y-3 border-[var(--gold-primary)]/25">
+                        <div className="flex items-center gap-2 text-[var(--gold-primary)]"><Radar className="w-4 h-4" /><strong className="text-[12px]">OSINT داخلي ومقفل</strong></div>
+                        <p className="text-[11px] leading-5 text-[var(--text-secondary)]">أدوات التحقيق لا تعمل من السطح العام لـ M3TM.WORLD. التشغيل متاح داخل M3TM.APP فقط بعد تسجيل الدخول واجتياز صلاحيات المستخدم والمالك.</p>
+                        <a href="https://m3tm.app/login?next=%2Fdashboard%2Fm3tm-1%2Fosint" className="flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--gold-primary)]/35 bg-[var(--gold-primary)]/10 px-3 text-[11px] font-bold text-[var(--gold-light)]">
+                          <ExternalLink className="w-3.5 h-3.5" /> فتح البوابة الداخلية
+                        </a>
+                      </div>
                     </div>
                   )}
                   {mobilePanel === 'remote' && (

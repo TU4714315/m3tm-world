@@ -4,6 +4,29 @@ import type { NextRequest, NextFetchEvent } from 'next/server';
 export function middleware(request: NextRequest, event: NextFetchEvent) {
   const url = request.nextUrl.pathname;
   
+  const protectedOsint = url.startsWith('/api/osint/') || url.startsWith('/api/tools/');
+  if (protectedOsint) {
+    const expectedToken = process.env.M3TM_WORLD_INTERNAL_TOOLS_TOKEN;
+    const explicitlyEnabled = process.env.M3TM_WORLD_INTERNAL_TOOLS_ENABLED === 'true';
+    const authorization = request.headers.get('authorization') || '';
+    const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    const providedToken = request.headers.get('x-m3tm-internal-token') || bearer;
+    const authorized = explicitlyEnabled && Boolean(expectedToken) && providedToken === expectedToken;
+
+    if (!authorized) {
+      return NextResponse.json(
+        {
+          error: 'internal_only',
+          message: 'OSINT tools are available only through the authorized M3TM.APP internal portal.',
+        },
+        {
+          status: 403,
+          headers: { 'Cache-Control': 'no-store, max-age=0' },
+        },
+      );
+    }
+  }
+
   const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '127.0.0.1';
   const userAgent = request.headers.get('user-agent') || 'Unknown OSIRIS Client';
   
@@ -54,6 +77,8 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
    map's critical path. Analytics wants page views; asset fetches are not one. */
 export const config = {
   matcher: [
+    '/api/osint/:path*',
+    '/api/tools/:path*',
     '/((?!api|_next/static|_next/image|vendor|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mjs|js|css|json|pbf|mvt|woff|woff2|ico|txt)$).*)',
   ],
 }
