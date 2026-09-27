@@ -67,7 +67,6 @@ M3TM.WORLD تطبيق مستقل مبني باستخدام Next.js 16 وMapLibre
 │  /api/sentinel        /api/telegram-feed        │
 │  /api/tools/*  INTERNAL — auth token + enable   │
 │  /api/osint/*  INTERNAL — M3TM.APP portal only  │
-│  /api/scanner  INTERNAL — same protected gate   │
 ├─────────────────────────────────────────────────┤
 │              EXTERNAL DATA SOURCES               │
 │  OpenSky · USGS · NASA · NOAA · TfL · NVD      │
