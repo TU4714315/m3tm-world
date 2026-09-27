@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { config } from './middleware';
+import { config, middleware } from './middleware';
+import { NextRequest } from 'next/server';
 import { version as maplibreVersion } from 'maplibre-gl/package.json';
 
 const vendorDir = fileURLToPath(new URL('../public/vendor/maplibre/', import.meta.url));
@@ -38,5 +39,46 @@ describe('map runtime assets', () => {
     expect(matches('/')).toBe(true);
     expect(matches('/merch')).toBe(true);
     expect(matches('/api/cctv')).toBe(false);
+  });
+});
+
+
+describe('public OSINT boundary', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('registers the private tool API paths with middleware', () => {
+    expect(config.matcher).toContain('/api/osint/:path*');
+    expect(config.matcher).toContain('/api/tools/:path*');
+  });
+
+  it('fails closed when the internal tool bridge is not explicitly enabled', async () => {
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'false');
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
+
+    const response = middleware(
+      new NextRequest('https://m3tm-world.vercel.app/api/osint/shodan'),
+      { waitUntil: vi.fn() } as never,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
+    expect(response.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('requires the server token even when the bridge flag is enabled', async () => {
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
+
+    const response = middleware(
+      new NextRequest('https://m3tm-world.vercel.app/api/tools/shodan', {
+        headers: { authorization: 'Bearer wrong-token' },
+      }),
+      { waitUntil: vi.fn() } as never,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
   });
 });
