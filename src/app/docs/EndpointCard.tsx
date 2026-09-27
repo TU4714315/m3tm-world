@@ -82,6 +82,11 @@ export default function EndpointCard({ ep, origin }: { ep: ApiEndpoint; origin: 
 
   const tabs = useMemo(() => buildTabs(ep, `${origin}${liveUrl}`), [ep, origin, liveUrl]);
 
+  const internalOnly = Boolean(ep.requiresAuth) && (
+    ep.path === '/api/scanner'
+    || ep.path.startsWith('/api/tools/')
+    || ep.path.startsWith('/api/osint/')
+  );
   const canTry = primary === 'GET' && !ep.requiresAuth;
   const missingRequired = (ep.params || []).filter(p => p.required && !values[p.name]?.trim());
 
@@ -210,10 +215,18 @@ export default function EndpointCard({ ep, origin }: { ep: ApiEndpoint; origin: 
           )}
 
           {/* Request snippets */}
-          <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-[var(--text-muted)] mb-1 mt-4">
-            Request
-          </div>
-          <CodeBlock dense tabs={tabs} />
+          {internalOnly ? (
+            <div className="mt-4 rounded-lg border border-[var(--gold-primary)]/25 bg-[var(--gold-primary)]/[0.06] p-3 text-[11.5px] leading-relaxed text-[var(--text-secondary)]">
+              Internal route — direct browser/client examples are intentionally hidden. Use the authenticated M3TM.APP server bridge so the internal token never reaches public UI.
+            </div>
+          ) : (
+            <>
+              <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-[var(--text-muted)] mb-1 mt-4">
+                Request
+              </div>
+              <CodeBlock dense tabs={tabs} />
+            </>
+          )}
 
           {/* Try it */}
           <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -242,9 +255,11 @@ export default function EndpointCard({ ep, origin }: { ep: ApiEndpoint; origin: 
               </>
             ) : (
               <span className="text-[11px] font-mono text-[var(--text-muted)]">
-                {ep.requiresAuth
-                  ? 'Requires a credential — run this from your own client.'
-                  : 'POST endpoint — run this from your own client.'}
+                {internalOnly
+                  ? 'Internal bridge only — direct public requests are disabled.'
+                  : ep.requiresAuth
+                    ? 'Requires a credential — run this from an authorized client.'
+                    : 'POST endpoint — run this from your own client.'}
               </span>
             )}
           </div>
