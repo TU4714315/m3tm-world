@@ -75,12 +75,24 @@ function importanceLabel(score: number): string {
 }
 
 function sortImportantNews(items: NewsTickerItem[]): NewsTickerItem[] {
-  return [...items]
-    .filter((item) => item.title.trim().length > 0 && /[\u0600-\u06FF]/.test(item.title))
+  const now = Date.now();
+  const valid = items.filter((item) => {
+    const publishedAt = Date.parse(item.published || '');
+    return item.title.trim().length > 0
+      && /[\u0600-\u06FF]/.test(item.title)
+      && Number.isFinite(publishedAt)
+      && publishedAt <= now + 10 * 60_000;
+  });
+  const within = (hours: number) => valid.filter((item) => now - Date.parse(item.published) <= hours * 3_600_000);
+  const recent72h = within(72);
+  const recent7d = within(24 * 7);
+  const pool = recent72h.length >= 6 ? recent72h : recent7d.length >= 6 ? recent7d : valid;
+
+  return [...pool]
     .sort((a, b) => {
       const riskDelta = Number(b.risk_score || 0) - Number(a.risk_score || 0);
       if (riskDelta !== 0) return riskDelta;
-      return Date.parse(b.published || '') - Date.parse(a.published || '');
+      return Date.parse(b.published) - Date.parse(a.published);
     })
     .slice(0, 10);
 }
