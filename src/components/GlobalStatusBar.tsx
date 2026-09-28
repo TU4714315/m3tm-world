@@ -13,13 +13,6 @@ interface NewsTickerItem {
   language?: string;
 }
 
-interface NewsPayload {
-  news?: NewsTickerItem[];
-  source?: string;
-  language?: string;
-  timestamp?: string;
-}
-
 interface SourceHealth {
   status: 'operational' | 'degraded';
   timestamp: string;
@@ -79,14 +72,15 @@ function sortImportantNews(items: NewsTickerItem[]): NewsTickerItem[] {
   const valid = items.filter((item) => {
     const publishedAt = Date.parse(item.published || '');
     return item.title.trim().length > 0
-      && /[\u0600-\u06FF]/.test(item.title)
       && Number.isFinite(publishedAt)
       && publishedAt <= now + 10 * 60_000;
   });
-  const within = (hours: number) => valid.filter((item) => now - Date.parse(item.published) <= hours * 3_600_000);
+  const arabic = valid.filter((item) => /[\u0600-\u06FF]/.test(item.title));
+  const languagePool = arabic.length >= 3 ? arabic : valid;
+  const within = (hours: number) => languagePool.filter((item) => now - Date.parse(item.published) <= hours * 3_600_000);
   const recent72h = within(72);
   const recent7d = within(24 * 7);
-  const pool = recent72h.length >= 6 ? recent72h : recent7d.length >= 6 ? recent7d : valid;
+  const pool = recent72h.length >= 6 ? recent72h : recent7d.length >= 6 ? recent7d : languagePool;
 
   return [...pool]
     .sort((a, b) => {
@@ -109,39 +103,9 @@ function compactPublished(value: string): string {
   return `قبل ${days.toLocaleString('ar-SA')} ي`;
 }
 
-export default function GlobalStatusBar() {
-  const [news, setNews] = useState<NewsTickerItem[]>([]);
-  const [newsSource, setNewsSource] = useState<string>('M3TM.APP');
+export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[] }) {
   const [sourceHealth, setSourceHealth] = useState<SourceHealth | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchNews = async () => {
-      try {
-        const res = await fetch('/api/news', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`news HTTP ${res.status}`);
-        const payload = await res.json() as NewsPayload;
-        const rows = Array.isArray(payload.news) ? payload.news : [];
-        if (!cancelled) {
-          setNews(sortImportantNews(rows));
-          setNewsSource(payload.source || 'M3TM.APP');
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setNews([]);
-          console.warn('[M3TM.WORLD] News ticker unavailable:', error instanceof Error ? error.message : error);
-        }
-      }
-    };
-
-    void fetchNews();
-    const iv = window.setInterval(() => void fetchNews(), 60_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(iv);
-    };
-  }, []);
+  const tickerItems = useMemo(() => sortImportantNews(news), [news]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,9 +142,7 @@ export default function GlobalStatusBar() {
     : 'جارٍ التحقق من المصادر';
 
   const sourceStatus = sourceHealth?.status ?? 'operational';
-  const hasTicker = news.length > 0;
-
-  const tickerItems = useMemo(() => news, [news]);
+  const hasTicker = tickerItems.length > 0;
 
   return (
     <motion.div
@@ -232,15 +194,16 @@ export default function GlobalStatusBar() {
           {hasTicker ? (
             <div className="flex items-center animate-ticker whitespace-nowrap">
               {[...Array(4)].map((_, repeatIdx) => (
-                <span key={repeatIdx} className="inline-flex items-center">
+                <span key={repeatIdx} className="inline-flex items-center" aria-hidden={repeatIdx === 0 ? undefined : true}>
                   {tickerItems.map((item) => (
                     <a
                       key={`${item.id}-${repeatIdx}`}
                       href={M3TM_APP_NEWS_URL}
                       target="_blank"
                       rel="noopener noreferrer"
+                      tabIndex={repeatIdx === 0 ? undefined : -1}
                       className="inline-flex items-center gap-1.5 mx-3 pointer-events-auto text-white/70 hover:text-white transition-colors"
-                      aria-label={`فتح الخبر في M3TM.APP: ${item.title}`}
+                      aria-label={repeatIdx === 0 ? `فتح الخبر في M3TM.APP: ${item.title}` : undefined}
                       title={`${item.source} · ${importanceLabel(item.risk_score)}`}
                     >
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${importanceTone(item.risk_score)}`} />
@@ -274,7 +237,7 @@ export default function GlobalStatusBar() {
             />
             <span className={`text-[9px] tracking-[0.12em] ${sourceStatus === 'operational' ? 'text-[#00E676]/70' : 'text-[#FF9500]/80'}`}>
               {sourceHealth
-                ? (sourceStatus === 'operational' ? `المصادر سليمة · ${newsSource}` : 'مصدر متدهور')
+                ? (sourceStatus === 'operational' ? 'المصادر سليمة' : 'مصدر متدهور')
                 : 'فحص المصادر'}
             </span>
           </div>
