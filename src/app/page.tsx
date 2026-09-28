@@ -2130,7 +2130,7 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      {!embedMode && <GlobalStatusBar />}
+      {!embedMode && <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} />}
 
       {/* Shortcut hint — more visible */}
       {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
