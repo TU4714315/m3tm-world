@@ -80,7 +80,10 @@ function sortImportantNews(items: NewsTickerItem[]): NewsTickerItem[] {
   const within = (hours: number) => languagePool.filter((item) => now - Date.parse(item.published) <= hours * 3_600_000);
   const recent72h = within(72);
   const recent7d = within(24 * 7);
-  const pool = recent72h.length >= 6 ? recent72h : recent7d.length >= 6 ? recent7d : languagePool;
+  // "Top news" must stay current even when an older headline has a higher
+  // risk score. Only widen the window when the fresher window is completely
+  // empty; never pad today's ticker with archival high-risk stories.
+  const pool = recent72h.length > 0 ? recent72h : recent7d.length > 0 ? recent7d : languagePool;
 
   return [...pool]
     .sort((a, b) => {
