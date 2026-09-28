@@ -782,7 +782,7 @@ export default function Dashboard() {
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
       setInterval(() => fetchEndpoint(eqUrl, eqTransform, undefined, { skipWhenHidden: true }), 900000),  // 15 min (was 5)
-      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 1800000),        // 30 min (was 10)
+      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 60000),          // 1 min — shared by map panels and top-news ticker
       setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000), // 15 min (was 5)
     ];
     return () => {
