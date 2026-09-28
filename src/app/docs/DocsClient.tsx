@@ -476,7 +476,7 @@ docker compose up -d`}</Pre>
                 },
                 {
                   k: 'Status Bar',
-                  v: 'Community and docs links on the left, then a live ticker of prices and significant seismic events.',
+                  v: 'Community and docs links on the left, then a prioritized Arabic news ticker sourced from the M3TM.APP public feed; ticker items link back to m3tm.app/news.',
                 },
               ].map(row => (
                 <div

@@ -246,7 +246,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/crypto',
         method: 'GET',
-        summary: 'Spot prices for the assets shown in the status ticker.',
+        summary: 'Spot prices used by market panels and analytics; the global status ticker now shows prioritized M3TM.APP news.',
         returns: ['…price series'],
       },
       {

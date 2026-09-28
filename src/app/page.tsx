@@ -782,7 +782,7 @@ export default function Dashboard() {
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
       setInterval(() => fetchEndpoint(eqUrl, eqTransform, undefined, { skipWhenHidden: true }), 900000),  // 15 min (was 5)
-      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 1800000),        // 30 min (was 10)
+      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 60000),          // 1 min — shared by map panels and top-news ticker
       setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000), // 15 min (was 5)
     ];
     return () => {
@@ -2130,7 +2130,7 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      {!embedMode && <GlobalStatusBar />}
+      {!embedMode && <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} />}
 
       {/* Shortcut hint — more visible */}
       {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
