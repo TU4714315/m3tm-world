@@ -190,7 +190,7 @@ export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[]
         {/* ── CENTER: M3TM.APP Important News Ticker ── */}
         <div
           className="flex-1 overflow-hidden relative"
-          dir="rtl"
+          dir="ltr"
           aria-label="أهم الأخبار من M3TM.APP"
           style={{ maskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)' }}
         >
@@ -202,6 +202,7 @@ export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[]
                     <a
                       key={`${item.id}-${repeatIdx}`}
                       href={M3TM_APP_NEWS_URL}
+                      dir="rtl"
                       target="_blank"
                       rel="noopener noreferrer"
                       tabIndex={repeatIdx === 0 ? undefined : -1}
