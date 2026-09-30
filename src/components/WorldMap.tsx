@@ -2768,7 +2768,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     try {
-      syncEtopo2022Relief(mapRef.current, !!activeLayers.terrain_etopo_2022, mapStyle);
+      syncEtopo2022Relief(mapRef.current, !!activeLayers.terrain_etopo_2022,
+        mapStyle === 'dark' ? 'dark' : 'satellite');
     } catch (error) {
       console.warn('[M3TM.WORLD] NOAA ETOPO 2022 relief unavailable:',
         error instanceof Error ? error.message : error);
