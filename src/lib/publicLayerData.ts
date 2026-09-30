@@ -29,7 +29,12 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     // are deliberately absent.
     military_activity: list(data.military_activity),
     military_activity_meta: data.military_activity_meta || null,
+    flight_source_status: data.flight_source_status || null,
     satellites: list(data.satellites).filter(s => !satelliteIsMilitary(s)),
+    military_satellite_activity: list(data.military_satellite_activity),
+    military_satellite_meta: data.military_satellite_meta || null,
+    military_satellite_summary: data.military_satellite_summary || null,
+    satellite_source_status: data.satellite_source_status || null,
     satellites_at: data.satellites_at || null,
     category_counts: data.category_counts || {},
     maritime_ports: list(data.maritime_ports),
