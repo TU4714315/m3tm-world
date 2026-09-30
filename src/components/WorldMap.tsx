@@ -4,6 +4,7 @@ import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
+import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
 import { MAP_DEFAULTS, MAP_PALETTE_KEYS, readMapPalette, satColorFor, type MapPalette } from '@/lib/map-palette';
 import { STYLE_EVENT } from '@/lib/style-tokens';
@@ -267,7 +268,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       container,
       style: styleUrl,
       center: [25.48, 42.70] as [number, number], zoom: 6.5, minZoom: 1.5, maxZoom: 18,
-      attributionControl: false as const,
+      // Show live attribution for CARTO/OSM, the active Mapzen DEM and imagery.
+      // Source declarations alone are invisible when this control is disabled.
+      attributionControl: MAP_ATTRIBUTION_OPTIONS,
       maxPitch: 85,
       transformRequest: (url: string) => {
         // Route all CARTO CDN requests through the internal Next.js proxy API
@@ -2741,6 +2744,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
             tileSize: 256,
             maxzoom: 18,
+            attribution: ARCGIS_IMAGERY_ATTRIBUTION,
           });
         }
         if (!map.getLayer('satellite-layer')) {
