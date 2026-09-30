@@ -264,6 +264,23 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   );
 }
 
+function CameraCatalogStatus({ data }: { data: any }) {
+  const status = data?.camera_catalog_status;
+  const failed = data?.camera_catalog_error === true;
+  if (!status && !failed) return null;
+  const sources = Array.isArray(status?.sourceNames) ? status.sourceNames.length : 0;
+  const pending = Array.isArray(status?.pendingRegions) ? status.pendingRegions.length : 0;
+  const cameras = Array.isArray(data?.cameras) ? data.cameras.length : 0;
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <p>{cameras.toLocaleString('ar-SA')} كاميرا مستلمة من {sources.toLocaleString('ar-SA')} جهات بيانات</p>
+      {pending > 0 && <p className="mt-1 text-amber-300/80">{pending.toLocaleString('ar-SA')} مناطق لم تكتمل بياناتها؛ لا تُعد الكاميرات الغائبة متوقفة بالضرورة.</p>}
+      {failed && <p className="mt-1 text-amber-300/80">فشل تحميل دفعة؛ ستُحاول الخدمة إعادة الجلب بحد أقصى.</p>}
+      {!pending && !failed && <p className="mt-1 text-white/30">اكتملت الدفعة المطلوبة؛ لا تعني هذه الحالة أن جميع البثوث الفردية تعمل الآن.</p>}
+    </div>
+  );
+}
+
 function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
@@ -366,6 +383,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   </button>
                 );
               })}
+              {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
@@ -558,7 +576,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                           </button>
                         );
                       })}
-                      {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
+                      {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
+              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
                     </div>
