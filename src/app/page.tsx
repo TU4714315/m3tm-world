@@ -817,7 +817,23 @@ export default function Dashboard() {
       };
       setDataVersion(value => value + 1);
       setBackendStatus('connected');
-    }, () => console.warn('[M3TM.WORLD] Camera catalogue load failed; bounded retry scheduled'));
+    }, () => {
+      console.warn('[M3TM.WORLD] Camera catalogue load failed; bounded retry scheduled');
+      dataRef.current = { ...dataRef.current, camera_catalog_error: true };
+      setDataVersion(v => v + 1);
+    }, status => {
+      const earlier = dataRef.current.camera_catalog_status?.sourceNames ?? [];
+      dataRef.current = {
+        ...dataRef.current,
+        camera_catalog_error: false,
+        camera_catalog_status: {
+          ...status,
+          // Across partial-region retries retain each observed provider once.
+          sourceNames: Array.from(new Set([...earlier, ...status.sourceNames])),
+        },
+      };
+      setDataVersion(v => v + 1);
+    });
   }, [activeLayers.cctv]);
 
   useEffect(() => {
