@@ -95,6 +95,8 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
       'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
+      'app_news',
       'country_borders',
     ].includes(key),
   ]),
