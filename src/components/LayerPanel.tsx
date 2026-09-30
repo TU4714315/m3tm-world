@@ -86,6 +86,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military_activity', label: 'نشاط أقمار عسكرية عام', dataKey: 'military_satellite_activity', description: 'تجميع واسع من كتالوجات TLE عامة: خلايا 30°، نافذة ساعة، دون أسماء أو NORAD IDs أو مواقع فردية دقيقة' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
