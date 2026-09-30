@@ -1,8 +1,8 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '2';
+export const LAYER_URL_SCHEMA = '3';
 
 /** These layers did not exist in pre-v2 shared URLs, and are default-on today. */
-const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders']);
+const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders', 'sat_military_activity']);
 
 export function restoreLayerState<T extends Record<string, boolean>>(
   defaults: T,
