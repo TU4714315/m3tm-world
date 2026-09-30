@@ -21,12 +21,49 @@ describe('GET /api/maritime', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    delete process.env.AIS_API_KEY;
     ships().clear();
     clearMaritimeSnapshot();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+
+  it('reports AIS as not configured without inventing live ships', async () => {
+    const body = await (await GET()).json();
+    expect(body.total_ships).toBe(0);
+    expect(body.source_status.ais).toMatchObject({
+      status: 'not_configured',
+      configured: false,
+      provider: 'AISStream.io',
+      public_ships: 0,
+      exact_military_tracks_exposed: false,
+    });
+    expect(body.source_status.ais.latest_observed_at).toBeNull();
+    expect(body.source_status.reference.status).toBe('active');
+    expect(JSON.stringify(body)).not.toContain('AIS_API_KEY');
+  });
+
+  it('publishes freshness for observed public vessels without exposing military AIS tracks', async () => {
+    process.env.AIS_API_KEY = 'test-only-not-returned';
+    addShip(1, 1.26, 103.84);
+    ships().set(2, {
+      id: 2, mmsi: 2, lat: 1.27, lng: 103.85, speed: 12,
+      type: 'military', name: 'MIL', timestamp: Date.now(),
+    });
+    const body = await (await GET()).json();
+    expect(body.total_ships).toBe(1);
+    expect(body.ships.map((ship: Ship) => ship.mmsi)).toEqual([1]);
+    expect(body.source_status.ais).toMatchObject({
+      status: 'active',
+      configured: true,
+      public_ships: 1,
+      latest_observation_age_s: 0,
+      exact_military_tracks_exposed: false,
+    });
+    expect(JSON.stringify(body)).not.toContain('test-only-not-returned');
   });
 
   it('still counts the ships sitting off a port', async () => {
