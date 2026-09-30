@@ -3,7 +3,7 @@ import { loadCameraCatalog, mergeCameraCatalog } from './camera-catalog';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
-const json = (cameras: { id: string }[], pendingRegions: string[] = []) => Response.json({ cameras, pendingRegions });
+const json = (cameras: { id: string }[], pendingRegions: string[] = [], sources: Record<string, number> = {}) => Response.json({ cameras, pendingRegions, sources, timestamp: '2026-09-30T12:00:00Z' });
 
 describe('progressive camera catalogue', () => {
   it('retries only missing regions, preserving cameras already loaded', async () => {
@@ -19,6 +19,22 @@ describe('progressive camera catalogue', () => {
     expect(cameras).toEqual([{ id: 'london' }, { id: 'ottawa' }]);
     await vi.advanceTimersByTimeAsync(120_000);
     expect(fetcher).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('reports provider names and remaining regions without starting extra requests', async () => {
+    const fetcher = vi.fn().mockResolvedValue(json([{ id: 'tx-1' }], ['canada'], { TxDOT: 1, TfL: 20 }));
+    vi.stubGlobal('fetch', fetcher);
+    const statuses: any[] = [];
+    const stop = loadCameraCatalog(vi.fn(), vi.fn(), status => statuses.push(status));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses[0]).toEqual({
+      sourceNames: ['TxDOT', 'TfL'],
+      pendingRegions: ['canada'],
+      lastResponseAt: '2026-09-30T12:00:00Z',
+      retriesRemaining: 2,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
     stop();
   });
 
