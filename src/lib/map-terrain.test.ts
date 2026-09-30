@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { attachTerrain, TERRAIN_SOURCE, TERRAIN_MIN_ZOOM, TERRAIN_SETTLE_MS } from './map-terrain';
+import { TILEZEN_TERRAIN_ATTRIBUTION } from './terrain-source-attribution';
 
 function createMap(initialZoom = 11) {
   const listeners = new Map<string, Set<(event: Record<string, unknown>) => void>>();
@@ -74,6 +75,7 @@ describe('lightweight terrain', () => {
     vi.advanceTimersByTime(TERRAIN_SETTLE_MS);
     expect(fixture.methods.addSource).toHaveBeenCalledWith(TERRAIN_SOURCE, expect.objectContaining({
       type: 'raster-dem', tileSize: 256, maxzoom: 10, encoding: 'terrarium',
+      attribution: TILEZEN_TERRAIN_ATTRIBUTION,
     }));
     expect(fixture.map.getPixelRatio()).toBe(1.5);
     expect(fixture.map.getMaxPitch()).toBe(60);
