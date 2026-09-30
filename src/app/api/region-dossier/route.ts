@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { ATTRIBUTION } from '@/lib/nominatim';
 import { httpJson } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
 
