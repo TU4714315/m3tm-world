@@ -21,9 +21,9 @@ const contributors = [
 
 const modernCandidates = [
   {
-    name: 'NOAA ETOPO 2022',
-    role: 'بديل أحدث للأعماق البحرية والارتفاعات العالمية منخفضة التكبير',
-    restriction: 'GeoTIFF/NetCDF: يتطلب إعداد بلاطات مناسبة لـMapLibre ومواءمة نموذج الارتفاع قبل النشر. غير متصل بالخريطة الحالية.',
+    name: 'NOAA ETOPO 2022 — ملفات الارتفاعات الرقمية',
+    role: 'ترقية محتملة للارتفاعات ثلاثية الأبعاد والأعماق الرقمية، منفصلة عن طبقة التظليل الملون المتاحة الآن',
+    restriction: 'يتوفر الآن تظليل ETOPO 2022 من خادم NOAA/ArcGIS كطبقة بصرية مستقلة، لكن ملفات GeoTIFF/NetCDF الرقمية غير مدمجة بمحرك ارتفاعات Mapzen الحالي؛ تحتاج تجهيز DEM ومراجعة المرجع الرأسي والأداء.',
     url: 'https://www.ncei.noaa.gov/products/etopo-global-relief-model',
   },
   {
@@ -49,7 +49,7 @@ export default function TerrainSourcesPage() {
           <h1 className="mt-2 text-2xl font-bold">التضاريس: المصدر المستخدم والبدائل الأحدث</h1>
           <p className="mt-3 text-sm leading-7 text-slate-300">
             هذا السجل يميز المصدر الذي تُحمّل منه الخريطة حاليًا عن مجموعات بيانات بديلة لا تُحمّل منها.
-            إظهار اسم مصدر أحدث هنا لا يعني إضافته إلى طبقات الإنتاج أو امتلاك صلاحية الوصول إليه.
+            أُضيفت طبقة عرض NOAA ETOPO 2022 الاختيارية، بينما لم يُستبدل نموذج الارتفاعات الثلاثي الأبعاد بالملفات الرقمية الأحدث.
           </p>
           <a href="/" className="mt-3 inline-block text-sm text-amber-300 underline underline-offset-4">العودة إلى الخريطة</a>
         </header>
@@ -91,8 +91,22 @@ export default function TerrainSourcesPage() {
             بيانات ETOPO1 مكوّن من التجميع الحالي؛ وجود ETOPO 2022 لاحقًا لا يغيّر مصدر البلاطات الحالية.
           </p>
         </section>
+        <section className="rounded-2xl border border-emerald-300/20 bg-white/[0.03] p-5">
+          <h2 className="text-lg font-semibold text-emerald-300">طبقة أحدث متاحة الآن: NOAA ETOPO 2022 Relief</h2>
+          <p className="mt-2 text-sm leading-7 text-slate-300">
+            تظهر طبقة «NOAA ETOPO 2022 · تضاريس وأعماق» عند تشغيلها من لوحة الطبقات
+            في عرض العالم منخفض/متوسط التكبير، مع اعتماد NOAA داخل الخريطة.
+            خدمة ArcGIS العامة تعيد بلاطات JPEG فعلية بحجم 256 بكسل.
+            هذا تظليل طبوغرافي ملون مرسوم مسبقًا، وليس بديلًا عن
+            بيانات Mapzen الرقمية المستخدمة لرفع الجبال في وضع 3D؛ ولا يصلح للملاحة.
+            تتوقف الطبقة عند مستويات التكبير العالية للحفاظ على وضوح الطبقات المحلية.
+          </p>
+          <a href="https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/ETOPO_hillshade/MapServer"
+             target="_blank" rel="noopener noreferrer"
+             className="mt-2 inline-block text-xs text-amber-300 underline">خدمة البلاطات الرسمية وتوصيفها</a>
+        </section>
         <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-lg font-semibold">مجموعات أحدث مرشحة — غير مُفعّلة حاليًا</h2>
+          <h2 className="text-lg font-semibold">ترقيات ملفات الارتفاعات الرقمية — غير مُفعّلة بعد</h2>
           <div className="mt-3 space-y-3">
             {modernCandidates.map(candidate => (
               <article key={candidate.name} className="rounded-xl border border-white/10 p-3">
