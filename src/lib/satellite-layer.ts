@@ -54,6 +54,8 @@ const KM_TO_M = 1000;
  * the GPU buffer, but neither draw nor pick until zooming back out.
  */
 export const SAT_MAX_ZOOM = 7;
+export const satelliteLayerVisibleAtZoom = (zoom: number) =>
+  !Number.isFinite(zoom) || zoom <= SAT_MAX_ZOOM;
 
 const FLOOR_KM = 620;      // clears the globe depth test
 const CEILING_KM = 2500;   // stays inside the frustum at world zoom
@@ -520,7 +522,7 @@ export function createSatelliteLayer(id: string): CustomLayerInterface & {
        * Clearing count caused satellites to disappear permanently after a
        * city-level zoom until the layer was toggled off/on.
        */
-      if (map && map.getZoom() > SAT_MAX_ZOOM) { lastProjection = null; return; }
+      if (map && !satelliteLayerVisibleAtZoom(map.getZoom())) { lastProjection = null; return; }
       const shader = args?.shaderData;
       if (!shader?.vertexShaderPrelude) return;
 
