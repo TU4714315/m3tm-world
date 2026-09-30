@@ -16,10 +16,13 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   // From v2 onward, missing keys unambiguously mean the user turned them off.
   const legacyBookmark = !params.has('layers_v')
     && ![...LEGACY_ADDED_LAYERS].some(key => active.has(key));
+  const savedVersion = Number(params.get('layers_v') || '0');
   const restored = { ...defaults };
   for (const key of Object.keys(defaults)) {
+    const addedAfterSavedSchema = key === 'sat_military_activity' && savedVersion < 3 && defaults[key];
     (restored as Record<string, boolean>)[key] = active.has(key)
-      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key]);
+      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key])
+      || addedAfterSavedSchema;
   }
   return restored;
 }
