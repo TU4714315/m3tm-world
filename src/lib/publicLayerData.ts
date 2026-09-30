@@ -37,6 +37,8 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     maritime_ships: list(data.maritime_ships).filter(s => !vesselIsMilitary(s)),
     submarine_cables: list(data.submarine_cables),
     cameras: list(data.cameras),
+    camera_catalog_status: data.camera_catalog_status || null,
+    camera_catalog_error: data.camera_catalog_error === true,
     fires: list(data.fires),
     weather_events: list(data.weather_events),
     infrastructure: list(data.infrastructure),
