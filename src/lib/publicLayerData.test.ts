@@ -34,11 +34,21 @@ describe('public WORLD source-backed layer projection', () => {
       satellites: [{ id: 'sat-1', category: 'navigation' }, { id: 'sat-2', category: 'military' }],
       commercial_flights: [{ id: 'civil-1' }],
       military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5 }],
+      flight_source_status: { status: 'active', exact_military_tracks_exposed: false },
+      military_satellite_activity: [{ lat: 20, lng: 30, approximate_count: '3-5' }],
+      military_satellite_meta: { mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false },
+      military_satellite_summary: { catalog_objects: 7, represented_objects: 3 },
+      satellite_source_status: { status: 'active', military_public_cells: 1 },
     });
     expect(result.maritime_ships).toEqual([{ id: 'cargo', type: 'cargo' }]);
     expect(result.satellites).toEqual([{ id: 'sat-1', category: 'navigation' }]);
     expect(result.commercial_flights).toHaveLength(1);
     expect(result.military_activity).toHaveLength(1);
+    expect(result.flight_source_status).toEqual({ status: 'active', exact_military_tracks_exposed: false });
+    expect(result.military_satellite_activity).toEqual([{ lat: 20, lng: 30, approximate_count: '3-5' }]);
+    expect(result.military_satellite_meta).toEqual({ mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false });
+    expect(result.military_satellite_summary).toEqual({ catalog_objects: 7, represented_objects: 3 });
+    expect(result.satellite_source_status).toEqual({ status: 'active', military_public_cells: 1 });
     expect(Object.keys(result)).not.toEqual(expect.arrayContaining([
       'military_flights', 'sat_military', 'internalToolsToken',
     ]));
