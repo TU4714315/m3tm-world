@@ -7,7 +7,8 @@
  * replacement DEM datasets are currently running.
  */
 export const MAP_ATTRIBUTION_OPTIONS = {
-  compact: true,
+  // Visible at rest and during map interaction; responsive CSS wraps small screens.
+  compact: false,
   customAttribution: '<a href="/terrain-sources" target="_blank" rel="noopener noreferrer">مصادر الخريطة</a>',
 } as const;
 
