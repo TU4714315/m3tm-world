@@ -273,7 +273,8 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
           </div>
         </div>
       )}
-      <div className="mt-1.5 text-white/30">الأعداد بلاغات مصنفة من المصادر. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
+      {data?.conflict_summary?.timestamp && <div className="mt-1 text-white/30">آخر تحديث طبقة النزاع: {String(data.conflict_summary.timestamp)}</div>}
+      <div className="mt-1.5 text-white/30">التصنيف: بلاغات أحداث عامة حسب CAMEO ومصادر منشورة. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
     </div>
   );
 }
@@ -297,7 +298,8 @@ function MilitaryActivityStatus({ data }: { data: any }) {
           {Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
         </div>
       )}
-      <div className="mt-1 text-white/30">رصد عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
+      <div className="mt-1 text-white/30">التصنيف: رصد ADS-B عسكري/حكومي عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
     </div>
   );
 }
@@ -342,7 +344,8 @@ function MilitarySatelliteActivityStatus({ data }: { data: any }) {
         {withheld > 0 && <span>متفرقة غير معروضة: <b className="text-white/60">{withheld.toLocaleString('ar-SA')}</b></span>}
       </div>
       {source?.provider && <div className="mt-1 text-white/35">المصدر: {String(source.provider)} · الحالة: {statusArabic(source.status)}</div>}
-      <div className="mt-1 text-white/30">المواضع تقدير SGP4 من TLE عامة بعد تجميع 20° وبحد أدنى 3 أجسام؛ لا تُعرض أسماء أو معرفات NORAD أو مسارات فردية.</div>
+      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
+      <div className="mt-1 text-white/30">التصنيف: نشاط أقمار عسكرية/حكومية عام. المواضع تقدير SGP4 من TLE عامة بعد تجميع 20° وبحد أدنى 3 أجسام؛ لا تُعرض أسماء أو معرفات NORAD أو مسارات فردية.</div>
     </div>
   );
 }
@@ -357,6 +360,8 @@ function CameraCatalogStatus({ data }: { data: any }) {
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <p>{cameras.toLocaleString('ar-SA')} كاميرا مستلمة من {sources.toLocaleString('ar-SA')} جهات بيانات</p>
+      {status?.lastResponseAt && <p className="mt-1 text-white/30">آخر استجابة للفهرس: {String(status.lastResponseAt)}</p>}
+      <p className="mt-1 text-white/30">التصنيف: كاميرات طرق/مرور وبثوث عامة منشورة حسب المصدر.</p>
       {pending > 0 && <p className="mt-1 text-amber-300/80">{pending.toLocaleString('ar-SA')} مناطق لم تكتمل بياناتها؛ لا تُعد الكاميرات الغائبة متوقفة بالضرورة.</p>}
       {failed && <p className="mt-1 text-amber-300/80">فشل تحميل دفعة؛ ستُحاول الخدمة إعادة الجلب بحد أقصى.</p>}
       {!pending && !failed && <p className="mt-1 text-white/30">اكتملت الدفعة المطلوبة؛ لا تعني هذه الحالة أن جميع البثوث الفردية تعمل الآن.</p>}
