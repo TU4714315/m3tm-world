@@ -108,6 +108,8 @@ function computeSolarTerminator(): [number, number][] {
 }
 
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
+const DOUBLE_RIGHT_MS = 500;
+const DOUBLE_RIGHT_SLOP_PX = 12;
 
 function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -998,7 +1000,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         onMouseCoords?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
       }
     });
-    map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+    let lastRightClick: { at: number; x: number; y: number } | null = null;
+    map.on('contextmenu', e => {
+      e.preventDefault();
+      const open = () => onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      if ((e.originalEvent as PointerEvent).pointerType === 'touch') { open(); return; }
+
+      const now = performance.now();
+      const { x, y } = e.point;
+      const isSecond = lastRightClick !== null
+        && now - lastRightClick.at < DOUBLE_RIGHT_MS
+        && Math.hypot(x - lastRightClick.x, y - lastRightClick.y) < DOUBLE_RIGHT_SLOP_PX;
+      if (isSecond) {
+        lastRightClick = null;
+        open();
+      } else {
+        lastRightClick = { at: now, x, y };
+      }
+    });
     const reportViewState = () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); };
     map.on('load', reportViewState);
     map.on('moveend', reportViewState);
