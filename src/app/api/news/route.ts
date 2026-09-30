@@ -151,6 +151,8 @@ export async function GET() {
             coords: hasCoords ? [lat, lng] : null,
             coords_default: !hasCoords,
             language: 'ar',
+            feed_origin: 'm3tm-app',
+            location_basis: hasCoords ? 'published-feed-coordinate' : 'none',
             verification_status: 'source-reported',
             machine_assessment: null,
           };
@@ -224,6 +226,8 @@ export async function GET() {
         coords: coords ? [coords[0], coords[1]] : null,
         coords_default: !coords,
         language: 'source',
+        feed_origin: 'independent-fallback',
+        location_basis: coords ? 'keyword-context' : 'none',
         verification_status: 'source-reported',
         machine_assessment: null,
       };
@@ -235,6 +239,7 @@ export async function GET() {
       news: newsItems,
       total: newsItems.length,
       timestamp: new Date().toISOString(),
+      source: allArticles.length ? 'Telegram / RSS independent fallback' : 'none',
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',

@@ -98,7 +98,8 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'cctv', label: 'كاميرات المراقبة', dataKey: 'cameras' },
       { key: 'cctv_previews', label: 'معاينات حية', dataKey: '', parent: 'cctv' },
-      { key: 'live_news', label: 'بث أخباري مباشر', dataKey: 'live_feeds' },
+      { key: 'live_news', label: 'بث مباشر وأخبار الخريطة المدمجة', dataKey: 'live_feeds', description: 'القنوات العامة والأخبار المتزامنة من M3TM.APP عند التضمين' },
+      { key: 'app_news', label: 'أخبار M3TM.APP على الخريطة', dataKey: 'app_news', description: 'عناصر منشورة ذات إحداثيات متاحة، في خلايا إقليمية 0.5°؛ لا يُستنتج موقع حادثة من عنوان الخبر' },
     ],
   },
   {
@@ -117,6 +118,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
+      { key: 'country_borders', label: 'الحدود الجغرافية المرجعية', dataKey: 'country_boundaries.features', description: 'Natural Earth 1:110m: خطوط عامة ثابتة، وخطوط متنازع عليها متقطعة؛ ليست مرجعًا سياديًا أو حدود نزاع لحظية' },
       { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
       { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },

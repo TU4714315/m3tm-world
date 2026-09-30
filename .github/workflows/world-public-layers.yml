@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'src/app/page.tsx'
+      - 'src/components/WorldMap.tsx'
+      - 'src/lib/appNewsPins*'
+      - 'src/app/api/news/route.ts'
+      - 'public/data/ne110-land-boundaries.geojson'
       - 'src/components/LayerPanel.tsx'
       - 'src/lib/publicLayerData*'
       - 'src/app/api/cctv/**'

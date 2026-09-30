@@ -7,6 +7,7 @@ import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satel
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
+import { buildAppNewsPins } from '@/lib/appNewsPins';
 import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -85,7 +86,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
-  cf_outages: false, cf_attacks: false,
+  cf_outages: false, cf_attacks: false, app_news: true, country_borders: true,
 };
 
 const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
@@ -94,6 +95,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
       'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      'country_borders',
     ].includes(key),
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
@@ -106,7 +108,7 @@ const PUBLIC_EMBED_LAYER_KEYS = [
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval', 'balloons', 'radiation',
-  'malware', 'cf_outages', 'cf_attacks', 'day_night', 'terrain_3d',
+  'malware', 'cf_outages', 'cf_attacks', 'app_news', 'country_borders', 'day_night', 'terrain_3d',
   'terrain_elevation',
 ] as const;
 
@@ -913,6 +915,15 @@ export default function Dashboard() {
       });
     };
 
+    // Static, non-operational global border reference from a vendored Natural Earth 1:110m dataset.
+    if ((activeLayers as any).country_borders) {
+      loadLayerOnce('country_borders', '/data/ne110-land-boundaries.geojson', d => ({
+        country_boundaries: d?.type === 'FeatureCollection' && Array.isArray(d.features)
+          ? d : { type: 'FeatureCollection', features: [] },
+        country_boundaries_meta: d?.metadata || null,
+      }));
+    }
+
     // GDELT 2.0 material-conflict events only.
     if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes) {
       loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
@@ -1175,9 +1186,14 @@ export default function Dashboard() {
 
   const sdkDisplayData = useMemo(() => (
     embedSurface === 'public'
-      ? buildPublicLayerData(data, embeddedLiveFeeds)
+      ? {
+          ...buildPublicLayerData(data, embeddedLiveFeeds),
+          app_news: buildAppNewsPins(data.news),
+          country_boundaries: data.country_boundaries || { type: 'FeatureCollection', features: [] },
+        }
       : {
           ...data,
+          app_news: buildAppNewsPins(data.news),
           sdk_entities: sdkEntities,
           ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
         }

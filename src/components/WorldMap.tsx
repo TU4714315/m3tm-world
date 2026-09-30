@@ -339,7 +339,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -729,6 +729,37 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#EC407A', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
+
+      // Only published M3TM.APP news with source-provided, generalized location.
+      map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,16, 10,22],
+        'circle-color': '#5CD9CE', 'circle-opacity': 0.11, 'circle-blur': 1,
+      }});
+      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,7, 10,10],
+        'circle-color': '#5CD9CE', 'circle-opacity': 0.86,
+        'circle-stroke-width': 1.3, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.45,
+      }});
+      map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', minzoom: 4, layout: {
+        'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
+        'text-offset': [0, 1.7], 'text-max-width': 13, 'text-allow-overlap': false,
+      }, paint: { 'text-color': '#5CD9CE', 'text-halo-color': '#000', 'text-halo-width': 1 }});
+
+      // Natural Earth 1:110m: cartographic reference, not a sovereignty ruling.
+      map.addLayer({ id: 'country-boundary-reference', type: 'line', source: 'public-boundaries',
+        filter: ['==', ['get', 'kind'], 'ordinary'],
+        paint: {
+          'line-color': '#E1CF9C', 'line-width': ['interpolate',['linear'],['zoom'], 1,0.65, 6,1.3, 12,1.9],
+          'line-opacity': 0.8,
+        },
+      });
+      map.addLayer({ id: 'country-boundary-contested', type: 'line', source: 'public-boundaries',
+        filter: ['==', ['get', 'kind'], 'contested'],
+        paint: {
+          'line-color': '#F0A455', 'line-width': ['interpolate',['linear'],['zoom'], 1,1, 6,1.8, 12,2.5],
+          'line-opacity': 0.8, 'line-dasharray': [2, 3],
+        },
+      });
 
       // ══ IP SWEEP — Neighborhood device visualization ══
       map.addLayer({ id: 'sweep-connections', type: 'line', source: 'ip-sweep-connections', paint: {
@@ -1148,7 +1179,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots',
+      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1782,6 +1813,21 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       });
     });
 
+    // Source-backed article detail; unlike the broadcast layer, clicking a
+    // news pin opens a sourced article, not an invented video feed.
+    map.on('click', 'app-news-dots', e => {
+      const p = e.features?.[0]?.properties;
+      if (!p) return;
+      const coords = (e.features![0].geometry as any).coordinates;
+      popup(coords, `<div style="${pStyle}border:1px solid rgba(92,217,206,0.4);">
+        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر منشور من M3TM.APP</div>
+        <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'خبر')}</div>
+        <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
+        <p style="font-size:8px;color:#A0A0A0;">موقع إقليمي معمّم 0.5°، وليس تحديدًا دقيقًا لمكان الواقعة. المحتوى منسوب لناشره.</p>
+        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">فتح الخبر المنشور ↗</a>` : ''}
+      </div>`);
+    });
+
     return () => { cancelAnimationFrame(hoverFrame); map.remove(); mapRef.current = null; };
   }, []);
 
@@ -2308,6 +2354,26 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('live-news', activeLayers.live_news && data.live_feeds ? data.live_feeds.map((f: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [f.lng, f.lat] }, properties: { bridge_id: f.bridge_id || '', name: f.name, city: f.city, country: f.country, url: f.url, category: f.category, embed_allowed: f.embed_allowed !== false } })) : []);
   }, [mapReady, data.live_feeds, activeLayers.live_news, setGeo]);
 
+  // Never infer current incidents from keyword matches; only plot sourced
+  // APP coordinates generalized to a broad regional grid.
+  useEffect(() => {
+    if (!mapReady) return;
+    setGeo('app-news', (activeLayers as any).app_news && Array.isArray(data.app_news)
+      ? data.app_news.map((n: any) => ({
+          type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
+          properties: { id: n.id, title: n.title, source: n.source,
+            url: n.url, published: n.published, precision: n.precision },
+        }))
+      : []);
+  }, [mapReady, data.app_news, (activeLayers as any).app_news, setGeo]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const features = data.country_boundaries?.type === 'FeatureCollection'
+      && Array.isArray(data.country_boundaries.features) ? data.country_boundaries.features : [];
+    setGeo('public-boundaries', (activeLayers as any).country_borders ? features : []);
+  }, [mapReady, data.country_boundaries, (activeLayers as any).country_borders, setGeo]);
+
   useEffect(() => {
     if (!mapReady) return;
     const bridgeRoutes = (activeLayers as any).reported_routes && data.live_feeds
@@ -2359,80 +2425,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   }, [mapReady, data.frontlines, (activeLayers as any).frontlines, setGeo]);
 
 
-  useEffect(() => {
-    if (!mapReady) return;
-    // 🔴 CONFLICT ZONES - Live from /api/conflicts 🔴
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/conflicts');
-        if (cancelled) return;
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const conflictData = await res.json();
-        if (cancelled) return;
-
-        // Zone anchor markers (war/high/elevated labels)
-        const zoneFeatures = (conflictData.zones || []).map((z: any) => ({
-          type: 'Feature' as const,
-          geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
-          properties: {
-            kind: 'zone',
-            label: z.labelAr || z.label,
-            severity: z.severity,
-            description: `${z.descriptionAr || z.description}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
-            sourceUrl: z.sourceUrl,
-            eventCount: z.eventCount,
-          },
-        }));
-
-        // Individual live conflict events (scatter dots across conflict zones)
-        const eventFeatures = (conflictData.liveEvents || [])
-          .filter((e: any) => e.lat && e.lng)
-          .map((e: any) => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [e.lng, e.lat] },
-            properties: {
-              kind: 'event',
-              label: e.title || 'حدث نزاع مُبلّغ عنه',
-              severity: e.type === 'aerial_attack' || e.type === 'mass_violence' ? 'war' : 'high',
-              description: `${e.location || 'موقع منشور'} · ${e.sources || 0} مصادر · ${e.articles || 0} مقالات · ${e.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم' : 'موقع منشور'}`,
-              sourceUrl: e.url || '',
-              eventCategory: e.type || 'material_conflict',
-              corroboration: e.corroboration || 'single-source-report',
-              eventCode: e.eventCode || '',
-              provider: e.provider || 'GDELT',
-              providerCount: e.providerCount || 1,
-              sourceLabel: e.sourceLabel || '',
-              fatalities: e.fatalities || 0,
-              reportingStrength: e.reportingStrength || 0,
-              ageHours: e.ageHours ?? null,
-              ageDays: e.ageDays ?? null,
-              timePrecision: e.timePrecision ?? null,
-              recencyWeight: e.recencyWeight ?? 0.45,
-            },
-          }));
-
-        setGeo('conflict-zones', [...zoneFeatures, ...eventFeatures]);
-      } catch (e) {
-        // Fallback: if API fails, use minimal known zones
-        const FALLBACK_ZONES = [
-          { label: 'الحرب في أوكرانيا', severity: 'war', lat: 48.5, lng: 31.2, description: 'منطقة نزاع مسلح مستمر وفق المصادر العامة.', sourceUrl: 'https://liveuamap.com/' },
-          { label: 'نزاع غزة', severity: 'war', lat: 31.35, lng: 34.35, description: 'منطقة نزاع وأزمة إنسانية وفق المصادر العامة.', sourceUrl: 'https://israelpalestine.liveuamap.com/' },
-          { label: 'الحرب في السودان', severity: 'war', lat: 15.0, lng: 30.0, description: 'نزاع مسلح مستمر وفق المصادر العامة.', sourceUrl: 'https://sudan.liveuamap.com/' },
-          { label: 'نزاع اليمن', severity: 'war', lat: 15.5, lng: 48.0, description: 'نزاع مستمر ومخاطر إقليمية وبحرية وفق المصادر العامة.', sourceUrl: 'https://yemen.liveuamap.com/' },
-          { label: 'نزاع ميانمار', severity: 'war', lat: 19.5, lng: 96.5, description: 'نزاع داخلي مستمر وفق المصادر العامة.', sourceUrl: 'https://myanmar.liveuamap.com/' },
-          { label: 'نزاع سوريا', severity: 'high', lat: 35.0, lng: 38.5, description: 'نزاع داخلي وبلاغات أمنية متفرقة وفق المصادر العامة.', sourceUrl: 'https://syria.liveuamap.com/' },
-        ];
-        const fallbackFeatures = FALLBACK_ZONES.map(z => ({
-          type: 'Feature' as const,
-          geometry: { type: 'Point' as const, coordinates: [z.lng, z.lat] },
-          properties: { kind: 'zone', label: z.label, severity: z.severity, description: z.description, sourceUrl: z.sourceUrl },
-        }));
-        setGeo('conflict-zones', fallbackFeatures);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [mapReady, setGeo]);
+  // The page's /api/conflicts loader is the single authority. Do not issue
+  // a parallel fetch here or invent event markers during source outages.
 
   // Page-level polling keeps the same conflict source fresh after initial map
   // load. The map's own request above remains the cold-load fallback.
@@ -2512,6 +2506,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
+    setVis(['app-news-glow','app-news-dots','app-news-label'], (activeLayers as any).app_news);
+    setVis(['country-boundary-reference','country-boundary-contested'], (activeLayers as any).country_borders);
     setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-dots','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
