@@ -1,9 +1,10 @@
 import type { AddProtocolAction } from 'maplibre-gl';
+import { ACTIVE_TERRAIN } from './terrain-source-catalog';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_REQUESTS = 2;
 export const TERRAIN_REQUEST_TIMEOUT_MS = 12_000;
-const BASE_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/';
+const BASE_URL = ACTIVE_TERRAIN.tileBaseUrl;
 
 /** Encoded-tile LRU, shared in-flight work and a cancellable two-request queue. */
 export function createTerrainTileLoader(maxBytes = MAX_BYTES) {
