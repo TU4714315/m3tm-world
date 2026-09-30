@@ -12,6 +12,7 @@ on:
       - 'src/lib/publicLayerData*'
       - 'src/lib/map-terrain*'
       - 'src/lib/terrain-source-attribution*'
+      - 'src/lib/etopo-relief*'
       - 'src/app/terrain-sources/page.tsx'
       - 'src/app/api/cctv/**'
       - '.github/workflows/world-public-layers.yml'
