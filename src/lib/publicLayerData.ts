@@ -52,6 +52,10 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     conflict_zones: list(data.conflict_zones),
     conflict_live_events: list(data.conflict_live_events),
     conflict_summary: data.conflict_summary || null,
+    // Public source state is diagnostic metadata, not a secret or live track.
+    conflict_source_status: data.conflict_source_status || null,
+    conflict_category_counts: data.conflict_category_counts || {},
+    country_boundaries_meta: data.country_boundaries_meta || null,
     frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
     frontlines_meta: data.frontlines_meta || null,
     earthquakes: list(data.earthquakes),
