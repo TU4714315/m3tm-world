@@ -29,6 +29,8 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     // are deliberately absent.
     military_activity: list(data.military_activity),
     military_activity_meta: data.military_activity_meta || null,
+    military_satellite_activity: list(data.military_satellite_activity),
+    military_satellite_activity_meta: data.military_satellite_activity_meta || null,
     satellites: list(data.satellites).filter(s => !satelliteIsMilitary(s)),
     satellites_at: data.satellites_at || null,
     category_counts: data.category_counts || {},
