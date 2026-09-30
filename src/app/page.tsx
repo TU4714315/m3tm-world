@@ -506,13 +506,14 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Restore active layers from URL if present
+    // Restore active layers from URL if present on standalone WORLD.
+    // Embedded surfaces still probe provider readiness, but do not inherit
+    // arbitrary URL layer state or auto-geolocate behind the parent app.
     const p = new URLSearchParams(window.location.search);
-    if (p.get('embed') === '1' && window.parent !== window) return;
-    if (p.has('layers')) {
+    const isEmbeddedFrame = p.get('embed') === '1' && window.parent !== window;
+    if (!isEmbeddedFrame && p.has('layers')) {
       setActiveLayers(prev => restoreLayerState(prev, p));
     }
-
     // Probe credential-gated feeds without exposing credentials. Keep their
     // controls visible as disabled/غير مهيأ when configuration is missing.
     fetch('/api/cloudflare-radar?probe=1', { cache: 'no-store' })
@@ -540,6 +541,8 @@ export default function Dashboard() {
         };
         setDataVersion(v => v + 1);
       });
+    if (isEmbeddedFrame) return;
+
     // Once the user interacts, a late IP-location response must not steal the
     // camera back. The request is also cancelled when this page unmounts.
     const geoController = new AbortController();
