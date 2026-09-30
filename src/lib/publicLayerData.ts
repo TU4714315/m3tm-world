@@ -158,6 +158,41 @@ const publicSatelliteSourceStatus = (value: unknown) => {
   };
 };
 
+const publicMaritimeSourceStatus = (value: unknown) => {
+  const status = record(value);
+  const ais = record(status.ais);
+  const reference = record(status.reference);
+  return {
+    ais: {
+      status: stringOrNull(ais.status),
+      configured: ais.configured === true,
+      provider: stringOrNull(ais.provider),
+      public_ships: finite(ais.public_ships),
+      latest_observed_at: stringOrNull(ais.latest_observed_at),
+      latest_observation_age_s: finite(ais.latest_observation_age_s),
+      persistence: stringOrNull(ais.persistence),
+      exact_military_tracks_exposed: ais.exact_military_tracks_exposed === true,
+    },
+    reference: {
+      status: stringOrNull(reference.status),
+      provider: stringOrNull(reference.provider),
+      ports: finite(reference.ports),
+      chokepoints: finite(reference.chokepoints),
+    },
+  };
+};
+
+const publicCloudflareSourceStatus = (value: unknown) => {
+  const status = record(value);
+  return {
+    status: stringOrNull(status.status),
+    configured: status.configured === true,
+    provider: stringOrNull(status.provider),
+    timestamp: stringOrNull(status.timestamp),
+    partial: status.partial === true,
+  };
+};
+
 export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unknown[] = []) {
   return {
     live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : list(data.live_feeds),
@@ -180,6 +215,9 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     maritime_ports: list(data.maritime_ports),
     maritime_chokepoints: list(data.maritime_chokepoints),
     maritime_ships: list(data.maritime_ships).filter(s => !vesselIsMilitary(s)),
+    maritime_source_status: publicMaritimeSourceStatus(data.maritime_source_status),
+    maritime_source: stringOrNull(data.maritime_source),
+    maritime_timestamp: stringOrNull(data.maritime_timestamp),
     submarine_cables: list(data.submarine_cables),
     cameras: list(data.cameras),
     camera_catalog_status: data.camera_catalog_status || null,
@@ -187,11 +225,14 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     fires: list(data.fires),
     weather_events: list(data.weather_events),
     infrastructure: list(data.infrastructure),
-    balloons: list(data.balloons),
-    radiation: list(data.radiation),
+    // These upstream endpoints are not implemented in this deployment. Keep
+    // the public contract empty rather than forwarding stale/injected rows.
+    balloons: [],
+    radiation: [],
     malware_threats: list(data.malware_threats),
     cf_outages: list(data.cf_outages),
     cf_attack_origins: list(data.cf_attack_origins),
+    cloudflare_source_status: publicCloudflareSourceStatus(data.cloudflare_source_status),
     gdelt: list(data.gdelt),
     gdelt_events: list(data.gdelt_events),
     reported_routes: list(data.reported_routes),
