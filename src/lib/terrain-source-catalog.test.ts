@@ -16,7 +16,7 @@ describe('terrain source provenance and map attribution', () => {
     expect(NEWER_DEM_CANDIDATES.map(candidate => candidate.id)).toEqual([
       'copernicus-glo90', 'copernicus-glo30-public', 'etopo-2022', 'usgs-3dep-s1m',
     ]);
-    expect(NEWER_DEM_CANDIDATES.every(candidate => candidate.status !== 'active')).toBe(true);
+    expect(NEWER_DEM_CANDIDATES.every(candidate => candidate.status.includes('validation'))).toBe(true);
     expect(NEWER_DEM_CANDIDATES.every(candidate => !('tileBaseUrl' in candidate))).toBe(true);
   });
 
