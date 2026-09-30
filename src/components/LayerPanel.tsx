@@ -206,6 +206,81 @@ function SubLayerStem() {
   );
 }
 
+const CONFLICT_COUNT_LABELS: Record<string, string> = {
+  aerial_attack: 'أسلحة جوية', heavy_weapons: 'أسلحة ثقيلة',
+  bombing: 'تفجيرات', armed_clash: 'اشتباكات', mass_violence: 'عنف جماعي',
+  assault: 'اعتداءات', other: 'أخرى',
+};
+
+function statusArabic(value: unknown): string {
+  switch (String(value || '')) {
+    case 'ok': case 'active': return 'نشط';
+    case 'configured': return 'مهيأ';
+    case 'not_configured': return 'غير مهيأ';
+    case 'unavailable': return 'غير متاح';
+    case 'empty': return 'لا بيانات';
+    default: return value ? String(value) : 'لم يُفحص';
+  }
+}
+
+function ConflictEvidenceStatus({ data }: { data: any }) {
+  const counts = data?.conflict_category_counts && typeof data.conflict_category_counts === 'object'
+    ? data.conflict_category_counts as Record<string, number> : {};
+  const entries = Object.entries(counts).filter(([, value]) => Number(value) > 0);
+  const gdelt = data?.conflict_source_status?.gdelt?.status;
+  const acled = data?.conflict_source_status?.acled?.status;
+  const frontlines = data?.frontlines_meta?.status;
+  if (!entries.length && !gdelt && !acled && !frontlines) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/50">
+      <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1">
+        {gdelt && <span>GDELT: <b className="text-white/70">{statusArabic(gdelt)}</b></span>}
+        {acled && <span>ACLED: <b className="text-white/70">{statusArabic(acled)}</b></span>}
+        {frontlines && <span>الجبهات: <b className="text-white/70">{statusArabic(frontlines)}</b></span>}
+      </div>
+      {entries.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {entries.map(([key, value]) => (
+            <span key={key} className="rounded border border-white/[0.08] px-1.5 py-0.5">
+              {CONFLICT_COUNT_LABELS[key] || key}: {Number(value).toLocaleString('ar-SA')}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-1.5 text-white/30">الأعداد بلاغات مصنفة من المصادر، وليست تحققًا مستقلاً أو مواقع معدات لحظية.</div>
+    </div>
+  );
+}
+
+function MilitaryActivityStatus({ data }: { data: any }) {
+  const cells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
+  const meta = data?.military_activity_meta;
+  if (!meta && !cells) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية
+      <div className="mt-1 text-white/30">رصد عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+    </div>
+  );
+}
+
+function CameraCatalogStatus({ data }: { data: any }) {
+  const status = data?.camera_catalog_status;
+  const failed = data?.camera_catalog_error === true;
+  if (!status && !failed) return null;
+  const sources = Array.isArray(status?.sourceNames) ? status.sourceNames.length : 0;
+  const pending = Array.isArray(status?.pendingRegions) ? status.pendingRegions.length : 0;
+  const cameras = Array.isArray(data?.cameras) ? data.cameras.length : 0;
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <p>{cameras.toLocaleString('ar-SA')} كاميرا مستلمة من {sources.toLocaleString('ar-SA')} جهات بيانات</p>
+      {pending > 0 && <p className="mt-1 text-amber-300/80">{pending.toLocaleString('ar-SA')} مناطق لم تكتمل بياناتها؛ لا تُعد الكاميرات الغائبة متوقفة بالضرورة.</p>}
+      {failed && <p className="mt-1 text-amber-300/80">فشل تحميل دفعة؛ ستُحاول الخدمة إعادة الجلب بحد أقصى.</p>}
+      {!pending && !failed && <p className="mt-1 text-white/30">اكتملت الدفعة المطلوبة؛ لا تعني هذه الحالة أن جميع البثوث الفردية تعمل الآن.</p>}
+    </div>
+  );
+}
+
 function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
@@ -308,6 +383,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   </button>
                 );
               })}
+              {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
+              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
+              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
             </div>
           </div>
@@ -498,7 +576,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                           </button>
                         );
                       })}
-                      {group.label === 'العرض' && terrainDetails}
+                      {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
+              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
+              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'العرض' && terrainDetails}
                     </div>
                   </motion.div>
                 )}

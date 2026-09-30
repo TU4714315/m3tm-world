@@ -54,3 +54,21 @@ describe('public WORLD source-backed layer projection', () => {
     expect(buildPublicLayerData({}).conflict_zones).toEqual([]);
   });
 });
+
+describe('public evidence status projection', () => {
+  it('returns source diagnostics and categorized counts without leaking internal data', () => {
+    const result = buildPublicLayerData({
+      conflict_source_status: { gdelt: { status: 'ok' }, acled: { status: 'not_configured' } },
+      conflict_category_counts: { aerial_attack: 2, heavy_weapons: 3 },
+      country_boundaries_meta: { source: 'Natural Earth', precision: 'overview' },
+      internalHostToken: 'not-public',
+      sdk_entities: [{ token: 'not-public' }],
+    });
+    expect(result.conflict_source_status).toEqual({
+      gdelt: { status: 'ok' }, acled: { status: 'not_configured' },
+    });
+    expect(result.conflict_category_counts).toEqual({ aerial_attack: 2, heavy_weapons: 3 });
+    expect(result.country_boundaries_meta).toEqual({ source: 'Natural Earth', precision: 'overview' });
+    expect(JSON.stringify(result)).not.toContain('not-public');
+  });
+});
