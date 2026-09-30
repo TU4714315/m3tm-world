@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/app/page.tsx'
       - 'src/components/WorldMap.tsx'
+      - 'src/app/globals.css'
       - 'src/lib/appNewsPins*'
       - 'src/app/api/news/route.ts'
       - 'public/data/ne110-land-boundaries.geojson'
