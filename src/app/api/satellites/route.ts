@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { propagateTLE } from '@/lib/orbit';
+import { buildGeneralizedMilitarySpaceActivity, observedCountBand } from '@/lib/military-space-activity';
 
 export const maxDuration = 60;
 
@@ -333,9 +334,30 @@ export async function GET() {
       });
     }
 
-    // Public WORLD exposes only explicitly public-safe mission families. Unknown
-    // objects are intentionally excluded because name-based classification alone
-    // cannot prove that an unlabelled active-catalog object is non-sensitive.
+    // Keep individual military/government objects out of the public catalogue.
+    // Publish only a deliberately broad aggregate from the same public TLE
+    // observations: 30° cells, minimum group 3, one-hour buckets, and no
+    // names/NORAD identifiers/individual positions.
+    const militarySatelliteRows = satellites.filter((satellite) => satellite.category === 'military');
+    const militarySatelliteActivity = buildGeneralizedMilitarySpaceActivity(militarySatelliteRows);
+    const militarySatelliteMeta = {
+      mode: 'coarse-regional-aggregate',
+      source_mode: 'public-tle-observations',
+      cell_degrees: 30,
+      minimum_group: 3,
+      time_precision: '60-minute-bucket',
+      identifiers_exposed: false,
+      exact_tracks_exposed: false,
+      individual_positions_exposed: false,
+      observed_count_band: observedCountBand(militarySatelliteRows.length),
+      observation_model: 'catalogued-only',
+      absence_semantics: 'not-catalogued-does-not-mean-absent',
+    };
+
+    // Public WORLD exposes only explicitly public-safe mission families as
+    // individual objects. Unknown objects stay excluded because name-based
+    // classification cannot prove an unlabelled active-catalog object is
+    // non-sensitive.
     const publicSafeCategories = new Set(['comms', 'navigation', 'earth_obs', 'science']);
     const publicSatellites = satellites.filter((satellite) => publicSafeCategories.has(satellite.category));
 
@@ -353,6 +375,8 @@ export async function GET() {
       satellites: publicSatellites,
       total: publicSatellites.length,
       category_counts: categoryCounts,
+      military_satellite_activity: militarySatelliteActivity,
+      military_satellite_activity_meta: militarySatelliteMeta,
       source,
       raw_count: allSats.length,
       timestamp: new Date().toISOString(),

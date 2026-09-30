@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { observedCountBand } from '@/lib/military-space-activity';
 
 export const maxDuration = 60;
 
@@ -508,6 +509,8 @@ export async function GET() {
         cell_degrees: PUBLIC_MILITARY_CELL_DEG,
         minimum_group: PUBLIC_MILITARY_MIN_GROUP,
         time_precision: '30-minute-bucket',
+        observed_count_band: observedCountBand(military.length),
+        aggregate_cells: militaryActivity.length,
         identifiers_exposed: false,
         exact_tracks_exposed: false,
         unobserved_aircraft_inferred: false,

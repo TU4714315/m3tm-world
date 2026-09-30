@@ -1,8 +1,8 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '2';
+export const LAYER_URL_SCHEMA = '3';
 
 /** These layers did not exist in pre-v2 shared URLs, and are default-on today. */
-const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders']);
+const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders', 'sat_military_activity']);
 
 export function restoreLayerState<T extends Record<string, boolean>>(
   defaults: T,
@@ -16,10 +16,13 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   // From v2 onward, missing keys unambiguously mean the user turned them off.
   const legacyBookmark = !params.has('layers_v')
     && ![...LEGACY_ADDED_LAYERS].some(key => active.has(key));
+  const savedVersion = Number(params.get('layers_v') || '0');
   const restored = { ...defaults };
   for (const key of Object.keys(defaults)) {
+    const addedAfterSavedSchema = key === 'sat_military_activity' && savedVersion < 3 && defaults[key];
     (restored as Record<string, boolean>)[key] = active.has(key)
-      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key]);
+      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key])
+      || addedAfterSavedSchema;
   }
   return restored;
 }

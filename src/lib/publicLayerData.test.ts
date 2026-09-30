@@ -34,11 +34,15 @@ describe('public WORLD source-backed layer projection', () => {
       satellites: [{ id: 'sat-1', category: 'navigation' }, { id: 'sat-2', category: 'military' }],
       commercial_flights: [{ id: 'civil-1' }],
       military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5 }],
+      military_satellite_activity: [{ id: 'aggregate-space-cell', lat: 15, lng: 15, level: 1 }],
+      military_satellite_activity_meta: { mode: 'coarse-regional-aggregate' },
     });
     expect(result.maritime_ships).toEqual([{ id: 'cargo', type: 'cargo' }]);
     expect(result.satellites).toEqual([{ id: 'sat-1', category: 'navigation' }]);
     expect(result.commercial_flights).toHaveLength(1);
     expect(result.military_activity).toHaveLength(1);
+    expect(result.military_satellite_activity).toHaveLength(1);
+    expect(result.military_satellite_activity_meta).toEqual({ mode: 'coarse-regional-aggregate' });
     expect(Object.keys(result)).not.toEqual(expect.arrayContaining([
       'military_flights', 'sat_military', 'internalToolsToken',
     ]));

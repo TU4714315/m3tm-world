@@ -24,9 +24,12 @@ Upstream has a working `alert_pins` concept tied to Live Alerts and location par
 This is intentionally not a unit/equipment tracker. A headline saying a tank or artillery was reported can be categorized as an equipment report at the publisher's generalized location, but the map does not infer the exact equipment position.
 
 ### military / sat_military
-The upstream project can render exact ADS-B military flight rows and military/intelligence satellite categories. M3TM.WORLD still contains renderer support, but the **public contract** currently omits exact military flight rows and filters military satellite categories. The public surface exposes a source-backed coarse military-air activity aggregate instead.
+The upstream project contains renderer paths for military ADS-B rows and military/intelligence satellite categories. M3TM.WORLD now exposes **two operational, source-backed public aggregates** that apply the same treatment to all actors/countries:
 
-This is a data-precision boundary applied independent of actor/country; it is not a political classification. The public map continues to display source-reported conflict events, generalized air activity, frontlines/context, and published field alerts. Exact operational tracks, if ever used, belong behind an authenticated internal surface with separate access controls, not by silently changing the public contract.
+- `military_activity`: 6° regional cells from publicly received ADS-B observations, 30-minute bucket, minimum group two, plus an observed-count band and aggregate-cell count.
+- `sat_military_activity`: 30° regional cells derived from public TLE catalogue objects classified as military/government, one-hour bucket, minimum group three, approximate count band and dominant orbit band.
+
+The public map therefore no longer treats these source families as simply absent: it represents their observable activity with explicit source, spatial precision and temporal precision metadata. Individual identifiers remain a separate data product from the aggregate layers and are not implied by an aggregate cell.
 
 ## Other upstream features checked
 
@@ -47,7 +50,8 @@ The panel must say explicitly whether a layer is **نشط** or **متوقف**. C
 - optional ACLED when server credentials are configured;
 - published frontlines/context;
 - M3TM.APP published field-alert categories;
-- generalized military-air activity.
+- generalized military-air activity;
+- generalized military-satellite activity from public TLE catalogues.
 
 A toggle may be active while its provider returns zero rows. Conversely, a provider can have data while a toggle is off. UI state and source readiness must remain separate.
 

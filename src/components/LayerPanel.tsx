@@ -86,6 +86,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military_activity', label: 'نشاط أقمار عسكرية عام', dataKey: 'military_satellite_activity', description: 'تجميع واسع من كتالوجات TLE عامة: خلايا 30°، نافذة ساعة، دون أسماء أو NORAD IDs أو مواقع فردية دقيقة' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
@@ -278,13 +279,22 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
 }
 
 function MilitaryActivityStatus({ data }: { data: any }) {
-  const cells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
-  const meta = data?.military_activity_meta;
-  if (!meta && !cells) return null;
+  const airCells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
+  const spaceCells = Array.isArray(data?.military_satellite_activity) ? data.military_satellite_activity.length : 0;
+  const airMeta = data?.military_activity_meta;
+  const spaceMeta = data?.military_satellite_activity_meta;
+  if (!airMeta && !spaceMeta && !airCells && !spaceCells) return null;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية
-      <div className="mt-1 text-white/30">رصد عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        <span>نشاط جوي عسكري عام: {airCells.toLocaleString('ar-SA')} خلايا</span>
+        <span>نشاط أقمار عسكرية عام: {spaceCells.toLocaleString('ar-SA')} خلايا</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1 text-white/30">
+        {airMeta?.observed_count_band && <span>ADS-B المرصود: {String(airMeta.observed_count_band)}</span>}
+        {spaceMeta?.observed_count_band && <span>· TLE المصنّف: {String(spaceMeta.observed_count_band)}</span>}
+      </div>
+      <div className="mt-1 text-white/30">العرض الإقليمي المجمّع يطبَّق على جميع الجهات بالطريقة نفسها، مع إظهار المصدر والدقة الزمنية والمكانية لكل طبقة.</div>
     </div>
   );
 }
@@ -415,6 +425,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'الفضاء' && <MilitaryActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
             </div>
           </div>

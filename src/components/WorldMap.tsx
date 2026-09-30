@@ -343,7 +343,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','military-space-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -428,6 +428,20 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
         'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
       }, paint: { 'text-color':'#FFCCBC', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
+
+      map.addLayer({ id: 'military-space-activity-halo', type: 'circle', source: 'military-space-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,20, 2,32, 3,46],
+        'circle-color': '#7E57C2', 'circle-opacity': 0.11, 'circle-blur': 0.9,
+      }});
+      map.addLayer({ id: 'military-space-activity-dots', type: 'circle', source: 'military-space-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,5, 2,7.5, 3,10],
+        'circle-color': ['interpolate',['linear'],['get','level'], 1,'#9575CD', 2,'#7E57C2', 3,'#5E35B1'],
+        'circle-opacity': 0.9, 'circle-stroke-width': 1.4, 'circle-stroke-color': '#EDE7F6', 'circle-stroke-opacity': 0.6,
+      }});
+      map.addLayer({ id: 'military-space-activity-label', type: 'symbol', source: 'military-space-activity', minzoom: 2.5, layout: {
+        'text-field': ['concat','نشاط فضائي عسكري · ',['get','activity'],' · ',['get','approximate_count']],
+        'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
+      }, paint: { 'text-color':'#D1C4E9', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
 
       map.addLayer({ id: 'reported-routes-halo', type: 'line', source: 'reported-routes', layout: { 'line-cap':'round', 'line-join':'round' }, paint: {
         'line-color':'#D4AF37', 'line-width':5, 'line-opacity':0.12, 'line-blur':2,
@@ -1206,7 +1220,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
+    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','military-space-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
       'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
@@ -1515,6 +1529,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
         <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · الزمن: نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
+      </div>`);
+    });
+    map.on('click', 'military-space-activity-dots', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const level = Number(p.level) || 1;
+      const color = level >= 3 ? '#5E35B1' : level >= 2 ? '#7E57C2' : '#9575CD';
+      popup(coords, `<div style="${pStyle}border:1px solid ${color}55;">
+        <div style="color:#D1C4E9;font-size:12px;font-weight:700;margin-bottom:6px;">نشاط أقمار عسكرية عام</div>
+        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي واسع من كتالوجات TLE عامة، يعرض كثافة الرصد العامة بدل نقطة قمر منفرد.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
+          <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
+          <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '3-5')}</span></div>
+          <div><span style="color:#5C5A54;">نطاق المدار</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.orbit_band || 'mixed')}</span></div>
+          <div><span style="color:#5C5A54;">الدقة المكانية</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.cell_degrees || 30))}°</span></div>
+        </div>
+        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الزمن: نافذة ساعة · المصدر: كتالوجات TLE عامة · الإحصاء يشمل الأجسام المصنفة في الكتالوج فقط.</div>
       </div>`);
     });
 
@@ -2010,6 +2042,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     }, [mapReady, palette.cctv]);
 
   // ── DECOUPLED LAYER RENDERERS (Performance Optimized) ──
+
+  useEffect(() => {
+    if (!mapReady) return;
+    setGeo('military-space-activity', (activeLayers as any).sat_military_activity && Array.isArray(data.military_satellite_activity)
+      ? data.military_satellite_activity.map((cell: any) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [cell.lng, cell.lat] },
+          properties: {
+            id: cell.id, level: cell.level, activity: cell.activity,
+            approximate_count: cell.approximate_count, cell_degrees: cell.cell_degrees,
+            observed_at_bucket: cell.observed_at_bucket, orbit_band: cell.orbit_band,
+            reporting_mode: cell.reporting_mode, precision: cell.precision,
+          },
+        }))
+      : []);
+  }, [mapReady, data.military_satellite_activity, (activeLayers as any).sat_military_activity, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
