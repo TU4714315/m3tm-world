@@ -1,5 +1,6 @@
 import type { Map, MapSourceDataEvent, ErrorEvent } from 'maplibre-gl';
 import { batchTerrainLayers } from './terrain-layer-order';
+import { ACTIVE_TERRAIN } from './terrain-source-catalog';
 
 export const TERRAIN_SOURCE = 'osiris-terrain-dem';
 export type TerrainStatus = 'idle' | 'waiting' | 'loading' | 'ready' | 'error';
@@ -50,9 +51,9 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
         type: 'raster-dem',
         tiles: ['osiris-dem://{z}/{x}/{y}'],
         encoding: 'terrarium',
-        tileSize: 256,
-        maxzoom: 10,
-        attribution: '<a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Terrain data credits</a>',
+        tileSize: ACTIVE_TERRAIN.tileSize,
+        maxzoom: ACTIVE_TERRAIN.maxTileZoom,
+        attribution: `<a href="${ACTIVE_TERRAIN.creditsUrl}" target="_blank" rel="noopener noreferrer">© Mapzen terrain data and contributors</a>`,
       });
       // DEM maxzoom only limits downloads, not terrain render-tile density.
       // Bound the latter too, especially the distant tiles in a pitched view.
