@@ -267,7 +267,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       container,
       style: styleUrl,
       center: [25.48, 42.70] as [number, number], zoom: 6.5, minZoom: 1.5, maxZoom: 18,
-      attributionControl: false as const,
+      // Preserve live MapLibre source attribution for CARTO/OSM and, when
+      // selected, the raster imagery and Tilezen DEM. The global stylesheet
+      // must not hide this control: credit obligations depend on rendered data.
+      attributionControl: { compact: false },
       maxPitch: 85,
       transformRequest: (url: string) => {
         // Route all CARTO CDN requests through the internal Next.js proxy API
@@ -2741,6 +2744,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
             tileSize: 256,
             maxzoom: 18,
+            attribution: '<a href="https://doc.arcgis.com/en/data-appliance/2025/maps/world-imagery.htm" target="_blank" rel="noopener noreferrer">© Esri, Maxar, Earthstar Geographics, GIS User Community</a>',
           });
         }
         if (!map.getLayer('satellite-layer')) {
