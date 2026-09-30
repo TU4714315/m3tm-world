@@ -1,5 +1,13 @@
 export type CatalogCamera = { id: string | number; [key: string]: unknown };
 
+export type CameraCatalogStatus = {
+  /** Provider names are independent sources, not the number of online cameras. */
+  sourceNames: string[];
+  pendingRegions: string[];
+  lastResponseAt: string;
+  retriesRemaining: number;
+};
+
 /** Partial retries must add cameras, not erase previously loaded regions. */
 export function mergeCameraCatalog<T extends { id: string | number }>(previous: T[], incoming: T[]): T[] {
   const merged = new Map(previous.map(camera => [String(camera.id), camera]));
@@ -8,7 +16,7 @@ export function mergeCameraCatalog<T extends { id: string | number }>(previous: 
 }
 
 /** Recover slow regions without downloading the entire worldwide list again. */
-export function loadCameraCatalog(onBatch: (cameras: CatalogCamera[]) => void, onError: () => void) {
+export function loadCameraCatalog(onBatch: (cameras: CatalogCamera[]) => void, onError: () => void, onStatus?: (status: CameraCatalogStatus) => void) {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let attempts = 0;
@@ -26,6 +34,14 @@ export function loadCameraCatalog(onBatch: (cameras: CatalogCamera[]) => void, o
       remaining = Array.isArray(data.pendingRegions)
         ? data.pendingRegions.filter((region: unknown): region is string => typeof region === 'string' && /^[a-z-]+$/.test(region))
         : data.cameras.length ? [] : regions;
+      onStatus?.({
+        sourceNames: data.sources && typeof data.sources === 'object' && !Array.isArray(data.sources)
+          ? Object.keys(data.sources).filter(name => name.length > 0 && name.length < 100)
+          : [],
+        pendingRegions: remaining,
+        lastResponseAt: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
+        retriesRemaining: Math.max(0, 3 - attempts),
+      });
     } catch {
       if (controller.signal.aborted) return;
       onError();
