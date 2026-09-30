@@ -219,9 +219,12 @@ function statusArabic(value: unknown): string {
   switch (String(value || '')) {
     case 'ok': case 'active': return 'نشط';
     case 'configured': return 'مهيأ';
+    case 'connecting': return 'جارٍ الاتصال';
+    case 'configured_no_data': return 'مهيأ · لا رصد حي';
     case 'not_configured': return 'غير مهيأ';
     case 'unavailable': return 'غير متاح';
     case 'empty': return 'لا بيانات';
+    case 'partial': return 'جزئي';
     default: return value ? String(value) : 'لم يُفحص';
   }
 }
