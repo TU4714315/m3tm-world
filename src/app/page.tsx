@@ -8,6 +8,7 @@ import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
 import { buildAppNewsPins } from '@/lib/appNewsPins';
+import { restoreLayerState, serializeLayerState } from '@/lib/layerUrlState';
 import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -507,14 +508,8 @@ export default function Dashboard() {
     // Restore active layers from URL if present
     const p = new URLSearchParams(window.location.search);
     if (p.get('embed') === '1' && window.parent !== window) return;
-    const layers = p.get('layers');
-    if (layers) {
-      const active = layers.split(',');
-      setActiveLayers(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(k => { (next as any)[k] = active.includes(k); });
-        return next;
-      });
+    if (p.has('layers')) {
+      setActiveLayers(prev => restoreLayerState(prev, p));
     }
 
     // Probe which credential-gated feeds this deployment has configured, so the
@@ -556,9 +551,7 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return;
     if (urlTimer.current) clearTimeout(urlTimer.current);
     urlTimer.current = setTimeout(() => {
-      const active = Object.entries(activeLayers).filter(([,v]) => v).map(([k]) => k).join(',');
-      const params = new URLSearchParams(window.location.search);
-      params.set('layers', active);
+      const params = serializeLayerState(activeLayers, new URLSearchParams(window.location.search));
       const url = `${window.location.pathname}?${params.toString()}`;
       window.history.replaceState(null, '', url);
     }, 1500);
