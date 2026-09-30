@@ -86,6 +86,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'تجميع إقليمي واسع من TLE عامة؛ لا أسماء ولا NORAD IDs ولا مسارات فردية دقيقة' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
@@ -280,11 +281,46 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
 function MilitaryActivityStatus({ data }: { data: any }) {
   const cells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
   const meta = data?.military_activity_meta;
-  if (!meta && !cells) return null;
+  const source = data?.flight_source_status;
+  if (!meta && !source && !cells) return null;
+  const adsbMil = Number(source?.providers?.adsbfi_mil || 0);
+  const openSky = Number(source?.providers?.opensky || 0);
+  const openSkyAge = Number(source?.providers?.opensky_age_s);
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية
+      <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      {source && (
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
+          <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>
+          <span>ADS-B عسكري مرصود: <b className="text-white/55">{adsbMil.toLocaleString('ar-SA')}</b></span>
+          <span>OpenSky: <b className="text-white/55">{openSky.toLocaleString('ar-SA')}</b></span>
+          {Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
+        </div>
+      )}
       <div className="mt-1 text-white/30">رصد عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+    </div>
+  );
+}
+
+function MilitarySatelliteActivityStatus({ data }: { data: any }) {
+  const cells = Array.isArray(data?.military_satellite_activity) ? data.military_satellite_activity.length : 0;
+  const summary = data?.military_satellite_summary;
+  const meta = data?.military_satellite_meta;
+  const source = data?.satellite_source_status;
+  if (!summary && !meta && !source && !cells) return null;
+  const catalog = Number(summary?.catalog_objects || source?.military_catalog_objects || 0);
+  const represented = Number(summary?.represented_objects || 0);
+  const withheld = Number(summary?.withheld_sparse_objects || 0);
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <div className="flex flex-wrap gap-x-2 gap-y-1">
+        <span>خلايا عسكرية/حكومية: <b className="text-white/60">{cells.toLocaleString('ar-SA')}</b></span>
+        <span>أجسام مصنفة في الكتالوج: <b className="text-white/60">{catalog.toLocaleString('ar-SA')}</b></span>
+        {represented > 0 && <span>ممثلة بالتجميع: <b className="text-white/60">{represented.toLocaleString('ar-SA')}</b></span>}
+        {withheld > 0 && <span>متفرقة غير معروضة: <b className="text-white/60">{withheld.toLocaleString('ar-SA')}</b></span>}
+      </div>
+      {source?.provider && <div className="mt-1 text-white/35">المصدر: {String(source.provider)} · الحالة: {statusArabic(source.status)}</div>}
+      <div className="mt-1 text-white/30">المواضع تقدير SGP4 من TLE عامة بعد تجميع 20° وبحد أدنى 3 أجسام؛ لا تُعرض أسماء أو معرفات NORAD أو مسارات فردية.</div>
     </div>
   );
 }
@@ -415,6 +451,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
             </div>
           </div>
@@ -611,6 +648,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
               {group.label === 'العرض' && terrainDetails}
                     </div>
                   </motion.div>
