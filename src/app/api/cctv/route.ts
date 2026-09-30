@@ -40,6 +40,8 @@ import { fetchNorthCarolinaCameras } from './northcarolina';
 import { fetchArizonaCameras } from './arizona';
 import { fetchTexasCameras } from './texas';
 import { fetchEdmontonCameras } from './edmonton';
+import { fetchSwedenCameras } from './sweden';
+import { fetchNlPublicWebcams, fetchEuropePublicWebcams, fetchAmericasPublicWebcams, fetchRestPublicWebcams } from './public-webcams';
 import { fetchLithuaniaCameras } from './lithuania';
 import { fetchEastAsiaCameras, fetchSeAsiaCameras, fetchWestAsiaCameras } from './opencctv';
 import {
@@ -479,6 +481,11 @@ const RAW_REGION_FETCHERS: Record<string, RegionFetcher> = {
   'texas': fetchTexasCameras,
   'edmonton': fetchEdmontonCameras,
   'lithuania': fetchLithuaniaCameras,
+  'sweden': fetchSwedenCameras,
+  'public-webcams-nl': fetchNlPublicWebcams,
+  'public-webcams-europe': fetchEuropePublicWebcams,
+  'public-webcams-americas': fetchAmericasPublicWebcams,
+  'public-webcams-rest': fetchRestPublicWebcams,
   'canada': fetchCanadaCameras,
   'europe': fetchEuropeCameras,
   'netherlands': fetchNetherlandsCameras,
@@ -619,6 +626,7 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
     regions.push('europe');
   }
   if (lat > 53.8 && lat < 56.5 && lng > 20.9 && lng < 26.9) regions.push('lithuania');
+  if (lat > 55.0 && lat < 69.2 && lng > 10.5 && lng < 24.3) regions.push('sweden');
   if (inBulgaria) regions.push('bulgaria');
   if (inGreece) regions.push('greece');
   if (inSerbia) regions.push('serbia');
@@ -674,6 +682,12 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   // European gaps (Azores in the west through northern Norway)
   if (lat > 35 && lat < 72 && lng > -32 && lng < 32) regions.push('europe-live');
 
+  // Operator-published public webcams: external-only entries link out rather
+  // than bypassing their sites' advertising or expiring stream tokens.
+  if (lat > 50.7 && lat < 53.7 && lng > 3.3 && lng < 7.3) regions.push('public-webcams-nl');
+  if (lat > 27 && lat < 72 && lng > -18 && lng < 31) regions.push('public-webcams-europe');
+  if (lat > 11 && lat < 52 && lng > -124 && lng < -59) regions.push('public-webcams-americas');
+  if (lat > -35 && lat < 62 && lng > 30 && lng < 152) regions.push('public-webcams-rest');
   return regions.length > 0 ? regions : ['uk', 'us-east']; // Default fallback
 }
 
