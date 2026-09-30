@@ -3,10 +3,12 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { ETOPO_2022_SOURCE, ETOPO_2022_LAYER, syncEtopo2022Relief } from './etopo-relief';
 import { NOAA_ETOPO_2022_TILE_URL, NOAA_ETOPO_2022_ATTRIBUTION } from './terrain-source-attribution';
 
-function mapFixture(withOverlay = true) {
+function mapFixture(withOverlay = true, initialZoom = 6.5) {
+  let zoom = initialZoom;
   const sources = new Set<string>();
   const layers = new Set(withOverlay ? ['conflict-density-heat', 'satellite-layer'] : []);
   const map = {
+    getZoom: vi.fn(() => zoom),
     getLayer: vi.fn((name: string) => layers.has(name) ? { id: name } : undefined),
     getSource: vi.fn((name: string) => sources.has(name) ? { id: name } : undefined),
     addSource: vi.fn((name: string) => { sources.add(name); }),
@@ -15,7 +17,7 @@ function mapFixture(withOverlay = true) {
     removeLayer: vi.fn((name: string) => layers.delete(name)),
     setLayoutProperty: vi.fn(),
   };
-  return { map: map as unknown as MapLibreMap, methods: map, sources, layers };
+  return { map: map as unknown as MapLibreMap, methods: map, sources, layers, zoomTo: (next: number) => { zoom = next; } };
 }
 
 describe('opt-in NOAA 2022 relief overlay', () => {
@@ -70,4 +72,36 @@ describe('opt-in NOAA 2022 relief overlay', () => {
     syncEtopo2022Relief(map, false, 'dark');
     expect(methods.setLayoutProperty).toHaveBeenLastCalledWith('satellite-layer', 'visibility', 'none');
   });
+  it('automatically returns to satellite beyond NOAA zoom 11, then restores NOAA when zoomed out', () => {
+    const { map, methods, sources, layers, zoomTo } = mapFixture(true, 12);
+    expect(syncEtopo2022Relief(map, true, 'satellite')).toBe(true);
+    expect(sources.has(ETOPO_2022_SOURCE)).toBe(false);
+    expect(methods.setLayoutProperty).toHaveBeenLastCalledWith('satellite-layer', 'visibility', 'visible');
+
+    zoomTo(6);
+    syncEtopo2022Relief(map, true, 'satellite');
+    expect(sources.has(ETOPO_2022_SOURCE)).toBe(true);
+    expect(layers.has(ETOPO_2022_LAYER)).toBe(true);
+    expect(methods.setLayoutProperty).toHaveBeenLastCalledWith('satellite-layer', 'visibility', 'none');
+
+    zoomTo(12);
+    syncEtopo2022Relief(map, true, 'satellite');
+    expect(layers.has(ETOPO_2022_LAYER)).toBe(false);
+    expect(sources.has(ETOPO_2022_SOURCE)).toBe(false);
+    expect(methods.setLayoutProperty).toHaveBeenLastCalledWith('satellite-layer', 'visibility', 'visible');
+
+    zoomTo(7);
+    syncEtopo2022Relief(map, true, 'satellite');
+    expect(sources.has(ETOPO_2022_SOURCE)).toBe(true);
+    expect(methods.addSource).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the dark base style at high zoom without requesting extra NOAA raster', () => {
+    const { map, methods, sources } = mapFixture(true, 13);
+    syncEtopo2022Relief(map, true, 'dark');
+    expect(sources.has(ETOPO_2022_SOURCE)).toBe(false);
+    expect(methods.addSource).not.toHaveBeenCalled();
+    expect(methods.setLayoutProperty).toHaveBeenLastCalledWith('satellite-layer', 'visibility', 'none');
+  });
+
 });
