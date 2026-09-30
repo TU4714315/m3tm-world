@@ -29,6 +29,15 @@ function hasOpenSkyCredentials() {
   return Boolean(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
 }
 
+function hasAisCredentials() {
+  return Boolean(process.env.AIS_API_KEY);
+}
+
+function hasCloudflareRadarCredentials() {
+  return Boolean(process.env.CLOUDFLARE_API_TOKEN);
+}
+
+
 async function probeGdelt(): Promise<{ status: SourceStatus; detail: string }> {
   try {
     const res = await fetch('https://data.gdeltproject.org/gdeltv2/lastupdate.txt', {
@@ -92,6 +101,8 @@ export async function GET(request: Request) {
 
   const acledConfigured = hasAcledCredentials();
   const openskyConfigured = hasOpenSkyCredentials();
+  const aisConfigured = hasAisCredentials();
+  const cloudflareConfigured = hasCloudflareRadarCredentials();
 
   const [gdeltProbe, acledProbe] = deep
     ? await Promise.all([probeGdelt(), probeAcled()])
@@ -131,6 +142,38 @@ export async function GET(request: Request) {
       status: 'public_no_auth' as SourceStatus,
       auth: 'none',
       detail: 'Runtime counts are exposed by /api/flights.providers.',
+    },
+    ais: {
+      role: 'public-maritime-observation',
+      configured: aisConfigured,
+      status: aisConfigured ? 'configured' as SourceStatus : 'not_configured' as SourceStatus,
+      authMode: aisConfigured ? 'server-api-key' : 'none',
+      detail: aisConfigured
+        ? 'AISStream.io is configured; runtime vessel counts/freshness are exposed by /api/maritime.source_status.'
+        : 'AIS_API_KEY is absent. Static public ports/chokepoints remain available, but live AIS vessels are not claimed.',
+    },
+    cloudflareRadar: {
+      role: 'optional-internet-observation',
+      configured: cloudflareConfigured,
+      status: cloudflareConfigured ? 'configured' as SourceStatus : 'not_configured' as SourceStatus,
+      authMode: cloudflareConfigured ? 'server-api-token' : 'none',
+      detail: cloudflareConfigured
+        ? 'Cloudflare Radar: Read credential is present.'
+        : 'CLOUDFLARE_API_TOKEN is absent; the public controls are disabled as غير مهيأ.',
+    },
+    balloons: {
+      role: 'optional-moving-object-layer',
+      configured: false,
+      status: 'unavailable' as SourceStatus,
+      authMode: 'none',
+      detail: '/api/balloons is not implemented in this deployment; no public control is exposed.',
+    },
+    radiation: {
+      role: 'optional-radiation-monitor-layer',
+      configured: false,
+      status: 'unavailable' as SourceStatus,
+      authMode: 'none',
+      detail: '/api/radiation is not implemented in this deployment; no public control is exposed.',
     },
   };
 
@@ -173,6 +216,10 @@ export async function GET(request: Request) {
       '/api/gdelt',
       '/api/markets',
       '/api/frontlines',
+      '/api/maritime',
+      '/api/cctv',
+      '/api/cloudflare-radar',
+      '/api/geosearch',
       '/api/region-dossier',
     ],
   }, {
