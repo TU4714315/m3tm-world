@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GET } from './route';
+import { GET, clearCctvRegionBackoff } from './route';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { clearSourceCache } from '@/lib/sourceCache';
 
 vi.mock('@/lib/stealthFetch', () => ({ stealthFetch: vi.fn(), stealthHeaders: vi.fn(() => ({})) }));
-beforeEach(() => { vi.useFakeTimers(); vi.resetAllMocks(); clearSourceCache(); });
+beforeEach(() => { vi.useFakeTimers(); vi.resetAllMocks(); clearSourceCache(); clearCctvRegionBackoff(); });
 afterEach(() => vi.useRealTimers());
 
 describe('CCTV partial responses', () => {
@@ -31,5 +31,18 @@ describe('CCTV partial responses', () => {
     vi.mocked(stealthFetch).mockResolvedValue(new Response('', { status: 503 }));
     const response = await GET(new Request('http://localhost/api/cctv?region=uk'));
     expect((await response.json()).pendingRegions).toEqual(['uk']);
+  });
+
+  it('does not immediately spend another 12s budget on a region that just timed out', async () => {
+    vi.mocked(stealthFetch).mockReturnValue(new Promise(() => {}));
+
+    const first = GET(new Request('http://localhost/api/cctv?region=uk'));
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect((await (await first).json()).pendingRegions).toEqual(['uk']);
+    expect(vi.mocked(stealthFetch)).toHaveBeenCalledTimes(1);
+
+    const second = await GET(new Request('http://localhost/api/cctv?region=uk'));
+    expect((await second.json()).pendingRegions).toEqual(['uk']);
+    expect(vi.mocked(stealthFetch)).toHaveBeenCalledTimes(1);
   });
 });
