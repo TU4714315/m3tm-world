@@ -34,7 +34,7 @@ jobs:
               basehead: baseline + '...' + head, per_page: 100,
             });
             const files = comparison.data.files || [];
-            const publicPaths = /^(src\/(app\/(api\/(cctv|conflicts|frontlines|flights|news)|page\.tsx)|components\/(LayerPanel|OsirisMap|LiveAlerts)|lib\/(alert-places|telegram|gdelt))|README\.md|DOCKER\.md)/;
+            const publicPaths = /^(src\/(app\/(api\/(cctv|conflicts|frontlines|flights|satellites|news|region-dossier)|page\.tsx)|components\/(LayerPanel|OsirisMap|LiveAlerts|OsintPanel|FingerprintSearch)|lib\/(alert-places|alert-digest|telegram|gdelt|satellite|fingerprint))|README\.md|DOCKER\.md)/;
             const relevant = files.filter(file => publicPaths.test(file.filename))
               .map(file => '- ' + file.status + ': `' + file.filename + '`');
             await core.summary.addRaw(
