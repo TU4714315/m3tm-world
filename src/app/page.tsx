@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
+import { buildPublicLayerData } from '@/lib/publicLayerData';
 import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -96,6 +97,18 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     ].includes(key),
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
+
+// Public map controls deliberately omit exact military tracks and internal OSINT tools.
+const PUBLIC_EMBED_LAYER_KEYS = [
+  'flights', 'military_activity', 'private', 'jets', 'maritime',
+  'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science',
+  'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
+  'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
+  'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
+  'sdk_sea', 'sdk_air', 'sdk_naval', 'balloons', 'radiation',
+  'malware', 'cf_outages', 'cf_attacks', 'day_night', 'terrain_3d',
+  'terrain_elevation',
+] as const;
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -442,12 +455,13 @@ export default function Dashboard() {
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
+  const [showPublicEmbedLayers, setShowPublicEmbedLayers] = useState(false);
 
   useEffect(() => {
-    if (embedSurface !== 'public') return;
+    // Never overwrite URL-selected layers on the standalone public WORLD page.
+    if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
-      if (!embedMode) return;
       setShowLayers(false);
       setShowMarkets(false);
       setShowAlerts(false);
@@ -1161,25 +1175,7 @@ export default function Dashboard() {
 
   const sdkDisplayData = useMemo(() => (
     embedSurface === 'public'
-      ? {
-          live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : (data.live_feeds || []),
-          commercial_flights: data.commercial_flights || [],
-          military_activity: data.military_activity || [],
-          military_activity_meta: data.military_activity_meta || null,
-          satellites: data.satellites || [],
-          category_counts: data.category_counts || {},
-          gdelt: data.gdelt || [],
-          gdelt_events: data.gdelt_events || [],
-          reported_routes: data.reported_routes || [],
-          reported_routes_meta: data.reported_routes_meta || null,
-          conflict_zones: data.conflict_zones || [],
-          conflict_live_events: data.conflict_live_events || [],
-          conflict_summary: data.conflict_summary || null,
-          frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
-          frontlines_meta: data.frontlines_meta || null,
-          earthquakes: data.earthquakes || [],
-          sdk_entities: [],
-        }
+      ? buildPublicLayerData(data, embeddedLiveFeeds)
       : {
           ...data,
           sdk_entities: sdkEntities,
@@ -1592,6 +1588,38 @@ export default function Dashboard() {
       )}
 
 
+
+      {/* Public APP iframe: allow users to operate the real public layers
+          without exposing internal OSINT controls or altering the bridge. */}
+      {embedMode && embedSurface === 'public' && (
+        <div dir="rtl" className="absolute bottom-20 left-2 z-[450] pointer-events-auto">
+          <button type="button" aria-controls="m3tm-public-embed-layers"
+            aria-expanded={showPublicEmbedLayers}
+            onClick={() => setShowPublicEmbedLayers(open => !open)}
+            className="glass-panel min-h-11 px-3 py-2 flex items-center gap-2 text-xs font-medium text-[var(--gold-primary)] shadow-lg"
+            aria-label="عرض وإدارة طبقات الخريطة العامة">
+            <Layers className="w-4 h-4" />
+            <span>الطبقات</span>
+            <span className="text-[10px] text-white/70">{PUBLIC_EMBED_LAYER_KEYS.filter(k => activeLayers[k]).length}</span>
+          </button>
+          {showPublicEmbedLayers && (
+            <section id="m3tm-public-embed-layers" aria-label="طبقات الخريطة العامة"
+              className="absolute bottom-12 left-0 w-[min(88vw,360px)] max-h-[min(65dvh,560px)] overflow-y-auto styled-scrollbar glass-panel rounded-xl border border-white/10 p-3 shadow-2xl"
+              onKeyDown={event => { if (event.key === 'Escape') setShowPublicEmbedLayers(false); }}>
+              <div className="sticky top-0 z-10 bg-[var(--bg-void)]/95 pb-2 mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-[var(--gold-primary)]">الطبقات العامة المتاحة</span>
+                <button type="button" aria-label="إغلاق الطبقات" className="p-1 text-white/70"
+                  onClick={() => setShowPublicEmbedLayers(false)}><X className="w-4 h-4" /></button>
+              </div>
+              <p className="mb-2 text-[10px] text-white/50">إتاحة الطبقة لا تعني توفر بيانات مصدرها الآن؛ تظهر أعداد العناصر بعد وصول البيانات.</p>
+              <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers}
+                setActiveLayers={setActiveLayers} isMobile={true}
+                allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
+                capabilities={capabilities} />
+            </section>
+          )}
+        </div>
+      )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
       {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
