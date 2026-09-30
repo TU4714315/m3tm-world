@@ -3,7 +3,7 @@ import { restoreLayerState, serializeLayerState } from './layerUrlState';
 
 const defaults = {
   flights: true, conflict_zones: true, cctv: true,
-  app_news: true, country_borders: true,
+  app_news: true, country_borders: true, sat_military_activity: true,
   weather: false,
 };
 
@@ -33,7 +33,7 @@ describe('versioned WORLD layer bookmarks', () => {
   it('round-trips an explicitly disabled layer state with the URL schema marker', () => {
     const selected = { ...defaults, app_news: false, country_borders: false, cctv: false };
     const params = serializeLayerState(selected, new URLSearchParams('surface=public&foo=bar'));
-    expect(params.get('layers_v')).toBe('2');
+    expect(params.get('layers_v')).toBe('3');
     expect(params.get('surface')).toBe('public');
     expect(params.get('foo')).toBe('bar');
     expect(restoreLayerState(defaults, params)).toEqual(selected);
