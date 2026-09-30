@@ -33,26 +33,33 @@ describe('public WORLD source-backed layer projection', () => {
       ],
       satellites: [{ id: 'sat-1', category: 'navigation' }, { id: 'sat-2', category: 'military' }],
       commercial_flights: [{ id: 'civil-1' }],
-      military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5 }],
-      flight_source_status: { status: 'active', exact_military_tracks_exposed: false },
-      military_satellite_activity: [{ lat: 20, lng: 30, approximate_count: '3-5' }],
-      military_satellite_meta: { mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false },
-      military_satellite_summary: { catalog_objects: 7, represented_objects: 3 },
-      satellite_source_status: { status: 'active', military_public_cells: 1 },
+      military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5, icao24: 'should-strip', token: 'strip-me' }],
+      military_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, internalEndpoint: 'http://10.0.0.4' },
+      flight_source_status: { status: 'active', exact_military_tracks_exposed: false, hostToken: 'strip-me' },
+      military_satellite_activity: [{ lat: 20, lng: 30, approximate_count: '3-5', noradId: '99999', name: 'strip-me' }],
+      military_satellite_meta: { mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false, secret: 'strip-me' },
+      military_satellite_summary: { catalog_objects: 7, represented_objects: 3, internal: 'strip-me' },
+      satellite_source_status: { status: 'active', military_public_cells: 1, internalIp: '10.0.0.5' },
     });
     expect(result.maritime_ships).toEqual([{ id: 'cargo', type: 'cargo' }]);
     expect(result.satellites).toEqual([{ id: 'sat-1', category: 'navigation' }]);
     expect(result.commercial_flights).toHaveLength(1);
     expect(result.military_activity).toHaveLength(1);
-    expect(result.flight_source_status).toEqual({ status: 'active', exact_military_tracks_exposed: false });
-    expect(result.military_satellite_activity).toEqual([{ lat: 20, lng: 30, approximate_count: '3-5' }]);
-    expect(result.military_satellite_meta).toEqual({ mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false });
-    expect(result.military_satellite_summary).toEqual({ catalog_objects: 7, represented_objects: 3 });
-    expect(result.satellite_source_status).toEqual({ status: 'active', military_public_cells: 1 });
+    expect(result.military_activity[0]).toMatchObject({ id: 'aggregate-cell', lat: 24, lng: 48 });
+    expect(result.military_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false });
+    expect(result.flight_source_status).toMatchObject({ status: 'active', exact_military_tracks_exposed: false });
+    expect(result.military_satellite_activity[0]).toMatchObject({ lat: 20, lng: 30, approximate_count: '3-5' });
+    expect(result.military_satellite_meta).toMatchObject({ mode: 'coarse-orbital-aggregate', exact_tracks_exposed: false });
+    expect(result.military_satellite_summary).toMatchObject({ catalog_objects: 7, represented_objects: 3 });
+    expect(result.satellite_source_status).toMatchObject({ status: 'active', military_public_cells: 1 });
     expect(Object.keys(result)).not.toEqual(expect.arrayContaining([
       'military_flights', 'sat_military', 'internalToolsToken',
     ]));
     expect(result.sdk_entities).toEqual([]);
+    const serialized = JSON.stringify(result);
+    for (const forbidden of ['sensitive-track', 'sensitive-satellite', 'should-strip', 'strip-me', '10.0.0.4', '10.0.0.5', '99999']) {
+      expect(serialized).not.toContain(forbidden);
+    }
   });
 
   it('prefers verified APP-synced public news over fallback broadcast feed', () => {
