@@ -8,6 +8,7 @@ import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
 import { buildAppNewsPins } from '@/lib/appNewsPins';
+import { buildPublicFieldAlerts } from '@/lib/publicFieldAlerts';
 import { restoreLayerState, serializeLayerState } from '@/lib/layerUrlState';
 import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
@@ -87,7 +88,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true,
-  cf_outages: false, cf_attacks: false, app_news: true, country_borders: true,
+  cf_outages: false, cf_attacks: false, app_news: true, alert_pins: true, country_borders: true,
 };
 
 const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
@@ -97,7 +98,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
       'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
-      'app_news',
+      'app_news', 'alert_pins',
       'country_borders',
     ].includes(key),
   ]),
@@ -111,7 +112,7 @@ const PUBLIC_EMBED_LAYER_KEYS = [
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval', 'balloons', 'radiation',
-  'malware', 'cf_outages', 'cf_attacks', 'app_news', 'country_borders', 'day_night', 'terrain_3d',
+  'malware', 'cf_outages', 'cf_attacks', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
   'terrain_elevation', 'terrain_etopo_2022',
 ] as const;
 
@@ -1200,11 +1201,13 @@ export default function Dashboard() {
       ? {
           ...buildPublicLayerData(data, embeddedLiveFeeds),
           app_news: buildAppNewsPins(data.news),
+          alert_pins: buildPublicFieldAlerts(data.news),
           country_boundaries: data.country_boundaries || { type: 'FeatureCollection', features: [] },
         }
       : {
           ...data,
           app_news: buildAppNewsPins(data.news),
+          alert_pins: buildPublicFieldAlerts(data.news),
           sdk_entities: sdkEntities,
           ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
         }

@@ -11,6 +11,7 @@ on:
       - 'public/data/ne110-land-boundaries.geojson'
       - 'src/components/LayerPanel.tsx'
       - 'src/lib/publicLayerData*'
+      - 'src/lib/publicFieldAlerts*'
       - 'src/lib/map-terrain*'
       - 'src/lib/terrain-source-attribution*'
       - 'src/lib/etopo-relief*'

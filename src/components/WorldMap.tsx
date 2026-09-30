@@ -343,7 +343,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -748,6 +748,30 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.7], 'text-max-width': 13, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#5CD9CE', 'text-halo-color': '#000', 'text-halo-width': 1 }});
+
+      // Published military/conflict-topic alerts from M3TM.APP. These reuse only
+      // publisher-provided coordinates already generalized to a 0.5° grid.
+      map.addLayer({ id: 'field-alert-glow', type: 'circle', source: 'field-alerts', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,18, 10,26],
+        'circle-color': ['match',['get','category'],
+          'air_defence','#42A5F5', 'drone','#AB47BC', 'missile','#FF7043',
+          'strike','#EF5350', 'ground','#FFA726', 'maritime','#26C6DA',
+          'equipment','#FFCA28', '#FF8A65'],
+        'circle-opacity': 0.13, 'circle-blur': 1,
+      }});
+      map.addLayer({ id: 'field-alert-dots', type: 'circle', source: 'field-alerts', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'], 1,4.5, 5,7.5, 10,11],
+        'circle-color': ['match',['get','category'],
+          'air_defence','#42A5F5', 'drone','#AB47BC', 'missile','#FF7043',
+          'strike','#EF5350', 'ground','#FFA726', 'maritime','#26C6DA',
+          'equipment','#FFCA28', '#FF8A65'],
+        'circle-opacity': 0.9, 'circle-stroke-width': 1.4,
+        'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.55,
+      }});
+      map.addLayer({ id: 'field-alert-label', type: 'symbol', source: 'field-alerts', minzoom: 4.5, layout: {
+        'text-field': ['get','label_ar'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
+        'text-offset': [0, 1.8], 'text-max-width': 16, 'text-allow-overlap': false,
+      }, paint: { 'text-color': '#FFE0D6', 'text-halo-color': '#000', 'text-halo-width': 1.2 }});
 
       // Natural Earth 1:110m: cartographic reference, not a sovereignty ruling.
       map.addLayer({ id: 'country-boundary-reference', type: 'line', source: 'public-boundaries',
@@ -1183,7 +1207,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots',
+      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1832,6 +1856,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
+    map.on('click', 'field-alert-dots', e => {
+      const p = e.features?.[0]?.properties;
+      if (!p) return;
+      const coords = (e.features![0].geometry as any).coordinates;
+      popup(coords, `<div style="${pStyle}border:1px solid rgba(255,112,67,0.45);">
+        <div style="color:#FFB199;font-size:11px;font-weight:700;margin-bottom:5px;">${htmlEsc(p.label_ar || 'تنبيه ميداني منشور')}</div>
+        <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'بلاغ منشور')}</div>
+        <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
+        <p style="font-size:8px;color:#A0A0A0;">تصنيف نصي لخبر منشور؛ الإحداثيات من الناشر ومُعمّمة 0.5°. لا يمثل تتبعًا لوحدة أو سلاح بعينه.</p>
+        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#FFB199;">فتح المصدر ↗</a>` : ''}
+      </div>`);
+    });
+
     return () => { cancelAnimationFrame(hoverFrame); map.remove(); mapRef.current = null; };
   }, []);
 
@@ -2370,6 +2407,21 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         }))
       : []);
   }, [mapReady, data.app_news, (activeLayers as any).app_news, setGeo]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    setGeo('field-alerts', (activeLayers as any).alert_pins && Array.isArray(data.alert_pins)
+      ? data.alert_pins.map((n: any) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
+          properties: {
+            id: n.id, title: n.title, source: n.source, url: n.url,
+            published: n.published, category: n.category, label_ar: n.label_ar,
+            precision: n.precision, status: n.status,
+          },
+        }))
+      : []);
+  }, [mapReady, data.alert_pins, (activeLayers as any).alert_pins, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
