@@ -18,7 +18,7 @@ describe('attribution is attached to real map sources', () => {
   });
   it('does not globally hide attribution or break narrow viewports', () => {
     const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
-    expect(css).not.toMatch(/\\.maplibregl-ctrl-attrib\\s*\\{\\s*display:\\s*none/i);
+    expect(css).not.toMatch(/\.maplibregl-ctrl-attrib\s*\{\s*display:\s*none/i);
     expect(css).toContain('.maplibregl-ctrl-attrib a:focus-visible');
     expect(css).toContain('max-width: calc(100vw - 20px)');
   });
