@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
+import { ACTIVE_TERRAIN } from '@/lib/terrain-source-catalog';
 
 interface LayerPanelProps {
   data: any;
@@ -152,7 +153,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
       { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
-      { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
+      { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'Mapzen Terrain Tiles؛ بيانات تاريخية متنوعة، تُحمّل عند تكبير 10+', dataKey: '' },
     ],
   },
 ];
@@ -307,8 +308,12 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
       {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
-      <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
-      <a className="mt-1 inline-block underline underline-offset-2" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">مصادر بيانات التضاريس</a>
+      <p className="mt-2 text-white/50">المصدر المستخدم: {ACTIVE_TERRAIN.labelAr} عبر AWS. بيانات الارتفاعات مجمّعة من مصادر بأعمار ودقة مختلفة؛ ليست نموذجًا جديدًا لحظيًا.</p>
+      <p className="mt-1 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا · لا يُعتمد عليها للملاحة</p>
+      <div className="mt-1 flex flex-wrap gap-3">
+        <a className="underline underline-offset-2" href={ACTIVE_TERRAIN.creditsUrl} target="_blank" rel="noopener noreferrer">حقوق ومصادر التضاريس</a>
+        <a className="underline underline-offset-2" href="https://github.com/TU4714315/m3tm-world/blob/main/docs/WORLD_TERRAIN_PROVENANCE_AND_UPGRADES_2026.md" target="_blank" rel="noopener noreferrer">البيانات الأحدث وخطة التحديث</a>
+      </div>
     </div>
   ) : null;
 
