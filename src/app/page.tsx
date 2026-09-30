@@ -96,7 +96,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -104,10 +104,10 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
 
-// Public map controls deliberately omit exact military tracks and internal OSINT tools.
+// Public controls expose only generalized military awareness. Exact military tracks and internal OSINT tools stay outside this surface.
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime',
-  'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science',
+  'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
   'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
