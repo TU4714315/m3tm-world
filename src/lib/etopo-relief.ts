@@ -4,6 +4,7 @@ import { NOAA_ETOPO_2022_TILE_URL, NOAA_ETOPO_2022_ATTRIBUTION } from './terrain
 export const ETOPO_2022_SOURCE = 'm3tm-etopo-2022';
 export const ETOPO_2022_LAYER = 'm3tm-etopo-2022-relief';
 const FIRST_M3TM_OVERLAY = 'conflict-density-heat';
+export const ETOPO_2022_MAX_DISPLAY_ZOOM = 11;
 
 /**
  * Toggle NOAA's public, opt-in **visual** relief. This is NOT raster-dem input
@@ -11,7 +12,11 @@ const FIRST_M3TM_OVERLAY = 'conflict-density-heat';
  * restore the user's satellite/regular map choice when the relief is hidden.
  */
 export function syncEtopo2022Relief(map: Map, enabled: boolean, mapStyle: 'dark' | 'satellite'): boolean {
-  if (enabled) {
+  // At high zoom NOAA relief has no more source detail. Fall back to the
+  // exact basemap the user selected instead of leaving an unintended dark map.
+  // The toggle remains ON so returning to overview automatically restores NOAA.
+  const showRelief = enabled && map.getZoom() < ETOPO_2022_MAX_DISPLAY_ZOOM;
+  if (showRelief) {
     // If bootstrapping is unfinished, do not create an orphan raster source.
     // Its 2022 hillshade must sit beneath ALL public-event overlays.
     if (!map.getLayer(FIRST_M3TM_OVERLAY)) return false;
@@ -30,7 +35,7 @@ export function syncEtopo2022Relief(map: Map, enabled: boolean, mapStyle: 'dark'
         id: ETOPO_2022_LAYER,
         type: 'raster',
         source: ETOPO_2022_SOURCE,
-        maxzoom: 11,
+        maxzoom: ETOPO_2022_MAX_DISPLAY_ZOOM,
         paint: { 'raster-opacity': 0.95, 'raster-resampling': 'linear' },
       }, FIRST_M3TM_OVERLAY);
     }
@@ -40,7 +45,7 @@ export function syncEtopo2022Relief(map: Map, enabled: boolean, mapStyle: 'dark'
   }
   if (map.getLayer('satellite-layer')) {
     map.setLayoutProperty('satellite-layer', 'visibility',
-      enabled ? 'none' : mapStyle === 'satellite' ? 'visible' : 'none');
+      showRelief ? 'none' : mapStyle === 'satellite' ? 'visible' : 'none');
   }
   return true;
 }
