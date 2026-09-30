@@ -82,7 +82,7 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 
 const DEFAULT_ACTIVE_LAYERS = {
   flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true,
-  satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
+  satellites: false, sat_comms: false, sat_military: false, sat_military_activity: true, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
@@ -96,7 +96,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_military_activity', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -107,7 +107,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
 // Public map controls deliberately omit exact military tracks and internal OSINT tools.
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime',
-  'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science',
+  'satellites', 'sat_comms', 'sat_military_activity', 'sat_navigation', 'sat_earth', 'sat_science',
   'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
