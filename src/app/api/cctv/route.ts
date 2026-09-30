@@ -38,6 +38,7 @@ import { fetchFloridaCameras } from './florida';
 import { fetchGeorgiaCameras } from './georgia';
 import { fetchNorthCarolinaCameras } from './northcarolina';
 import { fetchArizonaCameras } from './arizona';
+import { fetchTexasCameras } from './texas';
 import { fetchEastAsiaCameras, fetchSeAsiaCameras, fetchWestAsiaCameras } from './opencctv';
 import {
   fetchLatamLiveCameras,
@@ -473,6 +474,7 @@ const RAW_REGION_FETCHERS: Record<string, RegionFetcher> = {
   'us-west': async () => { const [w, c] = await Promise.all([fetchWSDOTCameras(), fetchCaltransCameras()]); return [...w, ...c]; },
   'us-east': fetchUSEastCameras,
   'us-central': fetchUSCentralCameras,
+  'texas': fetchTexasCameras,
   'canada': fetchCanadaCameras,
   'europe': fetchEuropeCameras,
   'netherlands': fetchNetherlandsCameras,
@@ -572,6 +574,8 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   if (lat > 34.9 && lat < 42.1 && lng > -120.1 && lng < -113.9) regions.push('nevada');
   // US-Central
   if (lat > 24 && lat < 49 && lng > -105 && lng < -80) regions.push('us-central');
+  // TxDOT has its own camera snapshot inventory; do not rely on generic US-Central.
+  if (lat > 25.8 && lat < 36.6 && lng > -106.7 && lng < -93.4) regions.push('texas');
   // Michigan (MDOT) — explicit, since us-central only covers Illinois
   if (lat > 41.6 && lat < 48.3 && lng > -90.5 && lng < -82.1) regions.push('michigan');
   // Indiana (INDOT TrafficWise) — explicit, since us-central only covers Illinois
