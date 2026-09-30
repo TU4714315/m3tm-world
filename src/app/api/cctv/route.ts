@@ -555,13 +555,38 @@ const REGION_FETCHERS: Record<string, RegionFetcher> = Object.fromEntries(
  */
 const REGION_BUDGET_MS = 12_000;
 
+/** A timed-out camera index should not consume another full 12s budget on the
+ * very next catalogue refresh. This mirrors current upstream behaviour while
+ * preserving M3TM's existing per-region cache and response contract. */
+const REGION_BACKOFF_MS = 5 * 60 * 1000;
+const regionBackoffUntil = new Map<string, number>();
+
+/** Test seam only; production entries expire naturally by timestamp. */
+export function clearCctvRegionBackoff(): void {
+  regionBackoffUntil.clear();
+}
+
 function withBudget(region: string, fetcher: RegionFetcher): Promise<{ cameras: Awaited<ReturnType<RegionFetcher>>; pending: boolean }> {
+  const cooldownUntil = regionBackoffUntil.get(region);
+  if (cooldownUntil) {
+    if (Date.now() < cooldownUntil) {
+      return Promise.resolve({ cameras: [], pending: true });
+    }
+    regionBackoffUntil.delete(region);
+  }
+
   let timer: ReturnType<typeof setTimeout>;
+  let timedOut = false;
   return Promise.race([
-    fetcher().then(cameras => ({ cameras, pending: cameras.length === 0 })).finally(() => clearTimeout(timer)),
+    fetcher().then(cameras => {
+      if (!timedOut) regionBackoffUntil.delete(region);
+      return { cameras, pending: cameras.length === 0 };
+    }).finally(() => clearTimeout(timer)),
     new Promise<{ cameras: Awaited<ReturnType<RegionFetcher>>; pending: boolean }>(resolve => {
       timer = setTimeout(() => {
-        console.warn(`[OSIRIS] cctv:${region} over ${REGION_BUDGET_MS}ms — returning without it`);
+        timedOut = true;
+        regionBackoffUntil.set(region, Date.now() + REGION_BACKOFF_MS);
+        console.warn(`[M3TM.WORLD] cctv:${region} over ${REGION_BUDGET_MS}ms — backing off for 300s`);
         resolve({ cameras: [], pending: true });
       }, REGION_BUDGET_MS);
     }),
