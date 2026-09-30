@@ -232,7 +232,18 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
   const gdelt = data?.conflict_source_status?.gdelt?.status;
   const acled = data?.conflict_source_status?.acled?.status;
   const frontlines = data?.frontlines_meta?.status;
-  if (!entries.length && !gdelt && !acled && !frontlines) return null;
+  const fieldAlertLabels: Record<string, string> = {
+    strike: 'ضربات/قصف', drone: 'مسيّرات', missile: 'صواريخ/قذائف',
+    air_defence: 'دفاع جوي', ground: 'قتال بري', maritime: 'أحداث بحرية', equipment: 'معدات/أسلحة',
+  };
+  const fieldCounts = (Array.isArray(data?.alert_pins) ? data.alert_pins : [])
+    .reduce((acc: Record<string, number>, item: any) => {
+      const key = String(item?.category || '');
+      if (key) acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  const fieldEntries = Object.entries(fieldCounts).filter(([, value]) => Number(value) > 0);
+  if (!entries.length && !fieldEntries.length && !gdelt && !acled && !frontlines) return null;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/50">
       <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1">
@@ -249,7 +260,19 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
           ))}
         </div>
       )}
-      <div className="mt-1.5 text-white/30">الأعداد بلاغات مصنفة من المصادر، وليست تحققًا مستقلاً أو مواقع معدات لحظية.</div>
+      {fieldEntries.length > 0 && (
+        <div className="mt-1.5">
+          <div className="mb-1 text-white/45">M3TM.APP · تنبيهات ميدانية منشورة</div>
+          <div className="flex flex-wrap gap-1">
+            {fieldEntries.map(([key, value]) => (
+              <span key={key} className="rounded border border-cyan-300/10 bg-cyan-300/[0.025] px-1.5 py-0.5">
+                {fieldAlertLabels[key] || key}: {Number(value).toLocaleString('ar-SA')}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="mt-1.5 text-white/30">الأعداد بلاغات مصنفة من المصادر. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
     </div>
   );
 }
