@@ -302,6 +302,28 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   );
 }
 
+function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloudflare' }) {
+  const source = kind === 'maritime'
+    ? data?.maritime_source_status?.ais
+    : data?.cloudflare_source_status;
+  if (!source) return null;
+  const provider = String(source.provider || (kind === 'maritime' ? 'AISStream.io' : 'Cloudflare Radar'));
+  const updated = source.latest_observed_at || source.timestamp || data?.maritime_timestamp || null;
+  const age = Number(source.latest_observation_age_s);
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <div className="flex flex-wrap gap-x-2 gap-y-1">
+        <span>المصدر: <b className="text-white/60">{provider}</b></span>
+        <span>الحالة: <b className="text-white/60">{statusArabic(source.status)}</b></span>
+        {Number.isFinite(age) && <span>عمر آخر رصد: <b className="text-white/60">{age < 60 ? `${Math.round(age)} ث` : `${Math.round(age / 60)} د`}</b></span>}
+      </div>
+      {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
+      {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ السطح العام لا يعرض مسارات بحرية عسكرية دقيقة.</div>}
+      {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ لا تُعرض بيانات انقطاع أو هجمات حتى إضافة اعتماد Radar: Read على الخادم.</div>}
+    </div>
+  );
+}
+
 function MilitarySatelliteActivityStatus({ data }: { data: any }) {
   const cells = Array.isArray(data?.military_satellite_activity) ? data.military_satellite_activity.length : 0;
   const summary = data?.military_satellite_summary;
@@ -374,22 +396,23 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     </div>
   ) : null;
 
-  /** Switch a whole group at once — off if any are on, otherwise all on. */
+  /** Switch a whole group at once — off if any available layer is on, otherwise all available layers on. */
   const toggleGroup = (layers: LayerDef[]) => {
-    const anyOn = layers.some(l => activeLayers[l.key]);
-    if (!anyOn && layers.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
+    const available = layers.filter(l => !l.requires || capabilities[l.requires] === true);
+    const anyOn = available.some(l => activeLayers[l.key]);
+    if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
     setActiveLayers((prev: any) => {
       const next = { ...prev };
-      for (const l of layers) next[l.key] = !anyOn;
+      for (const l of available) next[l.key] = !anyOn;
       return next;
     });
   };
 
-  /* Drop layers whose backing capability is not configured, then drop any group
-     left with nothing to show. */
+  /* Keep credential-gated layers visible so an absent credential is explicit
+     "غير مهيأ" rather than a disappearing control that looks accidentally missing. */
   const visibleGroups = LAYER_GROUPS.map(g => ({
     ...g,
-    layers: g.layers.filter(l => (!allowedLayerKeys || allowedLayerKeys.includes(l.key)) && (!l.requires || capabilities[l.requires])),
+    layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
   })).filter(g => g.layers.length > 0);
 
   const getCount = (dk: string, catKey?: string): number | null => {
@@ -423,13 +446,16 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 const isLayerActive = activeLayers[layer.key];
                 const count = getCount(layer.dataKey, layer.catKey);
                 const dormant = !!layer.parent && !activeLayers[layer.parent];
+                const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
                 return (
                   <button
                     key={layer.key}
-                    onClick={() => toggle(layer.key)}
+                    onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
+                    disabled={capabilityUnavailable}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
-                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
+                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : undefined}
+                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
@@ -438,7 +464,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                     </span>
                     <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                      {isLayerActive ? 'نشط' : 'متوقف'}
+                      {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
                     </span>
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
@@ -452,6 +478,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
               {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
+              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
+              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
               {group.label === 'العرض' && terrainDetails}
             </div>
           </div>
@@ -618,15 +646,17 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         const isLayerActive = activeLayers[layer.key];
                         const count = getCount(layer.dataKey, layer.catKey);
                         const dormant = !!layer.parent && !activeLayers[layer.parent];
+                        const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
 
                         return (
                           <button
                             key={layer.key}
-                            onClick={() => toggle(layer.key)}
+                            onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
+                            disabled={capabilityUnavailable}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
-                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors cursor-pointer text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
+                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
+                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {layer.parent && <SubLayerStem />}
                             <ToggleSwitch active={!!isLayerActive} />
@@ -635,7 +665,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                             </span>
                             <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                              {isLayerActive ? 'نشط' : 'متوقف'}
+                              {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
                             </span>
                             {count !== null && (
                               <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
@@ -649,6 +679,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
               {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
+              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
+              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
               {group.label === 'العرض' && terrainDetails}
                     </div>
                   </motion.div>
