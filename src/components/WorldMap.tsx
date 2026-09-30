@@ -4,7 +4,8 @@ import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
-import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION, NOAA_ETOPO_2022_TILE_URL, NOAA_ETOPO_2022_ATTRIBUTION } from '@/lib/terrain-source-attribution';
+import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
+import { syncEtopo2022Relief } from '@/lib/etopo-relief';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
 import { MAP_DEFAULTS, MAP_PALETTE_KEYS, readMapPalette, satColorFor, type MapPalette } from '@/lib/map-palette';
 import { STYLE_EVENT } from '@/lib/style-tokens';
@@ -2762,54 +2763,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     }
   }, [mapReady, mapStyle]);
 
-  // NOAA NCEI's ETOPO 2022 is a genuine newer *colored global relief*
-  // product. Its ArcGIS JPEG cache is not a numeric DEM and must not replace
-  // the Mapzen Terrarium source used by the existing 3D terrain engine.
-  // Off by default; never prefetch the extra global raster on startup.
+  // Newer NOAA public relief is on-demand; the separate Mapzen DEM stays
+  // authoritative for 3D elevation. Satellite and M3TM overlays are preserved.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    const map = mapRef.current;
-    const sourceId = 'm3tm-etopo-2022';
-    const layerId = 'm3tm-etopo-2022-relief';
-    const enabled = !!activeLayers.terrain_etopo_2022;
     try {
-      if (enabled) {
-        if (!map.getSource(sourceId)) {
-          map.addSource(sourceId, {
-            type: 'raster',
-            tiles: [NOAA_ETOPO_2022_TILE_URL],
-            tileSize: 256,
-            minzoom: 0,
-            maxzoom: 10,
-            attribution: NOAA_ETOPO_2022_ATTRIBUTION,
-          });
-        }
-        if (!map.getLayer(layerId)) {
-          // Place relief underneath ALL M3TM event, conflict and boundary
-          // overlays; putting it near day-night would obscure those reports.
-          if (!map.getLayer('conflict-density-heat')) {
-            console.warn('[M3TM.WORLD] ETOPO basemap anchor unavailable.');
-            return;
-          }
-          map.addLayer({
-            id: layerId,
-            type: 'raster',
-            source: sourceId,
-            maxzoom: 11,
-            paint: { 'raster-opacity': 0.95, 'raster-resampling': 'linear' },
-          }, 'conflict-density-heat');
-        }
-      } else {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
-      }
-      // The old satellite raster is later in the style stack and otherwise
-      // masks the selected ETOPO basemap completely. Restore user imagery
-      // choice as soon as ETOPO is switched off.
-      if (map.getLayer('satellite-layer')) {
-        map.setLayoutProperty('satellite-layer', 'visibility',
-          enabled ? 'none' : mapStyle !== 'dark' ? 'visible' : 'none');
-      }
+      syncEtopo2022Relief(mapRef.current, !!activeLayers.terrain_etopo_2022, mapStyle);
     } catch (error) {
       console.warn('[M3TM.WORLD] NOAA ETOPO 2022 relief unavailable:',
         error instanceof Error ? error.message : error);
