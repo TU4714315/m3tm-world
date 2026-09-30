@@ -153,6 +153,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
       { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
       { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
+      { key: 'terrain_etopo_2022', label: 'NOAA ETOPO 2022 · تضاريس وأعماق', description: 'تظليل ملون من بيانات NOAA الأحدث للعرض العالمي؛ لا يغيّر ارتفاعات الخريطة ثلاثية الأبعاد ولا يصلح للملاحة', dataKey: '' },
     ],
   },
 ];
