@@ -2767,13 +2767,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   // authoritative for 3D elevation. Satellite and M3TM overlays are preserved.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    try {
-      syncEtopo2022Relief(mapRef.current, !!activeLayers.terrain_etopo_2022,
-        mapStyle === 'dark' ? 'dark' : 'satellite');
-    } catch (error) {
-      console.warn('[M3TM.WORLD] NOAA ETOPO 2022 relief unavailable:',
-        error instanceof Error ? error.message : error);
-    }
+    const map = mapRef.current;
+    const enabled = !!activeLayers.terrain_etopo_2022;
+    const refreshRelief = () => {
+      try {
+        syncEtopo2022Relief(map, enabled,
+          mapStyle === 'dark' ? 'dark' : 'satellite');
+      } catch (error) {
+        console.warn('[M3TM.WORLD] NOAA ETOPO 2022 relief unavailable:',
+          error instanceof Error ? error.message : error);
+      }
+    };
+    refreshRelief();
+    // NOAA's overview raster ends at zoom 11. Restore the selected normal
+    // basemap beyond this threshold and reinstate relief on the way back.
+    // zoomend avoids repeated source churn during a fly-to animation.
+    if (enabled) map.on('zoomend', refreshRelief);
+    return () => { if (enabled) map.off('zoomend', refreshRelief); };
   }, [mapReady, activeLayers.terrain_etopo_2022, mapStyle]);
 
   // ── DRAWN POLYGONS ──
