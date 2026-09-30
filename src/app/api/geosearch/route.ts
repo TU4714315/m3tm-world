@@ -150,6 +150,10 @@ async function searchPhoton(q: string, lat?: number, lng?: number): Promise<GeoR
   return (json.features || []).map(normalizePhoton).filter((r): r is GeoResult => r !== null);
 }
 
+/** Photon usually satisfies type-ahead search on its own. Only fall back to
+ * Nominatim when Photon is thin, reducing load on the community service. */
+const ENOUGH_FROM_PHOTON = 3;
+
 async function searchNominatim(q: string): Promise<GeoResult[]> {
   const url = `${NOMINATIM}?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=0`;
   const json = await httpJson<NominatimRow[]>(url, { timeoutMs: 8000 });
@@ -174,11 +178,10 @@ export async function GET(request: Request) {
     const results = await cachedSource<GeoResult>(
       key,
       async () => {
-        const [photon, nominatim] = await Promise.all([
-          optional(searchPhoton(q, lat, lng)),
-          optional(searchNominatim(q)),
-        ]);
-        return mergeResults(photon || [], nominatim || []);
+        const photon = (await optional(searchPhoton(q, lat, lng))) || [];
+        if (photon.length >= ENOUGH_FROM_PHOTON) return mergeResults(photon, []);
+        const supplement = (await optional(searchNominatim(q))) || [];
+        return mergeResults(photon, supplement);
       },
       10 * 60 * 1000,
     )();

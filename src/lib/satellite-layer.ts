@@ -49,6 +49,14 @@ const KM_TO_M = 1000;
  * This is a display transform, not a measurement. The popup shows the real
  * altitude in kilometres.
  */
+/*
+ * Above this zoom the operator is looking at the ground. Satellites remain in
+ * the GPU buffer, but neither draw nor pick until zooming back out.
+ */
+export const SAT_MAX_ZOOM = 7;
+export const satelliteLayerVisibleAtZoom = (zoom: number) =>
+  !Number.isFinite(zoom) || zoom <= SAT_MAX_ZOOM;
+
 const FLOOR_KM = 620;      // clears the globe depth test
 const CEILING_KM = 2500;   // stays inside the frustum at world zoom
 const MIN_ALT_KM = 150;    // lowest catalogue altitude that still orbits
@@ -508,6 +516,13 @@ export function createSatelliteLayer(id: string): CustomLayerInterface & {
       // An inactive satellite layer must not compile three GPU programs on
       // startup or whenever the map switches between globe and flat views.
       if (!points.length) { count = 0; lastProjection = null; return; }
+      /*
+       * Do not zero `count` here. It is the number of uploaded satellite
+       * vertices and is refreshed only when setPoints() marks the buffer dirty.
+       * Clearing count caused satellites to disappear permanently after a
+       * city-level zoom until the layer was toggled off/on.
+       */
+      if (map && !satelliteLayerVisibleAtZoom(map.getZoom())) { lastProjection = null; return; }
       const shader = args?.shaderData;
       if (!shader?.vertexShaderPrelude) return;
 

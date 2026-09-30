@@ -40,6 +40,21 @@ This is a data-precision boundary applied independent of actor/country; it is no
 | camera-source expansion | Yes | Yes | Prior parity work registered the reviewed upstream public camera categories; runtime availability remains source-specific. |
 | camera timeout backoff (#403) | Yes | Added in follow-up | Timed-out regions enter a 5-minute cooldown instead of spending the full 12-second regional budget on every catalogue refresh; successful regions and cached camera indexes are unchanged. |
 
+## Newer upstream runtime fixes discovered in the second pass
+
+The first layer-key audit was not sufficient by itself. A commit-level review of recent upstream work found additional behaviour that is not represented by a LayerPanel key:
+
+| Upstream change | M3TM status before this follow-up | Follow-up action |
+|---|---|---|
+| Satellite layer restores itself after city zoom (#390) | Missing: renderer had no high-zoom guard, so the upstream restoration fix was absent | Ported: above zoom 7 it clears only the projection/pick state and preserves the GPU point count; zoom-out restores without toggling |
+| Search ranks near current map centre and aborts stale type-ahead (#390) | Missing: SearchBar called direct global lookup and did not receive `mapCenter` | Ported: SearchBar uses existing `/api/geosearch?lat=&lng=`, current map centre, AbortController and conditional Nominatim fallback |
+| Region Dossier uses Photon + cache and Wikidata REST (#390) | Old implementation: direct Nominatim reverse + Wikidata SPARQL | Ported: cached Photon reverse, one retry, sparse-land radius, Wikidata REST current-statement selection |
+| Malaysian OpenCCTV images/proxy fixes (#380) | Missing | Ported: HTTPS proxy for Selangor HTTP snapshots, dead `/offcam/` rows dropped, multi-address retry and image-byte MIME detection |
+| Live Alerts media/place/digest rebuild (#376/#380) | M3TM.APP public feed has published coordinates but currently **no media fields**; M3TM does not carry upstream Telegram perspective roster | Not falsely enabled. Generalized `alert_pins` is already live from M3TM.APP. Media playback requires a real M3TM.APP media contract first; source/perspective labels are not inferred by WORLD. |
+| Nearby-biased region dossier/search | Partially present through `mapCenter` state and Directions only | Search parity included here; dossier reverse lookup no longer competes with an unrelated Nominatim queue |
+
+This second pass is why commit-level parity remains necessary even after all layer keys are compared.
+
 ## Current public conflict evidence contract
 
 The panel must say explicitly whether a layer is **نشط** or **متوقف**. Count alone is not a state indicator. Conflict evidence is split by source:
