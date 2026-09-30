@@ -99,7 +99,7 @@ export default function TerrainSourcesPage() {
             خدمة ArcGIS العامة تعيد بلاطات JPEG فعلية بحجم 256 بكسل.
             هذا تظليل طبوغرافي ملون مرسوم مسبقًا، وليس بديلًا عن
             بيانات Mapzen الرقمية المستخدمة لرفع الجبال في وضع 3D؛ ولا يصلح للملاحة.
-            تتوقف الطبقة عند مستويات التكبير العالية للحفاظ على وضوح الطبقات المحلية.
+            تُوقف الطبقة تلقائيًا عند التكبير العالي وتعود خلفيتك المختارة (الأقمار الصناعية أو الوضع الداكن)، ثم يظهر تظليل NOAA مجددًا عند الابتعاد دون تغيير مفتاح الطبقة.
           </p>
           <a href="https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/ETOPO_hillshade/MapServer"
              target="_blank" rel="noopener noreferrer"
