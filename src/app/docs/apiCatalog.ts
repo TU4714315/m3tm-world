@@ -89,16 +89,16 @@ export const API_GROUPS: ApiGroup[] = [
         path: '/api/flights',
         method: 'GET',
         summary: 'Live ADS-B aircraft, bucketed by class.',
-        returns: ['commercial_flights', 'private_flights', 'private_jets', 'military_flights', 'source'],
+        returns: ['commercial_flights', 'private_flights', 'private_jets', 'military_activity', 'military_activity_meta', 'source'],
         notes:
-          'Keyless via adsb.lol. Each bucket is an array; sum them for a total. `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` are reserved for higher rate limits and are not required.',
+          'Keyless via adsb.lol. Public military-air data is returned as coarse regional activity cells with source/precision metadata. `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` are reserved for higher rate limits and are not required.',
       },
       {
         path: '/api/satellites',
         method: 'GET',
         summary: 'Tracked orbital objects with TLE-derived positions.',
-        returns: ['satellites', 'total', 'category_counts', 'raw_count', 'timestamp'],
-        notes: 'Sourced from celestrak.org. `category_counts` breaks the set down by mission type.',
+        returns: ['satellites', 'total', 'category_counts', 'military_satellite_activity', 'military_satellite_activity_meta', 'raw_count', 'timestamp'],
+        notes: 'Sourced from public TLE catalogues. Individual public satellite rows cover non-military mission families; the military/government subset is exposed separately as coarse regional aggregate cells with explicit precision metadata.',
       },
       {
         path: '/api/space-weather',
