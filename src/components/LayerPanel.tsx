@@ -153,6 +153,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
       { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
       { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
+      { key: 'terrain_etopo_2022', label: 'NOAA ETOPO 2022 · تضاريس وأعماق', description: 'تظليل ملون من بيانات NOAA الأحدث للعرض العالمي؛ لا يغيّر ارتفاعات الخريطة ثلاثية الأبعاد ولا يصلح للملاحة', dataKey: '' },
     ],
   },
 ];
@@ -308,7 +309,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
       {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
       <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
-      <a className="mt-1 inline-block underline underline-offset-2" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">مصادر بيانات التضاريس</a>
+      <p className="mt-1 text-white/35">المصدر الحالي: AWS Mapzen / Tilezen Terrarium، وليس DEM حديثًا تلقائي التحديث.</p>
+      <a className="mt-1 inline-block underline underline-offset-2 text-[var(--gold-primary)]" href="/terrain-sources" target="_blank" rel="noopener noreferrer">اعتمادات المصادر والبدائل الأحدث</a>
     </div>
   ) : null;
 

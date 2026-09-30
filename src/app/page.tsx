@@ -86,7 +86,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
-  terrain_elevation: false, malware: false, cyber_attacks: false, gdelt_events: true,
+  terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true,
   cf_outages: false, cf_attacks: false, app_news: true, country_borders: true,
 };
 
@@ -112,7 +112,7 @@ const PUBLIC_EMBED_LAYER_KEYS = [
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval', 'balloons', 'radiation',
   'malware', 'cf_outages', 'cf_attacks', 'app_news', 'country_borders', 'day_night', 'terrain_3d',
-  'terrain_elevation',
+  'terrain_elevation', 'terrain_etopo_2022',
 ] as const;
 
 function useIsMobile() {
