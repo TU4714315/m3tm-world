@@ -531,6 +531,20 @@ export async function GET() {
         opensky_auth:    hasOpenSkyCreds(),
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
+      flight_source_status: {
+        status: militaryActivity.length || commercial.length || privateFl.length || jets.length ? 'active' : 'empty',
+        provider: source,
+        providers: {
+          adsbfi_mil: milCount,
+          adsbfi_regional: openSkyWorked ? 0 : allRaw.length - milCount,
+          opensky: osSnapshot.length,
+          opensky_auth: hasOpenSkyCreds(),
+          opensky_age_s: osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
+        },
+        military_public_cells: militaryActivity.length,
+        exact_military_tracks_exposed: false,
+        timestamp: new Date().toISOString(),
+      },
       timestamp:          new Date().toISOString(),
     };
   })();
