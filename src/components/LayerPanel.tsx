@@ -20,6 +20,8 @@ interface LayerPanelProps {
   /** Server-side capabilities, e.g. { cloudflare: true }. Layers declaring a
    *  `requires` key stay hidden until the matching capability is present. */
   capabilities?: Record<string, boolean>;
+  /** Optional public-embed allowlist: only expose non-operational layers. */
+  allowedLayerKeys?: readonly string[];
   terrainStatus?: TerrainStatus;
   onTerrainRetry?: () => void;
   onTerrainFocus?: () => void;
@@ -129,7 +131,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Network,
     layers: [
       { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'هجمات حية', dataKey: 'cyber_attacks' },
+      { key: 'cyber_attacks', label: 'تصور تقديري للتهديدات', description: 'روابط استدلالية مشتقة من مؤشرات Feodo، وليست هجمات مرصودة أو إسنادًا موثوقًا لمصدرها', dataKey: 'cyber_attacks' },
     ],
   },
   {
@@ -202,7 +204,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -248,7 +250,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
      left with nothing to show. */
   const visibleGroups = LAYER_GROUPS.map(g => ({
     ...g,
-    layers: g.layers.filter(l => !l.requires || capabilities[l.requires]),
+    layers: g.layers.filter(l => (!allowedLayerKeys || allowedLayerKeys.includes(l.key)) && (!l.requires || capabilities[l.requires])),
   })).filter(g => g.layers.length > 0);
 
   const getCount = (dk: string, catKey?: string): number | null => {
