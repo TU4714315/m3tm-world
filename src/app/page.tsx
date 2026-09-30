@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
+import { buildPublicLayerData } from '@/lib/publicLayerData';
 import WorldFeed from '@/components/WorldFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -1174,45 +1175,7 @@ export default function Dashboard() {
 
   const sdkDisplayData = useMemo(() => (
     embedSurface === 'public'
-      ? {
-          // Expose source-backed, non-operational public layers. A layer toggle
-          // must not silently display an empty map because its payload was
-          // removed by this projection. Keep internal sdk_entities and exact
-          // military positions out of public WORLD.
-          live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : (data.live_feeds || []),
-          commercial_flights: data.commercial_flights || [],
-          private_flights: data.private_flights || [],
-          private_jets: data.private_jets || [],
-          military_activity: data.military_activity || [],
-          military_activity_meta: data.military_activity_meta || null,
-          satellites: data.satellites || [],
-          satellites_at: data.satellites_at || null,
-          category_counts: data.category_counts || {},
-          maritime_ports: data.maritime_ports || [],
-          maritime_chokepoints: data.maritime_chokepoints || [],
-          maritime_ships: (data.maritime_ships || []).filter((ship: any) => ship?.type !== 'military'),
-          submarine_cables: data.submarine_cables || [],
-          cameras: data.cameras || [],
-          fires: data.fires || [],
-          weather_events: data.weather_events || [],
-          infrastructure: data.infrastructure || [],
-          balloons: data.balloons || [],
-          radiation: data.radiation || [],
-          malware_threats: data.malware_threats || [],
-          cf_outages: data.cf_outages || [],
-          cf_attack_origins: data.cf_attack_origins || [],
-          gdelt: data.gdelt || [],
-          gdelt_events: data.gdelt_events || [],
-          reported_routes: data.reported_routes || [],
-          reported_routes_meta: data.reported_routes_meta || null,
-          conflict_zones: data.conflict_zones || [],
-          conflict_live_events: data.conflict_live_events || [],
-          conflict_summary: data.conflict_summary || null,
-          frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
-          frontlines_meta: data.frontlines_meta || null,
-          earthquakes: data.earthquakes || [],
-          sdk_entities: [],
-        }
+      ? buildPublicLayerData(data, embeddedLiveFeeds)
       : {
           ...data,
           sdk_entities: sdkEntities,
