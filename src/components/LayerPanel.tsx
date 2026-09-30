@@ -123,6 +123,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
       { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
+      { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'ميزة alert_pins من المشروع الأصلي بعد تكييفها مع M3TM.APP: ضربات/مسيّرات/صواريخ/دفاع جوي/قتال بري/بحري/معدات كما يذكرها الناشر، بإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
       { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO: أسلحة جوية/ثقيلة/تفجيرات/اشتباكات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
     ],
@@ -174,9 +175,9 @@ function ToggleSwitch({ active }: { active: boolean }) {
       <div
         className="absolute inset-0 rounded-full transition-all duration-300"
         style={{
-          background: active ? 'rgba(255,255,255,0.2)' : 'transparent',
-          border: active ? '1px solid rgba(255,255,255,0.35)' : '1px solid rgba(255,255,255,0.12)',
-          boxShadow: active ? '0 0 8px rgba(255,255,255,0.1)' : 'none',
+          background: active ? 'rgba(0,229,255,0.26)' : 'rgba(255,255,255,0.02)',
+          border: active ? '1px solid rgba(0,229,255,0.75)' : '1px solid rgba(255,255,255,0.12)',
+          boxShadow: active ? '0 0 10px rgba(0,229,255,0.28)' : 'none',
         }}
       />
       <motion.div
@@ -184,8 +185,8 @@ function ToggleSwitch({ active }: { active: boolean }) {
         style={{
           width: 10,
           height: 10,
-          background: active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.2)',
-          boxShadow: active ? '0 0 6px rgba(255,255,255,0.4)' : 'none',
+          background: active ? '#D9FCFF' : 'rgba(255,255,255,0.20)',
+          boxShadow: active ? '0 0 7px rgba(0,229,255,0.65)' : 'none',
         }}
         animate={{ left: active ? 16 : 2 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -376,6 +377,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
                       {layer.label}
                       {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                    </span>
+                    <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
+                      {isLayerActive ? 'نشط' : 'متوقف'}
                     </span>
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
@@ -569,6 +573,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
                               {layer.label}
                               {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                            </span>
+                            <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
+                              {isLayerActive ? 'نشط' : 'متوقف'}
                             </span>
                             {count !== null && (
                               <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
