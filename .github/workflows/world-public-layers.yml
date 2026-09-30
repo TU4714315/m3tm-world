@@ -17,6 +17,10 @@ on:
       - 'src/lib/etopo-relief*'
       - 'src/app/terrain-sources/page.tsx'
       - 'src/app/api/cctv/**'
+      - 'src/app/api/flights/route.ts'
+      - 'src/app/api/satellites/route.ts'
+      - 'src/lib/military-space-activity*'
+      - 'src/lib/layerUrlState*'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
 
