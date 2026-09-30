@@ -39,6 +39,8 @@ import { fetchGeorgiaCameras } from './georgia';
 import { fetchNorthCarolinaCameras } from './northcarolina';
 import { fetchArizonaCameras } from './arizona';
 import { fetchTexasCameras } from './texas';
+import { fetchEdmontonCameras } from './edmonton';
+import { fetchLithuaniaCameras } from './lithuania';
 import { fetchEastAsiaCameras, fetchSeAsiaCameras, fetchWestAsiaCameras } from './opencctv';
 import {
   fetchLatamLiveCameras,
@@ -475,6 +477,8 @@ const RAW_REGION_FETCHERS: Record<string, RegionFetcher> = {
   'us-east': fetchUSEastCameras,
   'us-central': fetchUSCentralCameras,
   'texas': fetchTexasCameras,
+  'edmonton': fetchEdmontonCameras,
+  'lithuania': fetchLithuaniaCameras,
   'canada': fetchCanadaCameras,
   'europe': fetchEuropeCameras,
   'netherlands': fetchNetherlandsCameras,
@@ -591,6 +595,7 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   if (lat > 31.3 && lat < 37.1 && lng > -115.0 && lng < -109.0) regions.push('arizona');
   // Canada
   if (lat > 42 && lat < 70 && lng > -141 && lng < -52) regions.push('canada');
+  if (lat > 53.3 && lat < 53.8 && lng > -114.0 && lng < -113.2) regions.push('edmonton');
   // Europe
   const inBulgaria = lat > 41 && lat < 44.5 && lng > 22 && lng < 29.5;
   const inGreece = lat > 34.5 && lat < 41.8 && lng > 19 && lng < 30;
@@ -613,6 +618,7 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   if (lat > 35 && lat < 72 && lng > -11 && lng < 40 && !inBalkans && !inWesternEurope) {
     regions.push('europe');
   }
+  if (lat > 53.8 && lat < 56.5 && lng > 20.9 && lng < 26.9) regions.push('lithuania');
   if (inBulgaria) regions.push('bulgaria');
   if (inGreece) regions.push('greece');
   if (inSerbia) regions.push('serbia');
