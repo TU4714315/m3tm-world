@@ -22,6 +22,7 @@ on:
       - 'src/lib/military-space-activity*'
       - 'src/lib/layerUrlState*'
       - '.github/workflows/world-public-layers.yml'
+      - '.github/workflows/world-upstream-parity-watch.yml'
   workflow_dispatch:
 
 permissions:
