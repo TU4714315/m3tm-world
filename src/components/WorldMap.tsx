@@ -1179,7 +1179,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots',
+      'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1811,6 +1811,21 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         category: p.category,
         embed_allowed: p.embed_allowed !== false && p.embed_allowed !== 'false',
       });
+    });
+
+    // Source-backed article detail; unlike the broadcast layer, clicking a
+    // news pin opens a sourced article, not an invented video feed.
+    map.on('click', 'app-news-dots', e => {
+      const p = e.features?.[0]?.properties;
+      if (!p) return;
+      const coords = (e.features![0].geometry as any).coordinates;
+      popup(coords, `<div style="${pStyle}border:1px solid rgba(92,217,206,0.4);">
+        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر منشور من M3TM.APP</div>
+        <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'خبر')}</div>
+        <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
+        <p style="font-size:8px;color:#A0A0A0;">موقع إقليمي معمّم 0.5°، وليس تحديدًا دقيقًا لمكان الواقعة. المحتوى منسوب لناشره.</p>
+        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">فتح الخبر المنشور ↗</a>` : ''}
+      </div>`);
     });
 
     return () => { cancelAnimationFrame(hoverFrame); map.remove(); mapRef.current = null; };
