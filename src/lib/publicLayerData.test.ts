@@ -13,9 +13,11 @@ describe('public WORLD source-backed layer projection', () => {
       conflict_live_events: [{ id: 'conflict-1' }], live_feeds: [{ id: 'feed-1' }],
     };
     const publicData = buildPublicLayerData(source);
-    for (const key of Object.keys(source)) {
+    for (const key of Object.keys(source).filter(key => !['balloons', 'radiation'].includes(key))) {
       expect(publicData[key as keyof typeof publicData]).toEqual(source[key as keyof typeof source]);
     }
+    expect(publicData.balloons).toEqual([]);
+    expect(publicData.radiation).toEqual([]);
     expect(publicData.sdk_entities).toEqual([]);
   });
 
@@ -69,6 +71,54 @@ describe('public WORLD source-backed layer projection', () => {
     );
     expect(result.live_feeds).toEqual([{ id: 'app-feed' }]);
     expect(buildPublicLayerData({}).conflict_zones).toEqual([]);
+  });
+});
+
+describe('public feed readiness projection', () => {
+  it('keeps source state useful while stripping operational details', () => {
+    const result = buildPublicLayerData({
+      maritime_source: 'AISStream.io + M3TM static maritime reference',
+      maritime_timestamp: '2026-09-30T22:00:00Z',
+      maritime_source_status: {
+        ais: {
+          status: 'active',
+          configured: true,
+          provider: 'AISStream.io',
+          public_ships: 42,
+          latest_observed_at: '2026-09-30T21:59:55Z',
+          latest_observation_age_s: 5,
+          persistence: 'process-memory',
+          exact_military_tracks_exposed: false,
+          serverless_note: 'internal deployment detail',
+          token: 'never-public',
+        },
+        reference: { status: 'active', provider: 'M3TM.WORLD curated static reference', ports: 50, chokepoints: 10 },
+      },
+      cloudflare_source_status: {
+        status: 'not_configured',
+        configured: false,
+        provider: 'Cloudflare Radar',
+        timestamp: '2026-09-30T22:00:00Z',
+        internalEndpoint: 'http://10.0.0.8',
+      },
+    });
+    expect(result.maritime_source_status.ais).toMatchObject({
+      status: 'active',
+      configured: true,
+      provider: 'AISStream.io',
+      public_ships: 42,
+      latest_observation_age_s: 5,
+      exact_military_tracks_exposed: false,
+    });
+    expect(result.cloudflare_source_status).toMatchObject({
+      status: 'not_configured',
+      configured: false,
+      provider: 'Cloudflare Radar',
+    });
+    const serialized = JSON.stringify(result);
+    for (const forbidden of ['never-public', 'internal deployment detail', '10.0.0.8']) {
+      expect(serialized).not.toContain(forbidden);
+    }
   });
 });
 
