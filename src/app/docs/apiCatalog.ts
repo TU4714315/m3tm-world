@@ -299,8 +299,8 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/maritime',
         method: 'GET',
-        summary: 'Ports, chokepoints, and vessel positions.',
-        returns: ['ports', 'chokepoints', 'ships', 'total_ports', 'total_chokepoints', 'total_ships', 'timestamp'],
+        summary: 'Public ports/chokepoints plus live civilian AIS vessel observations when AISStream.io is configured. Military-class AIS tracks are excluded from the public response.',
+        returns: ['ports', 'chokepoints', 'ships', 'total_ports', 'total_chokepoints', 'total_ships', 'source', 'source_status', 'timestamp'],
         env: ['AIS_API_KEY'],
       },
       {

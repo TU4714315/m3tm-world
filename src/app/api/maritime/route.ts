@@ -307,13 +307,46 @@ function buildSnapshot(now: number): string {
     };
   });
 
+  const latestObservedMs = ships.reduce((latest, ship) => {
+    const observed = Number(ship?.timestamp);
+    return Number.isFinite(observed) ? Math.max(latest, observed) : latest;
+  }, 0);
+  const aisConfigured = Boolean(process.env.AIS_API_KEY);
+  const aisStatus = !aisConfigured
+    ? 'not_configured'
+    : ships.length > 0
+      ? 'active'
+      : globalForAis.isAisConnecting
+        ? 'connecting'
+        : 'configured_no_data';
+
   return JSON.stringify({
     ports: dynamicPorts,
     chokepoints: dynamicChokepoints,
-    ships: ships,
+    ships,
     total_ports: dynamicPorts.length,
     total_chokepoints: dynamicChokepoints.length,
     total_ships: ships.length,
+    source: 'AISStream.io + M3TM static maritime reference',
+    source_status: {
+      ais: {
+        status: aisStatus,
+        configured: aisConfigured,
+        provider: 'AISStream.io',
+        public_ships: ships.length,
+        latest_observed_at: latestObservedMs ? new Date(latestObservedMs).toISOString() : null,
+        latest_observation_age_s: latestObservedMs ? Math.max(0, Math.round((now - latestObservedMs) / 1000)) : null,
+        persistence: 'process-memory',
+        serverless_note: 'A persistent live AIS stream requires a long-lived ingestion process; serverless instances may reset between invocations.',
+        exact_military_tracks_exposed: false,
+      },
+      reference: {
+        status: 'active',
+        provider: 'M3TM.WORLD curated static reference',
+        ports: dynamicPorts.length,
+        chokepoints: dynamicChokepoints.length,
+      },
+    },
     timestamp: new Date(now).toISOString(),
   });
 }

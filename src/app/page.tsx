@@ -96,7 +96,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -104,14 +104,14 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
 
-// Public map controls deliberately omit exact military tracks and internal OSINT tools.
+// Public controls expose only generalized military awareness. Exact military tracks and internal OSINT tools stay outside this surface.
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime',
-  'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science',
+  'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
   'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
-  'sdk_sea', 'sdk_air', 'sdk_naval', 'balloons', 'radiation',
+  'sdk_sea', 'sdk_air', 'sdk_naval',
   'malware', 'cf_outages', 'cf_attacks', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
   'terrain_elevation', 'terrain_etopo_2022',
 ] as const;
@@ -506,19 +506,42 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Restore active layers from URL if present
+    // Restore active layers from URL if present on standalone WORLD.
+    // Embedded surfaces still probe provider readiness, but do not inherit
+    // arbitrary URL layer state or auto-geolocate behind the parent app.
     const p = new URLSearchParams(window.location.search);
-    if (p.get('embed') === '1' && window.parent !== window) return;
-    if (p.has('layers')) {
+    const isEmbeddedFrame = p.get('embed') === '1' && window.parent !== window;
+    if (!isEmbeddedFrame && p.has('layers')) {
       setActiveLayers(prev => restoreLayerState(prev, p));
     }
-
-    // Probe which credential-gated feeds this deployment has configured, so the
-    // layer panel can hide toggles that could never return data.
-    fetch('/api/cloudflare-radar?probe=1')
+    // Probe credential-gated feeds without exposing credentials. Keep their
+    // controls visible as disabled/غير مهيأ when configuration is missing.
+    fetch('/api/cloudflare-radar?probe=1', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
-      .then(p => { if (p) setCapabilities(c => ({ ...c, cloudflare: !!p.configured })); })
-      .catch(() => { /* leave the layer hidden */ });
+      .then(p => {
+        if (!p) return;
+        const configured = Boolean(p.configured);
+        setCapabilities(current => ({ ...current, cloudflare: configured }));
+        dataRef.current = {
+          ...dataRef.current,
+          cloudflare_source_status: {
+            status: configured ? 'configured' : 'not_configured',
+            configured,
+            provider: String(p.source || 'Cloudflare Radar'),
+            timestamp: new Date().toISOString(),
+          },
+        };
+        setDataVersion(v => v + 1);
+        if (!configured) setActiveLayers(prev => ({ ...prev, cf_outages: false, cf_attacks: false }));
+      })
+      .catch(() => {
+        dataRef.current = {
+          ...dataRef.current,
+          cloudflare_source_status: { status: 'unavailable', configured: false, provider: 'Cloudflare Radar', timestamp: new Date().toISOString() },
+        };
+        setDataVersion(v => v + 1);
+      });
+    if (isEmbeddedFrame) return;
 
     // Once the user interacts, a late IP-location response must not steal the
     // camera back. The request is also cancelled when this page unmounts.
@@ -858,18 +881,15 @@ export default function Dashboard() {
     }
     // Maritime
     if ((activeLayers.maritime || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
+      fetchEndpoint('/api/maritime', d => ({
+        maritime_ports: d.ports ?? [],
+        maritime_chokepoints: d.chokepoints ?? [],
+        maritime_ships: d.ships ?? [],
+        maritime_source_status: d.source_status ?? null,
+        maritime_source: d.source ?? 'M3TM maritime reference',
+        maritime_timestamp: d.timestamp ?? null,
+      }));
       layerFetchedRef.current.add('maritime');
-    }
-    // Balloons
-    if (activeLayers.balloons && !layerFetchedRef.current.has('balloons')) {
-      fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons }));
-      layerFetchedRef.current.add('balloons');
-    }
-    // Radiation
-    if (activeLayers.radiation && !layerFetchedRef.current.has('radiation')) {
-      fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
-      layerFetchedRef.current.add('radiation');
     }
     // Live News
     if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
@@ -977,6 +997,13 @@ export default function Dashboard() {
       loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
+        cloudflare_source_status: {
+          status: d.configured === false ? 'not_configured' : d.partial ? 'partial' : 'active',
+          configured: d.configured !== false,
+          provider: d.source ?? 'Cloudflare Radar',
+          timestamp: d.timestamp ?? new Date().toISOString(),
+          partial: d.partial === true,
+        },
       }));
     }
 
@@ -991,15 +1018,6 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
     }
 
-    if (activeLayers.balloons) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons })), 300000)); // 5m
-    }
-    if (activeLayers.radiation) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/radiation', d => ({ radiation: d.stations })), 300000)); // 5m
-    }
-    if (activeLayers.maritime || activeLayers.sdk_sea) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
-    }
     if ((activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => {
         layerFetchedRef.current.delete('cyber_attacks');
@@ -1048,6 +1066,37 @@ export default function Dashboard() {
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
 
+  // Maritime earns a fast cadence only while live vessels are actually arriving.
+  // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
+  useEffect(() => {
+    if (!(activeLayers.maritime || activeLayers.sdk_sea)) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const transformMaritime = (d: any) => ({
+      maritime_ports: d.ports ?? [],
+      maritime_chokepoints: d.chokepoints ?? [],
+      maritime_ships: d.ships ?? [],
+      maritime_source_status: d.source_status ?? null,
+      maritime_source: d.source ?? 'M3TM maritime reference',
+      maritime_timestamp: d.timestamp ?? null,
+    });
+
+    const schedule = () => {
+      if (cancelled) return;
+      const liveShips = Array.isArray(dataRef.current.maritime_ships) ? dataRef.current.maritime_ships.length : 0;
+      timer = setTimeout(async () => {
+        await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
+        schedule();
+      }, liveShips > 0 ? 10_000 : 300_000);
+    };
+    schedule();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [activeLayers.maritime, activeLayers.sdk_sea, fetchEndpoint]);
   /* ── LIVE MALWARE — pushed over SSE while the layer is on ──
      Detections arrive when URLhaus reports them rather than on a timer, so
      there is no poll interval to tune and no request that re-downloads the
@@ -1758,7 +1807,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showDesktopSearch && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <SearchBar alwaysExpanded onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setShowDesktopSearch(false); }} />
+                <SearchBar alwaysExpanded center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setShowDesktopSearch(false); }} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -2013,7 +2062,7 @@ export default function Dashboard() {
                   {mobilePanel === 'intel' && <WorldFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
-                      <SearchBar onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
+                      <SearchBar center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
                     </div>
                   )}

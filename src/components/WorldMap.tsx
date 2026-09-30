@@ -108,6 +108,8 @@ function computeSolarTerminator(): [number, number][] {
 }
 
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
+const DOUBLE_RIGHT_MS = 500;
+const DOUBLE_RIGHT_SLOP_PX = 12;
 
 function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -343,7 +345,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -428,6 +430,20 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
         'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
       }, paint: { 'text-color':'#FFCCBC', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
+
+      map.addLayer({ id: 'military-satellite-activity-halo', type: 'circle', source: 'military-satellite-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,16, 2,24, 3,34],
+        'circle-color': '#AB47BC', 'circle-opacity': 0.11, 'circle-blur': 0.82,
+      }});
+      map.addLayer({ id: 'military-satellite-activity-dots', type: 'circle', source: 'military-satellite-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,4.5, 2,6.5, 3,8.5],
+        'circle-color': ['interpolate',['linear'],['get','level'], 1,'#CE93D8', 2,'#BA68C8', 3,'#AB47BC'],
+        'circle-opacity': 0.88, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#F3E5F5', 'circle-stroke-opacity': 0.55,
+      }});
+      map.addLayer({ id: 'military-satellite-activity-label', type: 'symbol', source: 'military-satellite-activity', minzoom: 2.5, layout: {
+        'text-field': ['concat','أقمار عسكرية · ',['get','approximate_count']],
+        'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.4], 'text-allow-overlap': false,
+      }, paint: { 'text-color':'#E1BEE7', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
 
       map.addLayer({ id: 'reported-routes-halo', type: 'line', source: 'reported-routes', layout: { 'line-cap':'round', 'line-join':'round' }, paint: {
         'line-color':'#D4AF37', 'line-width':5, 'line-opacity':0.12, 'line-blur':2,
@@ -984,7 +1000,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         onMouseCoords?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
       }
     });
-    map.on('contextmenu', e => { e.preventDefault(); onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }); });
+    let lastRightClick: { at: number; x: number; y: number } | null = null;
+    map.on('contextmenu', e => {
+      e.preventDefault();
+      const open = () => onRightClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      if ((e.originalEvent as PointerEvent).pointerType === 'touch') { open(); return; }
+
+      const now = performance.now();
+      const { x, y } = e.point;
+      const isSecond = lastRightClick !== null
+        && now - lastRightClick.at < DOUBLE_RIGHT_MS
+        && Math.hypot(x - lastRightClick.x, y - lastRightClick.y) < DOUBLE_RIGHT_SLOP_PX;
+      if (isSecond) {
+        lastRightClick = null;
+        open();
+      } else {
+        lastRightClick = { at: now, x, y };
+      }
+    });
     const reportViewState = () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); };
     map.on('load', reportViewState);
     map.on('moveend', reportViewState);
@@ -1206,7 +1239,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
+    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-dots','military-activity-dots','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
       'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-dots',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
@@ -1515,6 +1548,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
         <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · الزمن: نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
+      </div>`);
+    });
+
+    map.on('click', 'military-satellite-activity-dots', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const level = Number(p.level) || 1;
+      const color = level >= 3 ? '#AB47BC' : level >= 2 ? '#BA68C8' : '#CE93D8';
+      popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
+        <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط أقمار عسكرية/حكومية عام</div>
+        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">موضع إقليمي مجمّع من TLE عامة بعد انتشار SGP4. ليس قياسًا مباشرًا ولا مسارًا مداريًا فرديًا.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
+          <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '3-5')}</span></div>
+          <div><span style="color:#5C5A54;">نطاق الارتفاع</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.average_altitude_band || 'غير محدد')}</span></div>
+        </div>
+        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية ${htmlEsc(String(p.cell_degrees || 20))}° · نافذة زمنية ساعة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''} · لا أسماء/معرفات/مسارات فردية.</div>
       </div>`);
     });
 
@@ -1934,6 +1984,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       : []);
   }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, data.military_activity, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const enabled = Boolean((activeLayers as any).sat_military);
+    const cells = enabled && Array.isArray(data.military_satellite_activity) ? data.military_satellite_activity : [];
+    setGeo('military-satellite-activity', cells.map((cell: any) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [cell.lng, cell.lat] },
+      properties: {
+        level: cell.level,
+        activity: cell.activity,
+        approximate_count: cell.approximate_count,
+        average_altitude_band: cell.average_altitude_band,
+        cell_degrees: cell.cell_degrees,
+        observed_at_bucket: cell.observed_at_bucket,
+        reporting_mode: cell.reporting_mode,
+      },
+    })));
+  }, [mapReady, data.military_satellite_activity, (activeLayers as any).sat_military, setGeo]);
+
   /**
    * Pull the palette out of the document whenever it can have changed.
    *
@@ -2067,7 +2136,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Otherwise filter by enabled sub-layers
     const enabledCategories: string[] = [];
     if (al.sat_comms) enabledCategories.push('comms');
-    if (al.sat_military) enabledCategories.push('military');
+    // sat_military is intentionally rendered through the coarse aggregate
+    // source above, never by inserting individual military objects here.
     if (al.sat_navigation) enabledCategories.push('navigation');
     if (al.sat_earth) enabledCategories.push('earth_obs');
     if (al.sat_science) enabledCategories.push('science');
@@ -2533,7 +2603,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   useEffect(() => {
     if (!mapReady) return;
     setVis(['eq-circles','eq-label'], activeLayers.earthquakes);
-    const anySat = activeLayers.satellites || (activeLayers as any).sat_comms || (activeLayers as any).sat_military || (activeLayers as any).sat_navigation || (activeLayers as any).sat_earth || (activeLayers as any).sat_science;
+    const anySat = activeLayers.satellites || (activeLayers as any).sat_comms || (activeLayers as any).sat_navigation || (activeLayers as any).sat_earth || (activeLayers as any).sat_science;
     // The circle layers stay hidden whatever the toggles say — the 3D layer
     // is the single representation, and showing both drew every satellite
     // twice, once flat on the ground and once at altitude.
@@ -2554,6 +2624,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
     setVis(['fl-military-halo','fl-military'], activeLayers.military);
     setVis(['military-activity-halo','military-activity-dots','military-activity-label'], (activeLayers as any).military_activity);
+    setVis(['military-satellite-activity-halo','military-satellite-activity-dots','military-satellite-activity-label'], (activeLayers as any).sat_military);
     setVis(['cctv-glow','cctv-dots','cctv-label'], activeLayers.cctv);
     setVis(['fires-heat'], activeLayers.fires);
     setVis(['weather-glow','weather-dots','weather-label'], activeLayers.weather);

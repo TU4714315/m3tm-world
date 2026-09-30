@@ -86,6 +86,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
       { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'تجميع إقليمي واسع من TLE عامة؛ لا أسماء ولا NORAD IDs ولا مسارات فردية دقيقة' },
       { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
@@ -218,9 +219,12 @@ function statusArabic(value: unknown): string {
   switch (String(value || '')) {
     case 'ok': case 'active': return 'نشط';
     case 'configured': return 'مهيأ';
+    case 'connecting': return 'جارٍ الاتصال';
+    case 'configured_no_data': return 'مهيأ · لا رصد حي';
     case 'not_configured': return 'غير مهيأ';
     case 'unavailable': return 'غير متاح';
     case 'empty': return 'لا بيانات';
+    case 'partial': return 'جزئي';
     default: return value ? String(value) : 'لم يُفحص';
   }
 }
@@ -272,7 +276,8 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
           </div>
         </div>
       )}
-      <div className="mt-1.5 text-white/30">الأعداد بلاغات مصنفة من المصادر. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
+      {data?.conflict_summary?.timestamp && <div className="mt-1 text-white/30">آخر تحديث طبقة النزاع: {String(data.conflict_summary.timestamp)}</div>}
+      <div className="mt-1.5 text-white/30">التصنيف: بلاغات أحداث عامة حسب CAMEO ومصادر منشورة. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
     </div>
   );
 }
@@ -280,11 +285,70 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
 function MilitaryActivityStatus({ data }: { data: any }) {
   const cells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
   const meta = data?.military_activity_meta;
-  if (!meta && !cells) return null;
+  const source = data?.flight_source_status;
+  if (!meta && !source && !cells) return null;
+  const adsbMil = Number(source?.providers?.adsbfi_mil || 0);
+  const openSky = Number(source?.providers?.opensky || 0);
+  const openSkyAge = Number(source?.providers?.opensky_age_s);
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية
-      <div className="mt-1 text-white/30">رصد عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+      <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      {source && (
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
+          <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>
+          <span>ADS-B عسكري مرصود: <b className="text-white/55">{adsbMil.toLocaleString('ar-SA')}</b></span>
+          <span>OpenSky: <b className="text-white/55">{openSky.toLocaleString('ar-SA')}</b></span>
+          {Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
+        </div>
+      )}
+      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
+      <div className="mt-1 text-white/30">التصنيف: رصد ADS-B عسكري/حكومي عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+    </div>
+  );
+}
+
+function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloudflare' }) {
+  const source = kind === 'maritime'
+    ? data?.maritime_source_status?.ais
+    : data?.cloudflare_source_status;
+  if (!source) return null;
+  const provider = String(source.provider || (kind === 'maritime' ? 'AISStream.io' : 'Cloudflare Radar'));
+  const updated = source.latest_observed_at || source.timestamp || data?.maritime_timestamp || null;
+  const age = Number(source.latest_observation_age_s);
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <div className="flex flex-wrap gap-x-2 gap-y-1">
+        <span>المصدر: <b className="text-white/60">{provider}</b></span>
+        <span>الحالة: <b className="text-white/60">{statusArabic(source.status)}</b></span>
+        {Number.isFinite(age) && <span>عمر آخر رصد: <b className="text-white/60">{age < 60 ? `${Math.round(age)} ث` : `${Math.round(age / 60)} د`}</b></span>}
+      </div>
+      {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
+      {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ السطح العام لا يعرض مسارات بحرية عسكرية دقيقة.</div>}
+      {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ لا تُعرض بيانات انقطاع أو هجمات حتى إضافة اعتماد Radar: Read على الخادم.</div>}
+    </div>
+  );
+}
+
+function MilitarySatelliteActivityStatus({ data }: { data: any }) {
+  const cells = Array.isArray(data?.military_satellite_activity) ? data.military_satellite_activity.length : 0;
+  const summary = data?.military_satellite_summary;
+  const meta = data?.military_satellite_meta;
+  const source = data?.satellite_source_status;
+  if (!summary && !meta && !source && !cells) return null;
+  const catalog = Number(summary?.catalog_objects || source?.military_catalog_objects || 0);
+  const represented = Number(summary?.represented_objects || 0);
+  const withheld = Number(summary?.withheld_sparse_objects || 0);
+  return (
+    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
+      <div className="flex flex-wrap gap-x-2 gap-y-1">
+        <span>خلايا عسكرية/حكومية: <b className="text-white/60">{cells.toLocaleString('ar-SA')}</b></span>
+        <span>أجسام مصنفة في الكتالوج: <b className="text-white/60">{catalog.toLocaleString('ar-SA')}</b></span>
+        {represented > 0 && <span>ممثلة بالتجميع: <b className="text-white/60">{represented.toLocaleString('ar-SA')}</b></span>}
+        {withheld > 0 && <span>متفرقة غير معروضة: <b className="text-white/60">{withheld.toLocaleString('ar-SA')}</b></span>}
+      </div>
+      {source?.provider && <div className="mt-1 text-white/35">المصدر: {String(source.provider)} · الحالة: {statusArabic(source.status)}</div>}
+      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
+      <div className="mt-1 text-white/30">التصنيف: نشاط أقمار عسكرية/حكومية عام. المواضع تقدير SGP4 من TLE عامة بعد تجميع 20° وبحد أدنى 3 أجسام؛ لا تُعرض أسماء أو معرفات NORAD أو مسارات فردية.</div>
     </div>
   );
 }
@@ -299,6 +363,8 @@ function CameraCatalogStatus({ data }: { data: any }) {
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <p>{cameras.toLocaleString('ar-SA')} كاميرا مستلمة من {sources.toLocaleString('ar-SA')} جهات بيانات</p>
+      {status?.lastResponseAt && <p className="mt-1 text-white/30">آخر استجابة للفهرس: {String(status.lastResponseAt)}</p>}
+      <p className="mt-1 text-white/30">التصنيف: كاميرات طرق/مرور وبثوث عامة منشورة حسب المصدر.</p>
       {pending > 0 && <p className="mt-1 text-amber-300/80">{pending.toLocaleString('ar-SA')} مناطق لم تكتمل بياناتها؛ لا تُعد الكاميرات الغائبة متوقفة بالضرورة.</p>}
       {failed && <p className="mt-1 text-amber-300/80">فشل تحميل دفعة؛ ستُحاول الخدمة إعادة الجلب بحد أقصى.</p>}
       {!pending && !failed && <p className="mt-1 text-white/30">اكتملت الدفعة المطلوبة؛ لا تعني هذه الحالة أن جميع البثوث الفردية تعمل الآن.</p>}
@@ -338,22 +404,23 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     </div>
   ) : null;
 
-  /** Switch a whole group at once — off if any are on, otherwise all on. */
+  /** Switch a whole group at once — off if any available layer is on, otherwise all available layers on. */
   const toggleGroup = (layers: LayerDef[]) => {
-    const anyOn = layers.some(l => activeLayers[l.key]);
-    if (!anyOn && layers.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
+    const available = layers.filter(l => !l.requires || capabilities[l.requires] === true);
+    const anyOn = available.some(l => activeLayers[l.key]);
+    if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
     setActiveLayers((prev: any) => {
       const next = { ...prev };
-      for (const l of layers) next[l.key] = !anyOn;
+      for (const l of available) next[l.key] = !anyOn;
       return next;
     });
   };
 
-  /* Drop layers whose backing capability is not configured, then drop any group
-     left with nothing to show. */
+  /* Keep credential-gated layers visible so an absent credential is explicit
+     "غير مهيأ" rather than a disappearing control that looks accidentally missing. */
   const visibleGroups = LAYER_GROUPS.map(g => ({
     ...g,
-    layers: g.layers.filter(l => (!allowedLayerKeys || allowedLayerKeys.includes(l.key)) && (!l.requires || capabilities[l.requires])),
+    layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
   })).filter(g => g.layers.length > 0);
 
   const getCount = (dk: string, catKey?: string): number | null => {
@@ -387,13 +454,16 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 const isLayerActive = activeLayers[layer.key];
                 const count = getCount(layer.dataKey, layer.catKey);
                 const dormant = !!layer.parent && !activeLayers[layer.parent];
+                const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
                 return (
                   <button
                     key={layer.key}
-                    onClick={() => toggle(layer.key)}
+                    onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
+                    disabled={capabilityUnavailable}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
-                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
+                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : undefined}
+                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
@@ -402,7 +472,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                     </span>
                     <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                      {isLayerActive ? 'نشط' : 'متوقف'}
+                      {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
                     </span>
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
@@ -415,6 +485,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
               {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
+              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
+              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
               {group.label === 'العرض' && terrainDetails}
             </div>
           </div>
@@ -581,15 +654,17 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         const isLayerActive = activeLayers[layer.key];
                         const count = getCount(layer.dataKey, layer.catKey);
                         const dormant = !!layer.parent && !activeLayers[layer.parent];
+                        const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
 
                         return (
                           <button
                             key={layer.key}
-                            onClick={() => toggle(layer.key)}
+                            onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
+                            disabled={capabilityUnavailable}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
-                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors cursor-pointer text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
+                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
+                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {layer.parent && <SubLayerStem />}
                             <ToggleSwitch active={!!isLayerActive} />
@@ -598,7 +673,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                             </span>
                             <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                              {isLayerActive ? 'نشط' : 'متوقف'}
+                              {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
                             </span>
                             {count !== null && (
                               <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
@@ -611,6 +686,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
               {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
               {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
+              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
+              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
+              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
               {group.label === 'العرض' && terrainDetails}
                     </div>
                   </motion.div>

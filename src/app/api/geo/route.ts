@@ -1,97 +1,84 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { visitorIp } from '@/lib/ssrf-guard';
 
-// Server-side proxy for IP geolocation — avoids mixed-content block on HTTPS pages
-// Three providers with cascading fallback for maximum reliability
-export async function GET(request: NextRequest) {
+const NO_STORE = { 'Cache-Control': 'private, no-store' };
+
+type GeoReply = {
+  status: 'success' | 'unavailable';
+  lat?: number;
+  lon?: number;
+  city?: string;
+  regionName?: string;
+  country?: string;
+  reason?: string;
+};
+
+function success(lat: unknown, lon: unknown, city: unknown, region: unknown, country: unknown): GeoReply | null {
+  const latitude = Number(lat);
+  const longitude = Number(lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return {
+    status: 'success',
+    lat: latitude,
+    lon: longitude,
+    city: typeof city === 'string' ? city : '',
+    regionName: typeof region === 'string' ? region : '',
+    country: typeof country === 'string' ? country : '',
+  };
+}
+
+// Server-side proxy for coarse visitor geolocation. The public response omits
+// the visitor IP, ASN, ISP and organization because the map only needs a city
+// coordinate for its optional fly-in.
+export async function GET(request: Request) {
   try {
-    // Extract the real client IP from standard proxy headers
-    const clientIp =
-      request.headers.get('cf-connecting-ip') ||        // Cloudflare
-      request.headers.get('x-real-ip') ||                // Nginx / generic
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      '';
+    const ip = visitorIp(request) ?? '';
 
-    // Skip private/loopback IPs — let the API auto-detect
-    const isPrivate = !clientIp || clientIp === '::1' || clientIp === '127.0.0.1' || clientIp.startsWith('192.168.') || clientIp.startsWith('10.') || clientIp.startsWith('172.');
-    const ip = isPrivate ? '' : clientIp;
+    // Never ask a provider to auto-detect the server in production when the
+    // visitor address is unavailable; that would mislocate every such visitor.
+    if (!ip && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ status: 'unavailable', reason: 'Visitor address unknown' } satisfies GeoReply, { headers: NO_STORE });
+    }
 
-    // ── Provider 1: ipapi.co (HTTPS, free tier 1000/day) ──
     try {
       const url = ip ? `https://ipapi.co/${ip}/json/` : 'https://ipapi.co/json/';
       const res = await fetch(url, {
         signal: AbortSignal.timeout(5000),
         cache: 'no-store',
-        headers: { 'User-Agent': 'OSIRIS/4.2' },
+        headers: { 'User-Agent': 'M3TM-WORLD/1.0 (+https://m3tm.world)' },
       });
       if (res.ok) {
         const d = await res.json();
-        if (!d.error && d.latitude) {
-          return NextResponse.json({
-            status: 'success',
-            query: d.ip,
-            lat: d.latitude,
-            lon: d.longitude,
-            city: d.city,
-            regionName: d.region,
-            country: d.country_name,
-            isp: d.org || 'غير معروف',
-            org: d.org || 'غير معروف',
-            as: d.asn ? `AS${d.asn} ${d.org}` : 'غير معروف',
-          });
-        }
+        const body = !d.error && success(d.latitude, d.longitude, d.city, d.region, d.country_name);
+        if (body) return NextResponse.json(body, { headers: NO_STORE });
       }
     } catch { /* fall through */ }
 
-    // ── Provider 2: freeipapi.com (HTTPS, no key needed) ──
     try {
       const url = ip ? `https://freeipapi.com/api/json/${ip}` : 'https://freeipapi.com/api/json';
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(5000),
-        cache: 'no-store',
-      });
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
       if (res.ok) {
         const d = await res.json();
-        if (d.latitude) {
-          return NextResponse.json({
-            status: 'success',
-            query: d.ipAddress || ip || 'تلقائي',
-            lat: d.latitude,
-            lon: d.longitude,
-            city: d.cityName || 'غير معروف',
-            regionName: d.regionName || 'غير معروف',
-            country: d.countryName || 'غير معروف',
-            isp: d.isp || 'غير معروف',
-            org: d.isp || 'غير معروف',
-            as: 'غير معروف',
-          });
-        }
+        const body = success(d.latitude, d.longitude, d.cityName, d.regionName, d.countryName);
+        if (body) return NextResponse.json(body, { headers: NO_STORE });
       }
     } catch { /* fall through */ }
 
-    // ── Provider 3: ip-api.com (HTTP — safe here because this is server-to-server) ──
     try {
       const url = ip
-        ? `http://ip-api.com/json/${ip}?fields=status,lat,lon,city,regionName,country,query,isp,org,as`
-        : 'http://ip-api.com/json/?fields=status,lat,lon,city,regionName,country,query,isp,org,as';
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(5000),
-        cache: 'no-store',
-      });
+        ? `http://ip-api.com/json/${ip}?fields=status,lat,lon,city,regionName,country`
+        : 'http://ip-api.com/json/?fields=status,lat,lon,city,regionName,country';
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000), cache: 'no-store' });
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'success') {
-          return NextResponse.json(data);
-        }
+        const d = await res.json();
+        const body = d.status === 'success' && success(d.lat, d.lon, d.city, d.regionName, d.country);
+        if (body) return NextResponse.json(body, { headers: NO_STORE });
       }
     } catch { /* fall through */ }
 
-    // Geolocation is an optional convenience. A provider outage must not turn a
-    // healthy public WORLD load into a browser-visible 5xx. The client already
-    // requires status === 'success' before moving the camera, so an explicit
-    // unavailable state preserves behavior without inventing a location.
-    return NextResponse.json({ status: 'unavailable', reason: 'تعذر تحديد الموقع تلقائيًا' });
-  } catch (e) {
-    console.warn('[M3TM.WORLD] Geolocation unavailable:', e instanceof Error ? e.message : e);
-    return NextResponse.json({ status: 'unavailable', reason: 'تعذر تحديد الموقع تلقائيًا' });
+    return NextResponse.json({ status: 'unavailable', reason: 'Geolocation providers unavailable' } satisfies GeoReply, { headers: NO_STORE });
+  } catch (error) {
+    console.warn('[M3TM.WORLD] Geolocation unavailable:', error instanceof Error ? error.message : error);
+    return NextResponse.json({ status: 'unavailable', reason: 'Geolocation unavailable' } satisfies GeoReply, { headers: NO_STORE });
   }
 }

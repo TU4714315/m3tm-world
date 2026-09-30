@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { propagateTLE } from '@/lib/orbit';
+import { buildPublicMilitarySatelliteActivity } from '@/lib/publicMilitarySatelliteActivity';
 
 export const maxDuration = 60;
 
@@ -333,9 +334,13 @@ export async function GET() {
       });
     }
 
-    // Public WORLD exposes only explicitly public-safe mission families. Unknown
-    // objects are intentionally excluded because name-based classification alone
-    // cannot prove that an unlabelled active-catalog object is non-sensitive.
+    // Preserve useful awareness of the military/government TLE catalogue without
+    // publishing individual names, NORAD IDs or exact propagated tracks. The
+    // public map receives only large 20° cells with a minimum group of three.
+    const militaryProjection = buildPublicMilitarySatelliteActivity(satellites);
+
+    // Public WORLD exposes only explicitly public-safe mission families as
+    // individual 3D objects. Unknown and military rows remain server-side.
     const publicSafeCategories = new Set(['comms', 'navigation', 'earth_obs', 'science']);
     const publicSatellites = satellites.filter((satellite) => publicSafeCategories.has(satellite.category));
 
@@ -349,13 +354,27 @@ export async function GET() {
       categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
     }
 
+    const timestamp = new Date().toISOString();
+
     return NextResponse.json({
       satellites: publicSatellites,
       total: publicSatellites.length,
       category_counts: categoryCounts,
+      military_satellite_activity: militaryProjection.activity,
+      military_satellite_summary: militaryProjection.summary,
+      military_satellite_meta: militaryProjection.meta,
+      satellite_source_status: {
+        status: publicSatellites.length || militaryProjection.summary.catalog_objects ? 'active' : 'empty',
+        provider: source,
+        raw_tle_count: allSats.length,
+        public_individual_objects: publicSatellites.length,
+        military_catalog_objects: militaryProjection.summary.catalog_objects,
+        military_public_cells: militaryProjection.activity.length,
+        timestamp,
+      },
       source,
       raw_count: allSats.length,
-      timestamp: new Date().toISOString(),
+      timestamp,
     }, {
       headers: {
         'Cache-Control': cacheControl,
