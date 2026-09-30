@@ -10,6 +10,9 @@ on:
       - 'public/data/ne110-land-boundaries.geojson'
       - 'src/components/LayerPanel.tsx'
       - 'src/lib/publicLayerData*'
+      - 'src/lib/map-terrain*'
+      - 'src/lib/terrain-source-attribution*'
+      - 'src/app/terrain-sources/page.tsx'
       - 'src/app/api/cctv/**'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
