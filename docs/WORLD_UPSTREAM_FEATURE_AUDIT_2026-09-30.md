@@ -38,6 +38,7 @@ This is a data-precision boundary applied independent of actor/country; it is no
 | `gps_jamming` | Upstream flight API exposes derived data | M3TM public API returns empty | Not presented as operational in public WORLD. |
 | `war_alerts` | Key appears in upstream page state | No working layer in M3TM | Upstream search found no corresponding LayerPanel/render/source implementation. It is not a functioning upstream feature to copy as-is. |
 | camera-source expansion | Yes | Yes | Prior parity work registered the reviewed upstream public camera categories; runtime availability remains source-specific. |
+| camera timeout backoff (#403) | Yes | Added in follow-up | Timed-out regions enter a 5-minute cooldown instead of spending the full 12-second regional budget on every catalogue refresh; successful regions and cached camera indexes are unchanged. |
 
 ## Current public conflict evidence contract
 
