@@ -499,7 +499,6 @@ docker compose up -d`}</Pre>
                 { key: 'F', desc: 'Toggle fullscreen' },
                 { key: 'S', desc: 'Share current view' },
                 { key: 'L', desc: 'Toggle layer panel' },
-                { key: 'M', desc: 'Toggle markets panel' },
                 { key: 'I', desc: 'إظهار/إخفاء موجز الأخبار' },
                 { key: 'R', desc: 'Reset to global view' },
                 { key: '?', desc: 'Show help' },
