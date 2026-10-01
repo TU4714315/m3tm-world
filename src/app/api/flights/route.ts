@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { buildFlightSummary } from '@/lib/flightSummary';
 
 export const maxDuration = 60;
 
@@ -300,6 +301,13 @@ const OPENSKY_COOLDOWN = 15 * 60 * 1000; // 15 min
 let osToken: string | null = null;
 let osTokenExpiry = 0;
 
+function respond(req: Request, data: any, cacheControl: string) {
+  const summaryOnly = new URL(req.url).searchParams.get('summary') === '1';
+  return NextResponse.json(summaryOnly ? buildFlightSummary(data) : data, {
+    headers: { 'Cache-Control': cacheControl },
+  });
+}
+
 async function getOpenSkyToken(): Promise<string | null> {
   const id = process.env.OPENSKY_CLIENT_ID;
   const secret = process.env.OPENSKY_CLIENT_SECRET;
@@ -337,21 +345,17 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const now = Date.now();
 
   if (cachedData && now - lastFetchTime < CACHE_TTL) {
-    return NextResponse.json(cachedData, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
-    });
+    return respond(req, cachedData, 'public, s-maxage=30, stale-while-revalidate=60');
   }
 
   if (fetchPromise) {
     try {
       const data = await fetchPromise;
-      return NextResponse.json(data, {
-        headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
-      });
+      return respond(req, data, 'public, s-maxage=30, stale-while-revalidate=60');
     } catch {
       return NextResponse.json({ error: 'Failed to fetch flight data' }, { status: 500 });
     }
@@ -554,20 +558,22 @@ export async function GET() {
     cachedData = data;
     lastFetchTime = Date.now();
     fetchPromise = null;
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': data.total < 100 ? 'no-store, max-age=0' : 'public, s-maxage=30, stale-while-revalidate=60',
-      },
-    });
+    return respond(
+      req,
+      data,
+      data.total < 100 ? 'no-store, max-age=0' : 'public, s-maxage=30, stale-while-revalidate=60',
+    );
   } catch (error) {
     console.error('[OSIRIS] Flight fetch error:', error);
     fetchPromise = null;
     // Stale-cache fallback: return last known good data instead of blank map
     if (cachedData) {
       console.warn('[OSIRIS] Returning stale flight cache as fallback');
-      return NextResponse.json({ ...cachedData, source: (cachedData.source || 'unknown') + '+stale' }, {
-        headers: { 'Cache-Control': 'no-store, max-age=0' },
-      });
+      return respond(
+        req,
+        { ...cachedData, source: (cachedData.source || 'unknown') + '+stale' },
+        'no-store, max-age=0',
+      );
     }
     return NextResponse.json({ error: 'Failed to fetch flight data' }, { status: 500 });
   }
