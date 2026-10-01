@@ -717,7 +717,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'icon-image': ['match',['upcase',['coalesce',['get','kind'],'']],
           'EQ','incident-eq', 'EARTHQUAKE','incident-eq',
           'FL','incident-fl', 'FLOOD','incident-fl',
-          'TC','incident-tc', 'CYCLONE','incident-tc',
+          'TC','incident-tc', 'CYCLONE','incident-tc', 'WEATHER','incident-tc',
           'VO','incident-vo', 'VOLCANO','incident-vo',
           'WF','incident-wf', 'WILDFIRE','incident-wf',
           'DR','incident-dr', 'DROUGHT','incident-dr',
@@ -2740,8 +2740,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['sat-glow','sat-dots'], false);
     // Clearing the 3D layer is what actually turns satellites off.
     if (!anySat) { satRowsRef.current = []; satLayerRef.current?.setPoints([]); }
-    setVis(['gdelt-incident-icons'], activeLayers.global_incidents);
-    setVis(['gdelt-event-icons'], (activeLayers as any).gdelt_events);
+    setVis(['gdelt-incident-halo','gdelt-incident-icons'], activeLayers.global_incidents);
+    setVis(['gdelt-event-halo','gdelt-event-icons'], (activeLayers as any).gdelt_events);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
 
@@ -2766,7 +2766,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['app-news-glow','app-news-dots','app-news-label'], (activeLayers as any).app_news);
     setVis(['country-boundary-reference','country-boundary-contested'], (activeLayers as any).country_borders);
     setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
-    setVis(['conflict-zone-halo','conflict-event-icons','conflict-icons'], activeLayers.conflict_zones !== false);
+    setVis(['conflict-zone-halo','conflict-event-halo','conflict-event-icons','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
     setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);
 
