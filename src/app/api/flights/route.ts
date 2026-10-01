@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { buildFlightSummary } from '@/lib/flightSummary';
 
 export const maxDuration = 60;
 
@@ -128,13 +129,19 @@ const ADSBFI_MIL_URL = `${ADSBFI_ROOT}/v2/mil`;
 // returning 200 with an empty ac[] rather than 429, so a parallel fanout looks
 // like it succeeded while returning nothing. The regional sweep is paced.
 const ADSBFI_GAP_MS = 1100;
+const FLIGHT_REFRESH_BUDGET_MS = 45_000;
+const OPENSKY_FETCH_TIMEOUT_MS = 10_000;
+const OPENSKY_TOKEN_TIMEOUT_MS = 6_000;
+const REGIONAL_REQUEST_TIMEOUT_MS = 3_000;
+const FLIGHT_REFRESH_STOP_MARGIN_MS = 2_500;
 
 // adsb.fi serves /mil but returns 400 for /ladd, /pia and /squawk/{code},
 // so the global type feeds collapse to the military one.
-async function fetchAdsbFiRegion(lat: number, lon: number): Promise<any[]> {
+async function fetchAdsbFiRegion(lat: number, lon: number, timeoutMs = REGIONAL_REQUEST_TIMEOUT_MS): Promise<any[]> {
   try {
+    const boundedTimeout = Math.max(500, Math.min(REGIONAL_REQUEST_TIMEOUT_MS, timeoutMs));
     const res = await stealthFetch(`${ADSBFI_REGION_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(boundedTimeout),
     });
     if (res.ok) {
       const data = await res.json();
@@ -300,6 +307,13 @@ const OPENSKY_COOLDOWN = 15 * 60 * 1000; // 15 min
 let osToken: string | null = null;
 let osTokenExpiry = 0;
 
+function respond(req: Request, data: any, cacheControl: string) {
+  const summaryOnly = new URL(req.url).searchParams.get('summary') === '1';
+  return NextResponse.json(summaryOnly ? buildFlightSummary(data) : data, {
+    headers: { 'Cache-Control': cacheControl },
+  });
+}
+
 async function getOpenSkyToken(): Promise<string | null> {
   const id = process.env.OPENSKY_CLIENT_ID;
   const secret = process.env.OPENSKY_CLIENT_SECRET;
@@ -312,7 +326,7 @@ async function getOpenSkyToken(): Promise<string | null> {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: secret }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(OPENSKY_TOKEN_TIMEOUT_MS),
       }
     );
     if (!res.ok) { console.warn('[OSIRIS] OpenSky token failed:', res.status); return null; }
@@ -337,21 +351,17 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const now = Date.now();
 
   if (cachedData && now - lastFetchTime < CACHE_TTL) {
-    return NextResponse.json(cachedData, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
-    });
+    return respond(req, cachedData, 'public, s-maxage=30, stale-while-revalidate=60');
   }
 
   if (fetchPromise) {
     try {
       const data = await fetchPromise;
-      return NextResponse.json(data, {
-        headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
-      });
+      return respond(req, data, 'public, s-maxage=30, stale-while-revalidate=60');
     } catch {
       return NextResponse.json({ error: 'Failed to fetch flight data' }, { status: 500 });
     }
@@ -360,6 +370,9 @@ export async function GET() {
   const JAMMING_NACAP_THRESHOLD = 4;
 
   fetchPromise = (async () => {
+    // Hard wall-clock budget keeps the serverless route below maxDuration even
+    // when OpenSky and the regional fallback are both degraded.
+    const refreshDeadline = Date.now() + FLIGHT_REFRESH_BUDGET_MS;
     const allRaw: any[] = [];
     const seenHex = new Set<string>();
     let source: string;
@@ -374,11 +387,11 @@ export async function GET() {
       Date.now() - osSnapshotTime < openSkyInterval();
     const token = skipOpenSky ? null : await getOpenSkyToken();
     const osInit: RequestInit = token
-      ? { signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}` } }
-      : { signal: AbortSignal.timeout(30000) };
+      ? { signal: AbortSignal.timeout(OPENSKY_FETCH_TIMEOUT_MS), headers: { Authorization: `Bearer ${token}` } }
+      : { signal: AbortSignal.timeout(OPENSKY_FETCH_TIMEOUT_MS) };
 
     const [milRes, osRes] = await Promise.allSettled([
-      stealthFetch(ADSBFI_MIL_URL, { signal: AbortSignal.timeout(15000) }),
+      stealthFetch(ADSBFI_MIL_URL, { signal: AbortSignal.timeout(OPENSKY_FETCH_TIMEOUT_MS) }),
       skipOpenSky
         ? Promise.reject(new Error('OpenSky in cooldown'))
         // extended=1 appends the ADS-B emitter category as an 18th field. Without
@@ -454,7 +467,19 @@ export async function GET() {
       console.warn('[OSIRIS] no OpenSky snapshot — falling back to adsb.fi regional sweep');
 
       for (const r of REGIONS) {
-        ingestAc(await fetchAdsbFiRegion(r.lat, r.lon), allRaw, seenHex);
+        const remaining = refreshDeadline - Date.now();
+        if (remaining <= FLIGHT_REFRESH_STOP_MARGIN_MS) {
+          console.warn('[OSIRIS] regional flight sweep stopped at refresh deadline');
+          break;
+        }
+        const requestBudget = Math.min(
+          REGIONAL_REQUEST_TIMEOUT_MS,
+          Math.max(500, remaining - ADSBFI_GAP_MS - FLIGHT_REFRESH_STOP_MARGIN_MS),
+        );
+        ingestAc(await fetchAdsbFiRegion(r.lat, r.lon, requestBudget), allRaw, seenHex);
+
+        const afterRequestRemaining = refreshDeadline - Date.now();
+        if (afterRequestRemaining <= ADSBFI_GAP_MS + FLIGHT_REFRESH_STOP_MARGIN_MS) break;
         await new Promise(resolve => setTimeout(resolve, ADSBFI_GAP_MS));
       }
 
@@ -554,20 +579,22 @@ export async function GET() {
     cachedData = data;
     lastFetchTime = Date.now();
     fetchPromise = null;
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': data.total < 100 ? 'no-store, max-age=0' : 'public, s-maxage=30, stale-while-revalidate=60',
-      },
-    });
+    return respond(
+      req,
+      data,
+      data.total < 100 ? 'no-store, max-age=0' : 'public, s-maxage=30, stale-while-revalidate=60',
+    );
   } catch (error) {
     console.error('[OSIRIS] Flight fetch error:', error);
     fetchPromise = null;
     // Stale-cache fallback: return last known good data instead of blank map
     if (cachedData) {
       console.warn('[OSIRIS] Returning stale flight cache as fallback');
-      return NextResponse.json({ ...cachedData, source: (cachedData.source || 'unknown') + '+stale' }, {
-        headers: { 'Cache-Control': 'no-store, max-age=0' },
-      });
+      return respond(
+        req,
+        { ...cachedData, source: (cachedData.source || 'unknown') + '+stale' },
+        'no-store, max-age=0',
+      );
     }
     return NextResponse.json({ error: 'Failed to fetch flight data' }, { status: 500 });
   }
