@@ -361,3 +361,13 @@ M3TM.WORLD
 - أضيفت اختبارات لفلترة payload العامة، نقاط خط التاريخ المتجاورة، والانقسام شرقًا وغربًا عند antimeridian.
 - Vercel check على head الخاص بـPR #12 = success قبل الدمج، ولم تظهر review threads جديدة على PR #12 وقت الإغلاق.
 
+
+
+## نقطة الاستئناف الجديدة — 2026-10-01 · Map Quality Phase 1
+- المرجع التنفيذي الجديد للمحادثات القادمة: `docs/M3TM_WORLD_QUALITY_AND_OSINT_ROADMAP_2026-10-01.md`.
+- الفرع الجاري: `feat/world-phase1-map-clarity-20261001`.
+- أُغلقت في الكود: إزالة Markets وBluetooth/Remote من واجهة WORLD العامة، تبسيط شريط الجوال، تكبير touch targets، واستبدال نقاط الأحداث الصغيرة برموز دلالية حسب النوع في GDELT / conflict zones / M3TM.APP field alerts / GDACS.
+- تحسين عرض ArcGIS World Imagery في الكود: zoom ceiling حتى 20 مع raster opacity/contrast/saturation tuning وlinear resampling، من دون تغيير المزود أو الإسناد.
+- فحص OSIRIS upstream الحي في 2026-10-01: أحدث commit مدمج ظاهر هو `d972d9af5c6f45aebf6d60b8a60f229a8abbe2f1` (Sweden CCTV #404). ملف Sweden في M3TM يطابق upstream blob `a630aacc5f07060cd24dfce14b95a0abaa2b9625` حرفيًا؛ لا port مكرر.
+- لا تنتقل إلى Entity Graph أو OSINT Orchestrator قبل إغلاق Phase 1E: TypeScript/tests/build + browser QA Mobile 390x844/Desktop + PR/CI.
+- بعد إغلاق Phase 1 فقط، الترتيب الإلزامي: Unified Entity Graph → Internal OSINT Orchestrator → RAW/Evidence Pipeline → Neutral TXT Reporting Agent → Continuous Quality Gate.

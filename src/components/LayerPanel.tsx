@@ -124,9 +124,9 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
       { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
-      { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'ميزة alert_pins من المشروع الأصلي بعد تكييفها مع M3TM.APP: ضربات/مسيّرات/صواريخ/دفاع جوي/قتال بري/بحري/معدات كما يذكرها الناشر، بإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
-      { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO: أسلحة جوية/ثقيلة/تفجيرات/اشتباكات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
+      { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'رموز مميزة حسب النوع: ضربة، مسيّرة، صاروخ، دفاع جوي، قتال بري، حدث بحري أو معدات؛ كلها كما يذكرها الناشر وبإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
+      { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', description: 'رمز مختلف للزلزال والفيضان والإعصار والبركان والحريق والجفاف عند توفر نوع الحدث من المصدر', dataKey: 'gdelt' },
+      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO مع رموز مستقلة للأسلحة الجوية والثقيلة والتفجيرات والاشتباكات والاعتداءات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
     ],
   },
   {
