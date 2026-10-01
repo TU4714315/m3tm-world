@@ -15,7 +15,13 @@ async function parseJson(result: SettledResponse): Promise<any | null> {
 
 function sourceState(result: SettledResponse, parsed: any | null) {
   if (result.status === 'rejected') return { ok: false, status: 0 };
-  return { ok: result.value.ok && parsed !== null, status: result.value.status };
+  const applicationStatus = typeof parsed?.status === 'string' ? parsed.status : null;
+  const applicationHealthy = applicationStatus !== 'degraded' && applicationStatus !== 'unavailable';
+  return {
+    ok: result.value.ok && parsed !== null && applicationHealthy,
+    status: result.value.status,
+    ...(applicationStatus ? { application_status: applicationStatus } : {}),
+  };
 }
 
 /**
