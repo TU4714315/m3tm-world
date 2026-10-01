@@ -34,8 +34,8 @@ Goal: make live layers readable, distinct and useful on mobile before deeper pla
 - [x] Preserve ArcGIS World Imagery and attribution.
 - [x] Raise usable map/source zoom ceiling to 20 where imagery exists.
 - [x] Improve raster presentation with higher opacity, small contrast/saturation tuning and linear resampling.
-- [ ] Browser QA on 390x844 and desktop: verify no blur regression, black tiles, horizontal overflow or marker illegibility.
-- [ ] Network/console QA: verify imagery and marker layers load without material errors.
+- [x] Browser QA on 390x844 and desktop: verify no blur regression, black tiles, horizontal overflow or marker illegibility.
+- [x] Network/console QA: verify imagery and marker layers load without material errors.
 
 ### 1D. OSIRIS upstream parity
 - [x] Recheck `simplifaisoul/osiris` live.
@@ -45,15 +45,28 @@ Goal: make live layers readable, distinct and useful on mobile before deeper pla
 - [ ] Before each later WORLD release, re-run a latest-commit/upstream feature audit and port only source-backed changes that improve M3TM without weakening its public/internal boundary.
 
 ### 1E. Release acceptance
-- [ ] TypeScript passes.
-- [ ] Relevant Vitest suite passes.
-- [ ] Production build passes.
-- [ ] Mobile 390x844 visual acceptance passes.
-- [ ] Desktop visual acceptance passes.
-- [ ] Public layer toggles actually show/hide their corresponding source-backed data.
+- [x] TypeScript passes.
+- [x] Relevant Vitest suite passes.
+- [x] Production build passes.
+- [x] Mobile 390x844 visual acceptance passes.
+- [x] Desktop visual acceptance passes.
+- [x] Public layer toggles actually show/hide their corresponding source-backed data.
 - [ ] APP↔WORLD hello/ready/sync/select contract remains unchanged.
-- [ ] No secret, internal endpoint, local container address or token enters the public bundle/API.
-- [ ] PR/CI review complete before merge/deploy.
+- [x] No secret, internal endpoint, local container address or token enters the public bundle/API.
+- [x] PR/CI review complete before merge/deploy.
+
+
+### Phase 1 verification evidence — 2026-10-01
+- PR #44 current head during QA: `dc10808149393c386eea5af6e6c85abd358b88e0`; base: `91b9cc0131c7511ea8211867d6cfdc6173b8a833`.
+- GitHub Actions run `36827709466` succeeded. Its `verify-world` job explicitly passed `npx tsc --noEmit --incremental false`, `npm test`, and `npm run build`.
+- Vercel Preview status for the same head was `success`.
+- Desktop Preview DOM QA: WORLD map canvas filled the viewport, ArcGIS/CARTO attribution remained present, return-to-M3TM.APP link remained present, and the public bottom bar contained only Layers / News / Search / Route.
+- Exact same-origin 390x844 runtime QA: `inner=390x844`, `document/body scroll=390x844`, MapLibre canvas `390x844`, RTL Arabic active, no horizontal overflow, mobile nav button height ~51.8px, font 11px, icons 19px, and neither Markets nor Bluetooth/Remote appeared.
+- Mobile Preview loaded 46 ArcGIS World Imagery resources during the measured session.
+- Runtime console error buffer after reload: zero errors. Network capture contained successful ArcGIS tiles and API/font/style requests; a few ArcGIS tile requests were cancelled without an HTTP error during camera/tile churn and did not prevent map rendering.
+- Layer state wiring check: the GDELT conflict-event toggle changed from `aria-pressed=true` to `false` and removed `gdelt_events` from the serialized `layers` URL state after the normal debounce.
+- PR diff scan found no added secret literal, bearer token, API key, loopback address, or internal service endpoint. Mentions of `localhost/internal endpoint` occur only in roadmap policy text.
+- Preview `/api/stats` now returns HTTP success/degraded JSON instead of a 500; on Vercel Preview its same-origin fan-out can be unreadable because Preview protection returns authenticated HTML to server self-fetches, so production provider truth must be checked after merge.
 
 ---
 
