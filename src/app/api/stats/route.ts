@@ -22,6 +22,10 @@ function sourceState(result: SettledResponse, parsed: any | null) {
  * OSIRIS — Global Stats API
  * Lightweight aggregation endpoint.
  *
+ * Flight aggregation uses /api/flights?summary=1 so this endpoint never
+ * serializes/parses the multi-megabyte aircraft payload merely to count it.
+ * The 50s flight budget covers the route's bounded ~33s regional fallback.
+ *
  * A failed or malformed upstream must never make the whole dashboard counter
  * endpoint fail. Counts are best-effort and the response explicitly reports
  * degraded state when one or more source APIs could not be read.
@@ -40,7 +44,7 @@ export async function GET(req: Request) {
     const origin = new URL(req.url).origin;
 
     const settled = await Promise.allSettled([
-      fetch(`${origin}/api/flights`, { signal: AbortSignal.timeout(20000), next: { revalidate: 45 } }),
+      fetch(`${origin}/api/flights?summary=1`, { signal: AbortSignal.timeout(50000), next: { revalidate: 45 } }),
       fetch(`${origin}/api/satellites`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/cctv`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/weather`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } }),
@@ -53,10 +57,12 @@ export async function GET(req: Request) {
 
     const stats = {
       flights:
-        (flightsData?.commercial_flights?.length || 0) +
-        (flightsData?.private_flights?.length || 0) +
-        (flightsData?.private_jets?.length || 0) +
-        (flightsData?.military_flights?.length || 0),
+        Number.isFinite(Number(flightsData?.counts?.public_total))
+          ? Number(flightsData.counts.public_total)
+          : (flightsData?.commercial_flights?.length || 0) +
+            (flightsData?.private_flights?.length || 0) +
+            (flightsData?.private_jets?.length || 0) +
+            (flightsData?.military_flights?.length || 0),
       sats: satsData?.satellites?.length || 0,
       cctv: cctvData?.cameras?.length || 0,
       weather: weatherData?.events?.length || weatherData?.weather_events?.length || 0,
