@@ -1943,8 +1943,9 @@ export default function Dashboard() {
                     aria-pressed={active}
                     disabled={isRoute && Boolean(navSession)}
                     className={`mobile-nav-btn ${active ? 'active' : ''}`}
+                    style={{ fontSize: '11px', minHeight: '48px', padding: '6px 5px' }}
                   >
-                    <tab.icon className="w-4 h-4" />
+                    <tab.icon style={{ width: 19, height: 19 }} />
                     <span>{tab.label}</span>
                   </button>
                 );
