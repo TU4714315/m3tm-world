@@ -58,4 +58,15 @@ describe('flight summary projection', () => {
       flight_source_status: { status: 'empty', providers: {} },
     }).status).toBe('degraded');
   });
+
+  it('reports stale fallback data as degraded even when cached rows exist', () => {
+    expect(buildFlightSummary({
+      commercial_flights: [{ icao24: 'stale-row' }],
+      private_flights: [],
+      private_jets: [],
+      military_activity: [],
+      flight_source_status: { status: 'active', providers: {} },
+      source: 'opensky-anon+stale',
+    }).status).toBe('degraded');
+  });
 });
