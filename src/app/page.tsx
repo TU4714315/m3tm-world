@@ -220,7 +220,6 @@ export default function Dashboard() {
   const [embeddedNewsItems, setEmbeddedNewsItems] = useState<EmbeddedNewsItem[]>([]);
   const [embeddedRoute, setEmbeddedRoute] = useState<EmbeddedRoute | null>(null);
   const worldMapReadyRef = useRef(false);
-  const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -572,16 +571,6 @@ export default function Dashboard() {
       window.history.replaceState(null, '', url);
     }, 1500);
   }, [activeLayers]);
-
-  // Global Stats Fetch
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(d => {
-        if (d.stats) setGlobalStats(d.stats);
-      })
-      .catch(console.error);
-  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
