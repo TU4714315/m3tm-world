@@ -25,10 +25,12 @@ export function buildFlightSummary(data: any): FlightSummary {
   const jets = count(data?.private_jets);
   const publicTotal = commercial + privateFlights + jets;
   const sourceStatus = String(data?.flight_source_status?.status || '');
+  const source = typeof data?.source === 'string' ? data.source : null;
+  const stale = Boolean(source && source.endsWith('+stale'));
   const militaryMeta = data?.military_activity_meta || {};
 
   return {
-    status: sourceStatus === 'active' || publicTotal > 0 ? 'operational' : 'degraded',
+    status: !stale && (sourceStatus === 'active' || publicTotal > 0) ? 'operational' : 'degraded',
     counts: {
       commercial,
       private: privateFlights,
@@ -41,7 +43,7 @@ export function buildFlightSummary(data: any): FlightSummary {
       exact_tracks_exposed: false,
       identifiers_exposed: false,
     },
-    source: typeof data?.source === 'string' ? data.source : null,
+    source,
     providers:
       data?.flight_source_status?.providers && typeof data.flight_source_status.providers === 'object'
         ? data.flight_source_status.providers
