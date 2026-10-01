@@ -30,7 +30,7 @@ function sourceState(result: SettledResponse, parsed: any | null) {
  *
  * Flight aggregation uses /api/flights?summary=1 so this endpoint never
  * serializes/parses the multi-megabyte aircraft payload merely to count it.
- * The 50s flight budget covers the route's bounded ~33s regional fallback.
+ * The 55s flight budget exceeds the route's hard 45s refresh budget.
  *
  * A failed or malformed upstream must never make the whole dashboard counter
  * endpoint fail. Counts are best-effort and the response explicitly reports
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     const origin = new URL(req.url).origin;
 
     const settled = await Promise.allSettled([
-      fetch(`${origin}/api/flights?summary=1`, { signal: AbortSignal.timeout(50000), next: { revalidate: 45 } }),
+      fetch(`${origin}/api/flights?summary=1`, { signal: AbortSignal.timeout(55000), next: { revalidate: 45 } }),
       fetch(`${origin}/api/satellites`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/cctv`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/weather`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } }),
