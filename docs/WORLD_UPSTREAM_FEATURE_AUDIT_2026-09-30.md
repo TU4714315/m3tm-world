@@ -44,7 +44,7 @@ This data-precision boundary is applied independent of actor/country. The reposi
 | camera-source expansion | Yes | Yes | Prior parity work registered the reviewed upstream public camera categories; runtime availability remains source-specific. |
 | camera timeout backoff (#403) | Yes | Added in follow-up | Timed-out regions enter a 5-minute cooldown instead of spending the full 12-second regional budget on every catalogue refresh; successful regions and cached camera indexes are unchanged. |
 | satellite zoom recovery (#390 / `ed3c8cc5...`) | Yes | Already present | Re-audited: M3TM's current custom satellite layer already keeps the GPU buffer count while zoom-hidden and clears only the projection, so zooming back out does not require a toggle reset. No duplicate port was needed. |
-| Sweden CCTV expansion (#404 / `d972d9af...`) | Yes | Not in this branch | Newly identified upstream source expansion (Trafikverket/CamStreamer). It is a separate camera-source parity item and was not mixed into this military/satellite PR. |
+| Sweden CCTV expansion (#404 / `d972d9af...`) | Yes | Yes | Rechecked 2026-10-01: M3TM carries the same `src/app/api/cctv/sweden.ts` blob as upstream (`a630aacc...`), including Trafikverket road cameras and CamStreamer live streams. |
 
 ## Current public conflict evidence contract
 
@@ -67,3 +67,12 @@ A toggle may be active while its provider returns zero rows. Conversely, a provi
 - browser preview shows nonzero alert-pin counts when matching M3TM.APP items exist and toggling the layer changes the map source;
 - no exact military-flight or exact individual military-satellite public contract is introduced by this PR;
 - `sat_military` is source-backed and functional through a coarse 20° / minimum-3 / 1-hour aggregate, with source readiness visible in the UI.
+
+
+## Upstream recheck — 2026-10-01
+
+- Live GitHub commit audit of `simplifaisoul/osiris` found `d972d9af5c6f45aebf6d60b8a60f229a8abbe2f1` (2026-09-30T04:25:12Z) as the latest merged commit visible at review time.
+- The latest upstream change is the Sweden CCTV expansion (#404). M3TM.WORLD already carries the exact same Sweden adapter blob (`a630aacc5f07060cd24dfce14b95a0abaa2b9625`), so no duplicate port is required.
+- The earlier timeout backoff (#403) and satellite zoom recovery (#390) remain present from prior parity work.
+- Upstream-only OSINT/recon capabilities such as FINGERPRINT are **not** copied into the public WORLD surface. They belong to the authenticated internal portal/orchestrator roadmap so public map UI and internal operational tooling remain separated.
+- Phase-1 local M3TM changes on `feat/world-phase1-map-clarity-20261001` focus on public map clarity: semantic event badges, improved satellite imagery presentation, and removal of Markets/Bluetooth Remote from public WORLD chrome.
