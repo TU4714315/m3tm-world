@@ -386,20 +386,8 @@ export interface GdeltEventsResult {
   scanned: number;
 }
 
-export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
+export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
   const { quads = [], eventCodePrefixes = [], minArticles = 1, limit = 600 } = opts;
-
-  const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
-
-  const exportUrl = manifest
-    .split('\n')
-    .map(l => l.trim())
-    .find(l => l.includes('.export.CSV.zip'))
-    ?.split(/\s+/)
-    .pop();
-  if (!exportUrl) throw new Error('No export archive listed in lastupdate.txt');
-
-  const { csv, url: resolvedUrl } = await fetchExportWithFallback(exportUrl);
   const rows = csv.split('\n');
   const events: GdeltEvent[] = [];
 
@@ -411,7 +399,6 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
 
     const lat = Number(c[COL.actionGeoLat]);
     const lng = Number(c[COL.actionGeoLong]);
-    // Ungeocoded rows carry empty coordinates; 0,0 is the null-island artefact.
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
 
     const articles = Number(c[COL.numArticles]) || 0;
@@ -420,9 +407,8 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     const quad = Number(c[COL.quadClass]) || 0;
     if (quads.length > 0 && !quads.includes(quad)) continue;
 
-    // Apply event-code selection before the result limit. Otherwise a busy
-    // export can fill the limit with unrelated QuadClass rows and hide a
-    // matching event later in the same 15-minute file.
+    // Event-code filtering belongs before the result limit. This guarantees a
+    // busy export cannot crowd out the monitored category with unrelated rows.
     const eventCode = c[COL.eventCode] || '';
     if (eventCodePrefixes.length > 0 && !eventCodePrefixes.some(prefix => eventCode.startsWith(prefix))) continue;
 
@@ -459,9 +445,26 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     });
   }
 
+  return { events, scanned: rows.length };
+}
+
+export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
+  const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
+
+  const exportUrl = manifest
+    .split('\n')
+    .map(l => l.trim())
+    .find(l => l.includes('.export.CSV.zip'))
+    ?.split(/\s+/)
+    .pop();
+  if (!exportUrl) throw new Error('No export archive listed in lastupdate.txt');
+
+  const { csv, url: resolvedUrl } = await fetchExportWithFallback(exportUrl);
+  const { events, scanned } = parseGdeltEventsCsv(csv, opts);
+
   return {
     events,
     window: resolvedUrl.split('/').pop() || '',
-    scanned: rows.length,
+    scanned,
   };
 }
