@@ -88,6 +88,7 @@ const globalForAis = globalThis as unknown as {
   shipsCache: Map<number, any>;
   isAisConnecting: boolean;
   durableHydrated?: boolean;
+  durableHydrationNextAttemptAt?: number;
   hydratedFromDurable?: boolean;
   lastDurableWriteAt?: number;
 };
@@ -102,26 +103,45 @@ const MARITIME_PUBLIC_CACHE_KEY = 'm3tm:public:ais-civil:v1';
 const MARITIME_PUBLIC_CACHE_TTL_SECONDS = 30 * 60;
 const MARITIME_DURABLE_WRITE_INTERVAL_MS = 60_000;
 const MARITIME_MAX_PERSISTED_SHIPS = 1200;
+const MARITIME_DURABLE_RETRY_MS = 60_000;
+
+function isExplicitPublicCivilianShip(ship: any): boolean {
+  return ship?.type === 'cargo' || ship?.type === 'tanker';
+}
 
 async function hydratePublicShipsFromDurable() {
   if (globalForAis.durableHydrated) return;
-  globalForAis.durableHydrated = true;
-  if (shipsCache.size > 0) return;
+  const now = Date.now();
+  if ((globalForAis.durableHydrationNextAttemptAt || 0) > now) return;
+  if (shipsCache.size > 0) {
+    globalForAis.durableHydrationNextAttemptAt = now + MARITIME_DURABLE_RETRY_MS;
+    return;
+  }
 
   const cached = await durableGetJson<{ ships: any[]; observed_at: string }>(MARITIME_PUBLIC_CACHE_KEY);
-  if (!cached.value?.ships?.length) return;
+  if (!cached.value?.ships?.length) {
+    globalForAis.durableHydrationNextAttemptAt = now + MARITIME_DURABLE_RETRY_MS;
+    return;
+  }
 
   const observedAt = Date.parse(cached.value.observed_at);
-  if (!Number.isFinite(observedAt) || Date.now() - observedAt > 10 * 60 * 1000) return;
+  if (!Number.isFinite(observedAt) || now - observedAt > 10 * 60 * 1000) {
+    globalForAis.durableHydrationNextAttemptAt = now + MARITIME_DURABLE_RETRY_MS;
+    return;
+  }
 
+  let loaded = 0;
   for (const ship of cached.value.ships) {
-    if (ship?.type === 'military') continue;
+    if (!isExplicitPublicCivilianShip(ship)) continue;
     if (!Number.isFinite(Number(ship?.lat)) || !Number.isFinite(Number(ship?.lng))) continue;
     const id = Number(ship?.mmsi ?? ship?.id);
     if (!Number.isFinite(id)) continue;
     shipsCache.set(id, { ...ship, timestamp: Number(ship.timestamp) || observedAt });
+    loaded += 1;
   }
-  globalForAis.hydratedFromDurable = shipsCache.size > 0;
+  globalForAis.hydratedFromDurable = loaded > 0;
+  globalForAis.durableHydrated = loaded > 0;
+  if (!loaded) globalForAis.durableHydrationNextAttemptAt = now + MARITIME_DURABLE_RETRY_MS;
 }
 
 function connectAisStream() {
@@ -330,7 +350,7 @@ function buildSnapshot(now: number): string {
   // coarse regional naval activity before removing those source rows.
   const allShips = Array.from(shipsCache.values());
   const navalActivity = buildPublicNavalActivity(allShips, now);
-  const ships = allShips.filter(ship => ship.type !== 'military');
+  const ships = allShips.filter(isExplicitPublicCivilianShip);
   const publicPorts = PORTS.filter(port => port.type !== 'naval');
 
   // Dynamically calculate live traffic (Fast approximation of Haversine)
@@ -484,7 +504,7 @@ export async function GET() {
     try {
       const parsed = JSON.parse(snapshot.body) as { ships?: any[]; timestamp?: string };
       const safeShips = (parsed.ships || [])
-        .filter(ship => ship?.type !== 'military')
+        .filter(isExplicitPublicCivilianShip)
         .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
         .slice(0, MARITIME_MAX_PERSISTED_SHIPS);
       if (safeShips.length > 0) {
