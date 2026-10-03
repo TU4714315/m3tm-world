@@ -865,6 +865,8 @@ export default function Dashboard() {
         maritime_ports: d.ports ?? [],
         maritime_chokepoints: d.chokepoints ?? [],
         maritime_ships: d.ships ?? [],
+        naval_activity: d.naval_activity ?? [],
+        naval_activity_meta: d.naval_activity_meta ?? null,
         maritime_source_status: d.source_status ?? null,
         maritime_source: d.source ?? 'M3TM maritime reference',
         maritime_timestamp: d.timestamp ?? null,
@@ -1066,7 +1068,9 @@ export default function Dashboard() {
       maritime_ports: d.ports ?? [],
       maritime_chokepoints: d.chokepoints ?? [],
       maritime_ships: d.ships ?? [],
-      maritime_source_status: d.source_status ?? null,
+        naval_activity: d.naval_activity ?? [],
+        naval_activity_meta: d.naval_activity_meta ?? null,
+        maritime_source_status: d.source_status ?? null,
       maritime_source: d.source ?? 'M3TM maritime reference',
       maritime_timestamp: d.timestamp ?? null,
     });
@@ -1074,10 +1078,11 @@ export default function Dashboard() {
     const schedule = () => {
       if (cancelled) return;
       const liveShips = Array.isArray(dataRef.current.maritime_ships) ? dataRef.current.maritime_ships.length : 0;
+      const navalCells = Array.isArray(dataRef.current.naval_activity) ? dataRef.current.naval_activity.length : 0;
       timer = setTimeout(async () => {
         await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
-      }, liveShips > 0 ? 10_000 : 300_000);
+      }, liveShips > 0 ? 10_000 : navalCells > 0 ? 60_000 : 300_000);
     };
     schedule();
 
