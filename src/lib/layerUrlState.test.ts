@@ -12,22 +12,33 @@ const defaults = {
 };
 
 describe('versioned WORLD layer bookmarks', () => {
-  it('migrates old bookmarks to the v4 public-awareness defaults', () => {
+  it('migrates a v3 bookmark only to the newly promoted v4 defaults', () => {
     const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=3&layers=flights'));
     expect(restored.flights).toBe(true);
     expect(restored.cctv).toBe(false);
-    expect(restored.military_activity).toBe(true);
-    expect(restored.maritime).toBe(true);
-    expect(restored.naval_activity).toBe(true);
+    expect(restored.military_activity).toBe(false);
+    expect(restored.maritime).toBe(false);
+    expect(restored.naval_activity).toBe(false);
+    expect(restored.conflict_zones).toBe(false);
     expect(restored.private).toBe(true);
     expect(restored.jets).toBe(true);
     expect(restored.sdk_air).toBe(true);
     expect(restored.cf_outages).toBe(true);
     expect(restored.cf_attacks).toBe(true);
+  });
+
+  it('still applies v3 and v4 defaults to bookmarks that predate v3', () => {
+    const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=2&layers=flights'));
+    expect(restored.military_activity).toBe(true);
+    expect(restored.maritime).toBe(true);
+    expect(restored.naval_activity).toBe(true);
     expect(restored.conflict_zones).toBe(true);
     expect(restored.gdelt_events).toBe(true);
     expect(restored.civil_unrest).toBe(true);
     expect(restored.alert_pins).toBe(true);
+    expect(restored.private).toBe(true);
+    expect(restored.jets).toBe(true);
+    expect(restored.sdk_air).toBe(true);
   });
 
   it('preserves explicit off choices once the URL is v4', () => {
