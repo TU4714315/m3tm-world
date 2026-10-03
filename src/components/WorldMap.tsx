@@ -494,7 +494,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['coalesce',['get','recencyWeight'],0.45]],
         'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
         'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
-        'heatmap-opacity': ['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18],
+        'heatmap-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.12,['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18]],
         'heatmap-color': ['interpolate',['linear'],['heatmap-density'],
           0,'rgba(0,0,0,0)',
           0.2,'rgba(255,193,7,0.18)',
@@ -505,14 +505,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
-        'circle-opacity': 0.12, 'circle-blur': 0.8,
+        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.05,0.12], 'circle-blur': 0.8,
       }});
       map.addLayer({ id: 'conflict-event-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], paint: {
         'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,8, 45,11, 75,14, 100,18],
         'circle-color': ['match',['get','eventCategory'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
           'armed_clash','#F4511E', 'mass_violence','#C62828', 'assault','#E53935', '#FF5252'],
-        'circle-opacity': ['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.04, 0.4,0.08, 1,0.16],
+        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.045,['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.04, 0.4,0.08, 1,0.16]],
         'circle-blur': 0.65,
       }});
       map.addLayer({ id: 'conflict-event-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], layout: {
@@ -522,7 +522,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'material_conflict','evt-conflict', 'evt-other'],
         'icon-size': ['interpolate',['linear'],['zoom'], 1,0.72, 5,0.84, 10,0.98],
         'icon-allow-overlap': false, 'icon-padding': 2,
-      }});
+      }, paint: { 'icon-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.45,1] }});
       map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
         'icon-image': ['match', ['get','severity'], 'war','warn-icon', 'high','warn-orange', 'warn-yellow'],
         'icon-size': ['interpolate',['linear'],['zoom'], 1,0.6, 4,0.8, 8,1],
@@ -534,7 +534,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-allow-overlap': false,
       }, paint: {
         'text-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
-        'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9,
+        'text-halo-color': '#000', 'text-halo-width': 1.5,
+        'text-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.48,0.9],
+        'icon-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.48,1],
       }});
 
       map.addLayer({ id: 'military-activity-halo', type: 'circle', source: 'military-activity', paint: {
@@ -1398,7 +1400,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
+    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
       'gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
@@ -1850,7 +1852,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
