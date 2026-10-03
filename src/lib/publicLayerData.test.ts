@@ -21,6 +21,30 @@ describe('public WORLD source-backed layer projection', () => {
     expect(publicData.sdk_entities).toEqual([]);
   });
 
+  it('projects a bounded public-safe AIR SDK subset without flight identifiers', () => {
+    const result = buildPublicLayerData({
+      commercial_flights: [
+        { id: 'civil-1', callsign: 'SECRETISH1', lat: 1.3, lng: 103.8 },
+        { id: 'civil-2', callsign: 'SECRETISH2', lat: 2.1, lng: 104.1 },
+      ],
+      private_flights: [{ id: 'private-1', callsign: 'PRIVATE1', lat: 25.2, lng: 55.3 }],
+      private_jets: [{ id: 'jet-1', callsign: 'JET1', lat: 40.7, lng: -74.0 }],
+      sdk_entities: [{ token: 'never-forward-raw-sdk' }],
+    });
+    expect(result.sdk_entities).toHaveLength(4);
+    for (const entity of result.sdk_entities) {
+      expect(entity.properties).toEqual({
+        domain: 'AIR',
+        name: 'رصد جوي عام',
+        source: 'ADS-B / OpenSky',
+      });
+    }
+    const serialized = JSON.stringify(result.sdk_entities);
+    for (const forbidden of ['civil-1', 'SECRETISH1', 'PRIVATE1', 'JET1', 'never-forward-raw-sdk']) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
   it('never forwards internal entities, exact military flights, or military AIS/satellite entities', () => {
     const result = buildPublicLayerData({
       military_flights: [{ icao24: 'sensitive-track' }],
