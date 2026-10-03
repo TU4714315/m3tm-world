@@ -258,6 +258,61 @@ async function fetchVesselApiFallback() {
    watching. The window sits well under the 10s the client polls at, so
    nothing reaches the map staler than it already was. */
 const SNAPSHOT_TTL_MS = 5_000;
+const PUBLIC_NAVAL_CELL_DEG = 6;
+const PUBLIC_NAVAL_MIN_GROUP = 2;
+const PUBLIC_NAVAL_TIME_BUCKET_MS = 30 * 60 * 1000;
+
+interface PublicNavalActivityCell {
+  id: string;
+  lat: number;
+  lng: number;
+  level: number;
+  activity: 'محدود' | 'متوسط' | 'مرتفع';
+  approximate_count: '2-4' | '5-9' | '10+';
+  cell_degrees: number;
+  precision: 'coarse-regional';
+  time_precision: '30-minute-bucket';
+  observed_at_bucket: string;
+  reporting_mode: 'public-ais-aggregate';
+}
+
+export function buildPublicNavalActivity(allShips: any[], now = Date.now()): PublicNavalActivityCell[] {
+  const buckets = new Map<string, { latIndex: number; lngIndex: number; count: number }>();
+  for (const ship of allShips) {
+    if (ship?.type !== 'military') continue;
+    const lat = Number(ship?.lat);
+    const lng = Number(ship?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+    const latIndex = Math.floor((lat + 90) / PUBLIC_NAVAL_CELL_DEG);
+    const lngIndex = Math.floor((lng + 180) / PUBLIC_NAVAL_CELL_DEG);
+    const key = `${latIndex}:${lngIndex}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.count += 1;
+    else buckets.set(key, { latIndex, lngIndex, count: 1 });
+  }
+
+  const observedAtBucket = new Date(
+    Math.floor(now / PUBLIC_NAVAL_TIME_BUCKET_MS) * PUBLIC_NAVAL_TIME_BUCKET_MS
+  ).toISOString();
+
+  return [...buckets.entries()].flatMap(([key, bucket]) => {
+    if (bucket.count < PUBLIC_NAVAL_MIN_GROUP) return [];
+    const level = bucket.count >= 10 ? 3 : bucket.count >= 5 ? 2 : 1;
+    return [{
+      id: `naval-activity-${key}`,
+      lat: -90 + (bucket.latIndex + 0.5) * PUBLIC_NAVAL_CELL_DEG,
+      lng: -180 + (bucket.lngIndex + 0.5) * PUBLIC_NAVAL_CELL_DEG,
+      level,
+      activity: level === 3 ? 'مرتفع' : level === 2 ? 'متوسط' : 'محدود',
+      approximate_count: bucket.count >= 10 ? '10+' : bucket.count >= 5 ? '5-9' : '2-4',
+      cell_degrees: PUBLIC_NAVAL_CELL_DEG,
+      precision: 'coarse-regional',
+      time_precision: '30-minute-bucket',
+      observed_at_bucket: observedAtBucket,
+      reporting_mode: 'public-ais-aggregate',
+    }];
+  });
+}
 
 const globalForSnapshot = globalThis as unknown as {
   maritimeSnapshot?: { body: string; builtAt: number };
@@ -271,8 +326,11 @@ function buildSnapshot(now: number): string {
     }
   }
 
-  // Public WORLD never exposes military-class AIS tracks.
-  const ships = Array.from(shipsCache.values()).filter(ship => ship.type !== 'military');
+  // Public WORLD never exposes military-class AIS tracks. We derive only
+  // coarse regional naval activity before removing those source rows.
+  const allShips = Array.from(shipsCache.values());
+  const navalActivity = buildPublicNavalActivity(allShips, now);
+  const ships = allShips.filter(ship => ship.type !== 'military');
   const publicPorts = PORTS.filter(port => port.type !== 'naval');
 
   // Dynamically calculate live traffic (Fast approximation of Haversine)
@@ -353,6 +411,19 @@ function buildSnapshot(now: number): string {
     ports: dynamicPorts,
     chokepoints: dynamicChokepoints,
     ships,
+    naval_activity: navalActivity,
+    naval_activity_meta: {
+      mode: 'coarse-regional-aggregate',
+      source_mode: 'public-ais-observations',
+      cell_degrees: PUBLIC_NAVAL_CELL_DEG,
+      minimum_group: PUBLIC_NAVAL_MIN_GROUP,
+      time_precision: '30-minute-bucket',
+      identifiers_exposed: false,
+      exact_tracks_exposed: false,
+      speed_heading_exposed: false,
+      unobserved_vessels_inferred: false,
+      absence_semantics: 'No aggregate cell means no qualifying public AIS observations in the current cache, not proof of absence.',
+    },
     total_ports: dynamicPorts.length,
     total_chokepoints: dynamicChokepoints.length,
     total_ships: ships.length,
@@ -363,6 +434,7 @@ function buildSnapshot(now: number): string {
         configured: aisConfigured,
         provider: 'AISStream.io',
         public_ships: ships.length,
+        military_public_cells: navalActivity.length,
         latest_observed_at: latestObservedMs ? new Date(latestObservedMs).toISOString() : null,
         latest_observation_age_s: latestObservedMs ? Math.max(0, Math.round((now - latestObservedMs) / 1000)) : null,
         persistence: 'process-memory',
@@ -381,6 +453,7 @@ function buildSnapshot(now: number): string {
       mode: durableCacheConfigured() ? 'durable+memory' : 'memory',
       hydrated_from_durable: !!globalForAis.hydratedFromDurable,
       military_tracks_persisted: false,
+      naval_aggregate_persisted: false,
     },
   });
 }
