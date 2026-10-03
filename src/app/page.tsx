@@ -471,7 +471,7 @@ export default function Dashboard() {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [embedMode, embedSurface]);
-  // Server-side capability flags — gate layers that need credentials.
+  // Server-side capability flags — describe provider readiness without locking toggles.
   const selectFlatMap = () => {
     setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
     setMapProjection('mercator');

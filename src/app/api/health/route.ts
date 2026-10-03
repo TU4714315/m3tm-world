@@ -161,7 +161,7 @@ export async function GET(request: Request) {
       authMode: cloudflareConfigured ? 'server-api-token' : 'none',
       detail: cloudflareConfigured
         ? 'Cloudflare Radar: Read credential is present.'
-        : 'CLOUDFLARE_API_TOKEN is absent; the public controls are disabled as غير مهيأ.',
+        : 'CLOUDFLARE_API_TOKEN is absent; public controls remain operable but report غير مهيأ and no Cloudflare data is claimed.',
     },
     durableCache: {
       role: 'public-last-good-snapshot-cache',

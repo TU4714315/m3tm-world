@@ -17,8 +17,8 @@ interface LayerPanelProps {
   isMobile?: boolean;
   theme?: 'core' | 'ghost';
   setTheme?: (theme: 'core' | 'ghost') => void;
-  /** Server-side capabilities, e.g. { cloudflare: true }. Layers declaring a
-   *  `requires` key stay hidden until the matching capability is present. */
+  /** Server-side capabilities, e.g. { cloudflare: true }. A missing capability
+   *  is presented as provider status only; it does not lock the public toggle. */
   capabilities?: Record<string, boolean>;
   /** Optional public-embed allowlist: only expose non-operational layers. */
   allowedLayerKeys?: readonly string[];
@@ -35,7 +35,7 @@ interface LayerDef {
   description?: string;
   /** Reads a bucket out of data.category_counts instead of a top-level array. */
   catKey?: string;
-  /** Capability that must be configured server-side for this layer to appear. */
+  /** Provider capability used only for honest status messaging. */
   requires?: string;
   /** Key of the layer this one modifies. Renders indented beneath it, and reads
    *  as inert while that parent is off — it has nothing to act on. */
@@ -417,20 +417,20 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     </div>
   ) : null;
 
-  /** Switch a whole group at once — off if any available layer is on, otherwise all available layers on. */
+  /** Switch a whole group at once. Provider availability never locks the toggle:
+   *  an enabled layer with no configured provider remains an honest no-data state. */
   const toggleGroup = (layers: LayerDef[]) => {
-    const available = layers.filter(l => !l.requires || capabilities[l.requires] === true);
-    const anyOn = available.some(l => activeLayers[l.key]);
-    if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
+    const anyOn = layers.some(l => activeLayers[l.key]);
+    if (!anyOn && layers.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
     setActiveLayers((prev: any) => {
       const next = { ...prev };
-      for (const l of available) next[l.key] = !anyOn;
+      for (const l of layers) next[l.key] = !anyOn;
       return next;
     });
   };
 
-  /* Keep credential-gated layers visible so an absent credential is explicit
-     "غير مهيأ" rather than a disappearing control that looks accidentally missing. */
+  /* Keep credential-gated layers visible and operable. Missing credentials are
+     provider state ("غير مهيأ"), not a locked UI state. */
   const visibleGroups = LAYER_GROUPS.map(g => ({
     ...g,
     layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
@@ -471,12 +471,11 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 return (
                   <button
                     key={layer.key}
-                    onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
-                    disabled={capabilityUnavailable}
+                    onClick={() => toggle(layer.key)}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
-                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : undefined}
-                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40' : ''}`}
+                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : undefined}
+                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
@@ -672,12 +671,11 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         return (
                           <button
                             key={layer.key}
-                            onClick={() => { if (!capabilityUnavailable) toggle(layer.key); }}
-                            disabled={capabilityUnavailable}
+                            onClick={() => toggle(layer.key)}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
-                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant || capabilityUnavailable ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
+                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {layer.parent && <SubLayerStem />}
                             <ToggleSwitch active={!!isLayerActive} />
