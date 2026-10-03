@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGdeltReportedRoutes, classifyPublicEvent, fetchGdeltEvents, QUAD_LABELS, toPublicGdeltEvent, type GdeltEvent } from './gdeltEvents';
+import { buildGdeltReportedRoutes, classifyPublicEvent, fetchGdeltEvents, parseGdeltEventsCsv, QUAD_LABELS, toPublicGdeltEvent, type GdeltEvent } from './gdeltEvents';
 
 /**
  * Live integration test — opt in with RUN_LIVE_TESTS=1 (hits the real GDELT
@@ -15,6 +15,34 @@ import { buildGdeltReportedRoutes, classifyPublicEvent, fetchGdeltEvents, QUAD_L
 const liveIt = process.env.RUN_LIVE_TESTS === '1' ? it : it.skip;
 
 describe('fetchGdeltEvents', () => {
+  it('applies event-code prefixes before the result limit', () => {
+    const row = (id: string, eventCode: string) => {
+      const cols = Array(61).fill('');
+      cols[0] = id;
+      cols[1] = '20261003';
+      cols[26] = eventCode;
+      cols[28] = eventCode.startsWith('176') ? '17' : '19';
+      cols[29] = '4';
+      cols[31] = '5';
+      cols[32] = '2';
+      cols[33] = '3';
+      cols[34] = '-4.2';
+      cols[52] = id === 'cyber' ? 'Singapore' : 'Other place';
+      cols[53] = id === 'cyber' ? 'SG' : 'US';
+      cols[56] = id === 'cyber' ? '1.35' : '40.7';
+      cols[57] = id === 'cyber' ? '103.8' : '-74';
+      cols[59] = '20261003183000';
+      cols[60] = `https://example.com/${id}`;
+      return cols.join('\t');
+    };
+    const csv = [row('unrelated', '190'), row('cyber', '176')].join('\n');
+
+    expect(parseGdeltEventsCsv(csv, { quads: [4], limit: 1 }).events[0]?.id).toBe('unrelated');
+    const filtered = parseGdeltEventsCsv(csv, { quads: [4], eventCodePrefixes: ['176'], limit: 1 });
+    expect(filtered.events).toHaveLength(1);
+    expect(filtered.events[0]).toMatchObject({ id: 'cyber', event_code: '176', country: 'SG' });
+  });
+
   it('classifies public conflict events from CAMEO codes without claiming independent verification', () => {
     expect(classifyPublicEvent('1951', '19', 4, 3, 5)).toMatchObject({
       event_category: 'aerial_attack',
