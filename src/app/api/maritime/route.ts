@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import WebSocket from 'ws';
+import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 /**
  * OSIRIS — Maritime Intelligence
@@ -86,6 +87,9 @@ const CHOKEPOINTS = [
 const globalForAis = globalThis as unknown as {
   shipsCache: Map<number, any>;
   isAisConnecting: boolean;
+  durableHydrated?: boolean;
+  hydratedFromDurable?: boolean;
+  lastDurableWriteAt?: number;
 };
 
 if (!globalForAis.shipsCache) {
@@ -94,6 +98,31 @@ if (!globalForAis.shipsCache) {
 }
 
 const shipsCache = globalForAis.shipsCache;
+const MARITIME_PUBLIC_CACHE_KEY = 'm3tm:public:ais-civil:v1';
+const MARITIME_PUBLIC_CACHE_TTL_SECONDS = 30 * 60;
+const MARITIME_DURABLE_WRITE_INTERVAL_MS = 60_000;
+const MARITIME_MAX_PERSISTED_SHIPS = 1200;
+
+async function hydratePublicShipsFromDurable() {
+  if (globalForAis.durableHydrated) return;
+  globalForAis.durableHydrated = true;
+  if (shipsCache.size > 0) return;
+
+  const cached = await durableGetJson<{ ships: any[]; observed_at: string }>(MARITIME_PUBLIC_CACHE_KEY);
+  if (!cached.value?.ships?.length) return;
+
+  const observedAt = Date.parse(cached.value.observed_at);
+  if (!Number.isFinite(observedAt) || Date.now() - observedAt > 10 * 60 * 1000) return;
+
+  for (const ship of cached.value.ships) {
+    if (ship?.type === 'military') continue;
+    if (!Number.isFinite(Number(ship?.lat)) || !Number.isFinite(Number(ship?.lng))) continue;
+    const id = Number(ship?.mmsi ?? ship?.id);
+    if (!Number.isFinite(id)) continue;
+    shipsCache.set(id, { ...ship, timestamp: Number(ship.timestamp) || observedAt });
+  }
+  globalForAis.hydratedFromDurable = shipsCache.size > 0;
+}
 
 function connectAisStream() {
   if (globalForAis.isAisConnecting) return;
@@ -348,6 +377,11 @@ function buildSnapshot(now: number): string {
       },
     },
     timestamp: new Date(now).toISOString(),
+    storage: {
+      mode: durableCacheConfigured() ? 'durable+memory' : 'memory',
+      hydrated_from_durable: !!globalForAis.hydratedFromDurable,
+      military_tracks_persisted: false,
+    },
   });
 }
 
@@ -359,6 +393,7 @@ export function clearMaritimeSnapshot(): void {
 export async function GET() {
   // Trigger Hybrid Fallback
   await fetchVesselApiFallback();
+  await hydratePublicShipsFromDurable();
 
   const now = Date.now();
   const cached = globalForSnapshot.maritimeSnapshot;
@@ -367,6 +402,29 @@ export async function GET() {
     ? cached
     : { body: buildSnapshot(now), builtAt: now };
   globalForSnapshot.maritimeSnapshot = snapshot;
+
+  if (
+    now - (globalForAis.lastDurableWriteAt || 0) >= MARITIME_DURABLE_WRITE_INTERVAL_MS
+    && shipsCache.size > 0
+  ) {
+    globalForAis.lastDurableWriteAt = now;
+    try {
+      const parsed = JSON.parse(snapshot.body) as { ships?: any[]; timestamp?: string };
+      const safeShips = (parsed.ships || [])
+        .filter(ship => ship?.type !== 'military')
+        .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+        .slice(0, MARITIME_MAX_PERSISTED_SHIPS);
+      if (safeShips.length > 0) {
+        await durableSetJson(
+          MARITIME_PUBLIC_CACHE_KEY,
+          { ships: safeShips, observed_at: parsed.timestamp || new Date(now).toISOString() },
+          MARITIME_PUBLIC_CACHE_TTL_SECONDS,
+        );
+      }
+    } catch (error) {
+      console.warn('[M3TM.WORLD] AIS durable snapshot skipped:', error instanceof Error ? error.message : error);
+    }
+  }
 
   const maxAgeSeconds = Math.floor(SNAPSHOT_TTL_MS / 1000);
 

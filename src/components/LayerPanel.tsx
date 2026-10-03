@@ -290,9 +290,14 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   const adsbMil = Number(source?.providers?.adsbfi_mil || 0);
   const openSky = Number(source?.providers?.opensky || 0);
   const openSkyAge = Number(source?.providers?.opensky_age_s);
+  const stale = meta?.stale_fallback === true;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      <div className={stale ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
+        البيانات: {stale ? 'آخر لقطة عامة مخزنة · المصدر الحي متعذر مؤقتًا' : 'رصد حي/مجمّع'}
+        {meta?.cache_backend ? ' · التخزين ' + String(meta.cache_backend) : ''}
+      </div>
       {source && (
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
           <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>

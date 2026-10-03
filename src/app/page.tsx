@@ -995,7 +995,8 @@ export default function Dashboard() {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
+      const flightPollMs = activeLayers.military_activity ? 120000 : 300000;
+      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), flightPollMs));
     }
 
     if ((activeLayers as any).cyber_attacks) {

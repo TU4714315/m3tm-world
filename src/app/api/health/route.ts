@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchAcledPublicEvents } from '@/lib/acled';
+import { durableCacheConfigured } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
   const openskyConfigured = hasOpenSkyCredentials();
   const aisConfigured = hasAisCredentials();
   const cloudflareConfigured = hasCloudflareRadarCredentials();
+  const durableConfigured = durableCacheConfigured();
 
   const [gdeltProbe, acledProbe] = deep
     ? await Promise.all([probeGdelt(), probeAcled()])
@@ -161,6 +163,15 @@ export async function GET(request: Request) {
         ? 'Cloudflare Radar: Read credential is present.'
         : 'CLOUDFLARE_API_TOKEN is absent; the public controls are disabled as غير مهيأ.',
     },
+    durableCache: {
+      role: 'public-last-good-snapshot-cache',
+      configured: durableConfigured,
+      status: durableConfigured ? 'configured' as SourceStatus : 'anonymous_fallback' as SourceStatus,
+      authMode: durableConfigured ? 'server-rest-token' : 'process-memory',
+      detail: durableConfigured
+        ? 'Redis/KV REST storage is configured for bounded public last-good snapshots.'
+        : 'Redis/KV is not configured; bounded process-memory fallback remains active.',
+    },
     balloons: {
       role: 'optional-moving-object-layer',
       configured: false,
@@ -198,6 +209,7 @@ export async function GET(request: Request) {
       spatialCellDegrees: 6,
       temporalBucketMinutes: 30,
       exactMilitaryTracksExposed: false,
+      exactMilitaryTracksPersisted: false,
       unobservedAircraftInferred: false,
       absenceMeaning: 'not-observed-does-not-mean-absent',
       knownPublicFeedLimitations: [

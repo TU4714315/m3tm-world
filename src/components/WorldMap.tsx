@@ -537,12 +537,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
       map.addLayer({ id: 'military-activity-halo', type: 'circle', source: 'military-activity', paint: {
         'circle-radius': ['interpolate',['linear'],['get','level'], 1,18, 2,28, 3,42],
-        'circle-color': '#EF5350', 'circle-opacity': 0.12, 'circle-blur': 0.85,
+        'circle-color': ['case',['==',['get','trend'],'up'],'#FF1744','#EF5350'],
+        'circle-opacity': ['case',['==',['get','data_state'],'cached-stale'],0.055,0.12], 'circle-blur': 0.85,
       }});
       map.addLayer({ id: 'military-activity-dots', type: 'circle', source: 'military-activity', paint: {
         'circle-radius': ['interpolate',['linear'],['get','level'], 1,5, 2,7, 3,9],
         'circle-color': ['interpolate',['linear'],['get','level'], 1,'#FFB74D', 2,'#FF7043', 3,'#EF5350'],
-        'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#FFF3E0', 'circle-stroke-opacity': 0.6,
+        'circle-opacity': ['case',['==',['get','data_state'],'cached-stale'],0.48,0.9],
+        'circle-stroke-width': ['case',['==',['get','trend'],'up'],2.4,1.5],
+        'circle-stroke-color': '#FFF3E0', 'circle-stroke-opacity': 0.6,
       }});
       map.addLayer({ id: 'military-activity-label', type: 'symbol', source: 'military-activity', minzoom: 3, layout: {
         'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
@@ -2109,6 +2112,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             time_precision: cell.time_precision,
             observed_at_bucket: cell.observed_at_bucket,
             reporting_mode: cell.reporting_mode,
+            trend: cell.trend,
+            data_state: cell.data_state,
+            observed_at: cell.observed_at,
+            age_seconds: cell.age_seconds,
           },
         }))
       : []);
