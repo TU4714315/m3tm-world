@@ -26,8 +26,8 @@ export function buildFlightSummary(data: any): FlightSummary {
   const publicTotal = commercial + privateFlights + jets;
   const sourceStatus = String(data?.flight_source_status?.status || '');
   const source = typeof data?.source === 'string' ? data.source : null;
-  const stale = Boolean(source && source.endsWith('+stale'));
   const militaryMeta = data?.military_activity_meta || {};
+  const stale = Boolean(source && source.endsWith('+stale')) || militaryMeta.stale_fallback === true || sourceStatus === 'degraded';
 
   return {
     status: !stale && (sourceStatus === 'active' || publicTotal > 0) ? 'operational' : 'degraded',
