@@ -14,21 +14,32 @@ export const maxDuration = 60;
  */
 
 const MAX_LIMIT = 2000;
+const ALLOWED_LIMITS = [300, 600, 1000, 2000] as const;
+const ALLOWED_MIN_ARTICLES = [1, 2, 5] as const;
 
 function parseQuads(raw: string | null): number[] {
   if (!raw) return [];
-  return raw
-    .split(',')
-    .map(v => Number(v.trim()))
-    .filter(v => v >= 1 && v <= 4);
+  return [...new Set(
+    raw.split(',')
+      .map(v => Number(v.trim()))
+      .filter(v => Number.isInteger(v) && v >= 1 && v <= 4)
+  )].sort((a, b) => a - b);
+}
+
+function nearestAllowed(raw: string | null, allowed: readonly number[], fallback: number): number {
+  const requested = Number(raw);
+  if (!Number.isFinite(requested)) return fallback;
+  return allowed.reduce((best, value) =>
+    Math.abs(value - requested) < Math.abs(best - requested) ? value : best
+  , allowed[0] ?? fallback);
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   const quads = parseQuads(searchParams.get('quad'));
-  const minArticles = Math.max(1, Number(searchParams.get('min_articles')) || 1);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, Number(searchParams.get('limit')) || 600));
+  const minArticles = nearestAllowed(searchParams.get('min_articles'), ALLOWED_MIN_ARTICLES, 1);
+  const limit = Math.min(MAX_LIMIT, nearestAllowed(searchParams.get('limit'), ALLOWED_LIMITS, 600));
   const cacheKey = 'm3tm:public:gdelt-events:v2:' + (quads.join('-') || 'all') + ':' + minArticles + ':' + limit;
   const previous = await durableGetJson<any>(cacheKey);
 
