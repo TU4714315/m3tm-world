@@ -575,7 +575,8 @@ export async function GET(req: Request) {
       }
     }
 
-    const observedAt = new Date().toISOString();
+    const militaryObservedAtMs = osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
+    const observedAt = new Date(militaryObservedAtMs).toISOString();
     const previousMilitary = await durableGetJson<PublicMilitaryActivitySnapshot>(PUBLIC_MILITARY_CACHE_KEY);
     let militaryActivity = buildPublicMilitaryActivity(military);
     let militaryActivityCacheBackend: string = previousMilitary.backend;
@@ -638,7 +639,7 @@ export async function GET(req: Request) {
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
       flight_source_status: {
-        status: militaryActivity.length || commercial.length || privateFl.length || jets.length ? 'active' : 'empty',
+        status: (!militaryActivityStale && militaryActivity.length) || commercial.length || privateFl.length || jets.length ? 'active' : 'empty',
         provider: source,
         providers: {
           adsbfi_mil: milCount,
