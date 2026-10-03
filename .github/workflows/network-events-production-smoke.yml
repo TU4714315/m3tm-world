@@ -1,0 +1,227 @@
+name: Network events production smoke
+
+on:
+  push:
+    branches:
+      - qa/network-events-production-smoke-20261003
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: API live smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://m3tm-world.vercel.app"
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/health?deep=1" -o /tmp/health.json
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/cloudflare-radar" -o /tmp/network.json
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/flights?summary=1" -o /tmp/flights.json
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/maritime" -o /tmp/maritime.json
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/conflicts" -o /tmp/conflicts.json
+          curl --fail --silent --show-error --retry 2 --max-time 90 "$BASE/api/gdelt-events?quad=3%2C4&min_articles=2&limit=1000" -o /tmp/gdelt.json
+
+          node <<'NODE'
+          const fs=require('fs');
+          const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
+          const h=read('/tmp/health.json'), n=read('/tmp/network.json'), f=read('/tmp/flights.json'), m=read('/tmp/maritime.json'), c=read('/tmp/conflicts.json'), g=read('/tmp/gdelt.json');
+          const expected='01fd7539fe5ed82df7f3d6436479484fbc803060';
+          if(h?.deployment?.sha!==expected) throw new Error('Production SHA mismatch '+h?.deployment?.sha);
+
+          if(n?.source_mode!=='public-fallback' && n?.source_mode!=='cloudflare-radar' && n?.source_mode!=='mixed') throw new Error('unexpected network source mode');
+          if(n?.configured===false){
+            if(n?.fallback_active!==true) throw new Error('Cloudflare absent but fallback is not active');
+            if(n?.fallback_sections?.outages!==true || n?.fallback_sections?.attacks!==true) throw new Error('public fallback sections not active');
+            if(n?.providers?.cloudflare_outages!=='not_configured' || n?.providers?.cloudflare_attacks!=='not_configured') throw new Error('Cloudflare state is not truthful');
+          }
+
+          const networkText=JSON.stringify(n);
+          if(/(?:^|["':,\s])(?:\d{1,3}\.){3}\d{1,3}(?:["',\s]|$)/.test(networkText)) throw new Error('IP address leaked in public network response');
+          if(/target_ip|Bearer\s+[A-Za-z0-9._-]{12,}/i.test(networkText)) throw new Error('secret/target IP field leaked');
+          for(const row of n?.attack_origins||[]){
+            if(row?.indicator_type==='observed-c2-infrastructure' && row?.source!=='abuse.ch Feodo Tracker') throw new Error('Feodo indicator source mismatch');
+            if('ip' in row || 'ip_address' in row || 'target_ip' in row) throw new Error('IP-bearing threat indicator');
+          }
+          for(const row of n?.outages||[]){
+            if(row?.source?.startsWith?.('GDELT') && row?.event_type!=='REPORTED_CYBER_EVENT') throw new Error('GDELT event mislabeled');
+          }
+
+          if(h?.observationPolicy?.exactMilitaryTracksExposed!==false || h?.observationPolicy?.exactMilitaryTracksPersisted!==false) throw new Error('military air privacy contract failed');
+          if(f?.military_activity?.exact_tracks_exposed!==false || f?.military_activity?.identifiers_exposed!==false) throw new Error('military activity privacy contract failed');
+          if(m?.naval_activity_meta?.exact_tracks_exposed!==false || m?.naval_activity_meta?.identifiers_exposed!==false || m?.naval_activity_meta?.speed_heading_exposed!==false) throw new Error('naval privacy contract failed');
+
+          const navalText=JSON.stringify(m?.naval_activity||[]).toLowerCase();
+          for(const k of ['mmsi','shipname','ship_name','callsign','speed','heading','destination','trajectory']) if(navalText.includes(k)) throw new Error('unsafe naval field '+k);
+
+          const unrest=(g.events||[]).filter(e=>e?.event_category==='civil_unrest').length;
+          const material=(g.events||[]).filter(e=>Number(e?.quad)===4 && e?.event_category!=='civil_unrest').length;
+          const age=Math.abs(Date.now()-Date.parse(n.timestamp||0))/1000;
+          if(!Number.isFinite(age) || age>900) throw new Error('network feed timestamp stale '+age);
+
+          console.log(JSON.stringify({
+            sha:h.deployment.sha,
+            status:h.status,
+            network:{
+              configured:n.configured,
+              source_mode:n.source_mode,
+              fallback_active:n.fallback_active,
+              fallback_sections:n.fallback_sections,
+              providers:n.providers,
+              network_events:Number(n.total_outages||0),
+              threat_indicators:Number(n.total_attack_origins||0),
+              timestamp:n.timestamp
+            },
+            flights:{
+              commercial:Number(f?.counts?.commercial||0),
+              private:Number(f?.counts?.private||0),
+              jets:Number(f?.counts?.jets||0),
+              military_cells:Number(f?.military_activity?.cells||0),
+              timestamp:f?.timestamp
+            },
+            maritime:{
+              status:m?.source_status?.ais?.status,
+              naval_cells:(m?.naval_activity||[]).length,
+              timestamp:m?.timestamp
+            },
+            conflicts:{
+              state:c?.dataState||c?.data_state,
+              zones:Number(c?.totalZones??c?.zones?.length??0),
+              events:Number(c?.totalLiveEvents??c?.liveEvents?.length??c?.events?.length??0),
+              timestamp:c?.timestamp||c?.servedAt||null
+            },
+            gdelt:{
+              state:g?.data_state,
+              total:Number(g?.total??g?.events?.length??0),
+              civil_unrest:unrest,
+              material_conflict:material,
+              routes:Number(g?.reported_routes_total||0),
+              timestamp:g?.timestamp
+            }
+          },null,2));
+          NODE
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright core
+        run: npm install --no-save --ignore-scripts playwright-core@1.55.0
+
+      - name: Desktop and mobile UI smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          mkdir -p qa-artifacts
+          export CHROME
+
+          node <<'NODE'
+          const { chromium }=require('playwright-core');
+          const fs=require('fs');
+          const BASE='https://m3tm-world.vercel.app';
+
+          async function openGroup(page,title){
+            const b=page.locator('button[title="'+title+'"]').first();
+            await b.waitFor({state:'visible',timeout:20000});
+            await b.click();
+            await page.waitForTimeout(250);
+          }
+          async function row(page,label){
+            const b=page.getByRole('button',{name:label}).first();
+            await b.waitFor({state:'visible',timeout:20000});
+            return b;
+          }
+          async function assertOn(page,label){
+            const b=await row(page,label);
+            if(await b.getAttribute('aria-pressed')!=='true') throw new Error(label+' not default-on');
+            if(await b.isDisabled()) throw new Error(label+' is locked');
+            return b;
+          }
+          async function base(page,label){
+            const networkP=page.waitForResponse(r=>r.url().includes('/api/cloudflare-radar') && !r.url().includes('probe=1') && r.status()===200,{timeout:100000});
+            await page.goto(BASE+'/?surface=public',{waitUntil:'domcontentloaded',timeout:45000});
+            await page.getByLabel('M3TM.WORLD').first().waitFor({state:'visible',timeout:20000});
+            await page.locator('canvas.maplibregl-canvas').first().waitFor({state:'visible',timeout:20000});
+            const network=await (await networkP).json();
+            await page.waitForTimeout(1200);
+
+            const metrics=await page.evaluate(()=>({cw:document.documentElement.clientWidth,sw:document.documentElement.scrollWidth,bcw:document.body.clientWidth,bsw:document.body.scrollWidth}));
+            if(metrics.sw>metrics.cw+4||metrics.bsw>metrics.bcw+4) throw new Error(label+' overflow '+JSON.stringify(metrics));
+            const html=await page.content(), body=await page.locator('body').innerText();
+            if(html.includes('discord.gg/EPaFD5FFKf')||html.includes('x.com/soulsimplifai')||body.includes('discord.gg/EPaFD5FFKf')||body.includes('x.com/soulsimplifai')) throw new Error(label+' legacy social link present');
+            if(/https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)/i.test(html)) throw new Error(label+' internal endpoint exposed');
+            if(await page.locator('img[src*="m3tm-world-logo"]').count()) throw new Error(label+' raster logo rendered');
+            const osint=await page.evaluate(()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/api/osint/')).length);
+            if(osint!==0) throw new Error(label+' public page triggered OSINT');
+            return {network,metrics};
+          }
+
+          (async()=>{
+            const browser=await chromium.launch({executablePath:process.env.CHROME,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+
+            const dc=await browser.newContext({viewport:{width:1440,height:900}});
+            const p=await dc.newPage();
+            const desktop=await base(p,'desktop');
+
+            await openGroup(p,'الشبكة والأحداث');
+            const eventsRow=await assertOn(p,'أحداث واضطرابات الشبكة');
+            const threatsRow=await assertOn(p,'مؤشرات تهديد شبكي مرصودة');
+            const eventsText=await eventsRow.innerText();
+            const threatsText=await threatsRow.innerText();
+            if(eventsText.includes('متوقف')||threatsText.includes('متوقف')) throw new Error('network layer shown stopped');
+            if(desktop.network?.fallback_active===true){
+              if(eventsText.includes('غير مهيأ')||threatsText.includes('غير مهيأ')) throw new Error('active fallback shown as unconfigured');
+              const body=await p.locator('body').innerText();
+              if(!body.includes('Cloudflare Radar غير مهيأ') && desktop.network?.source_mode==='public-fallback') throw new Error('fallback explanation missing');
+            }
+            if(Number(desktop.network?.total_outages||0)>0 && !eventsText.match(/[1-9٠-٩]/)) throw new Error('network event count not visible');
+            if(Number(desktop.network?.total_attack_origins||0)>0 && !threatsText.match(/[1-9٠-٩]/)) throw new Error('threat indicator count not visible');
+            await p.screenshot({path:'qa-artifacts/desktop-network-events-1440x900.png',fullPage:false});
+            await openGroup(p,'الشبكة والأحداث');
+
+            await openGroup(p,'الطيران');
+            for(const x of ['التجارية','الخاصة','الطائرات الخاصة','نشاط جوي عسكري عام']) await assertOn(p,x);
+            await openGroup(p,'الطيران');
+            await openGroup(p,'البحرية');
+            await assertOn(p,'نشاط بحري عسكري عام');
+            await openGroup(p,'البحرية');
+            await openGroup(p,'الحروب والأحداث العامة');
+            for(const x of ['مناطق الحروب والنزاعات','كثافة النزاع الحديثة','القصف والاشتباكات والأحداث المبلّغ عنها','احتجاجات واضطرابات مُبلّغ عنها']) await assertOn(p,x);
+            await dc.close();
+
+            const mc=await browser.newContext({viewport:{width:390,height:844}});
+            const m=await mc.newPage();
+            const mobile=await base(m,'mobile');
+            const tab=m.getByText('الطبقات',{exact:true}).last();
+            await tab.waitFor({state:'visible',timeout:15000});
+            await tab.click();
+            await m.getByText('الطبقات والإحصائيات',{exact:true}).waitFor({state:'visible',timeout:15000});
+            await assertOn(m,'أحداث واضطرابات الشبكة');
+            await assertOn(m,'مؤشرات تهديد شبكي مرصودة');
+            await assertOn(m,'نشاط جوي عسكري عام');
+            await assertOn(m,'نشاط بحري عسكري عام');
+            await assertOn(m,'احتجاجات واضطرابات مُبلّغ عنها');
+            await m.screenshot({path:'qa-artifacts/mobile-network-events-390x844.png',fullPage:false});
+            fs.writeFileSync('qa-artifacts/ui-state.json',JSON.stringify({
+              desktop:{metrics:desktop.metrics,network:desktop.network},
+              mobile:{metrics:mobile.metrics,network:mobile.network}
+            },null,2));
+            await mc.close();
+            await browser.close();
+            console.log('ui_smoke=PASS');
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: network-events-production-smoke
+          path: qa-artifacts/
+          retention-days: 3
+          if-no-files-found: error
