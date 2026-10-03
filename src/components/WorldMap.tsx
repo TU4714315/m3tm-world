@@ -345,7 +345,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -380,7 +380,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const createMapBadge = (
         id: string,
         color: string,
-        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic',
+        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'unrest'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic',
       ) => {
         if (map.hasImage(id)) return;
         const size = 28;
@@ -438,6 +438,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             line(c,9,c,16); dot(c,19,1.2); break;
           case 'conflict':
             line(8,10,20,18); line(20,10,8,18); dot(c,c,2.2); break;
+          case 'unrest':
+            dot(9,10,1.8); dot(c,8,1.8); dot(19,10,1.8); line(7,15,21,15); line(9,19,19,19); break;
           case 'quake':
             line(6,10,11,10); line(11,10,9,15); line(9,15,15,12); line(15,12,13,19); line(13,19,22,19); break;
           case 'flood':
@@ -478,7 +480,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       [
         ['evt-air','#FF1744','air'], ['evt-heavy','#FF6D00','heavy'], ['evt-bomb','#FF3D3D','bomb'],
         ['evt-clash','#F4511E','clash'], ['evt-mass','#C62828','mass'], ['evt-assault','#E53935','assault'],
-        ['evt-conflict','#FF5252','conflict'], ['evt-other','#9B978E','generic'],
+        ['evt-conflict','#FF5252','conflict'], ['evt-unrest','#FFB300','unrest'], ['evt-other','#9B978E','generic'],
         ['incident-eq','#FF7043','quake'], ['incident-fl','#42A5F5','flood'], ['incident-tc','#AB47BC','cyclone'],
         ['incident-vo','#EF5350','volcano'], ['incident-wf','#FF9800','wildfire'], ['incident-dr','#FDD835','drought'],
         ['incident-other','#D32F2F','generic'],
@@ -551,6 +553,20 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
         'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
       }, paint: { 'text-color':'#FFCCBC', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
+
+      map.addLayer({ id: 'naval-activity-halo', type: 'circle', source: 'naval-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,18, 2,28, 3,40],
+        'circle-color': '#26C6DA', 'circle-opacity': 0.10, 'circle-blur': 0.88,
+      }});
+      map.addLayer({ id: 'naval-activity-dots', type: 'circle', source: 'naval-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','level'], 1,5, 2,7, 3,9],
+        'circle-color': ['interpolate',['linear'],['get','level'], 1,'#80DEEA', 2,'#26C6DA', 3,'#00ACC1'],
+        'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': '#E0F7FA', 'circle-stroke-opacity': 0.62,
+      }});
+      map.addLayer({ id: 'naval-activity-label', type: 'symbol', source: 'naval-activity', minzoom: 3, layout: {
+        'text-field': ['concat','نشاط بحري عسكري عام · ',['get','activity'],' · ',['get','approximate_count']],
+        'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
+      }, paint: { 'text-color':'#B2EBF2', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
 
       map.addLayer({ id: 'military-satellite-activity-halo', type: 'circle', source: 'military-satellite-activity', paint: {
         'circle-radius': ['interpolate',['linear'],['get','level'], 1,16, 2,24, 3,34],
@@ -744,6 +760,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'aerial_attack','evt-air', 'heavy_weapons','evt-heavy', 'bombing','evt-bomb',
           'armed_clash','evt-clash', 'mass_violence','evt-mass', 'assault','evt-assault',
           'material_conflict','evt-conflict', 'evt-other'],
+        'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
+        'icon-allow-overlap': false, 'icon-padding': 2,
+      }});
+
+      map.addLayer({ id: 'civil-unrest-halo', type: 'circle', source: 'civil-unrest', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','articles'], 1,8, 10,11, 50,15, 200,20],
+        'circle-color': '#FFB300', 'circle-opacity': 0.11, 'circle-blur': 0.68,
+      }});
+      map.addLayer({ id: 'civil-unrest-icons', type: 'symbol', source: 'civil-unrest', layout: {
+        'icon-image': 'evt-unrest',
         'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
@@ -1552,6 +1578,34 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
       </div>`);
+    })
+
+    map.on('click', 'civil-unrest-icons', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const accent = '#FFB300';
+      const src = urlSafe(p.url);
+      const tone = Number(p.tone);
+      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية من عدة مصادر' : 'بلاغ من مصدر واحد';
+      const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
+      popup(coords, `
+      <div style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
+          <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'احتجاج أو اضطراب مدني مُبلّغ عنه')}</span>
+        </div>
+        <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
+          <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
+          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
+          <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
+          <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
+          <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
+        </div>
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
+      </div>`);
     });
 
     // ── Cloudflare Radar: internet outage ──
@@ -1681,6 +1735,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
         <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · الزمن: نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
+      </div>`);
+    });
+
+    map.on('click', 'naval-activity-dots', e => {
+      if (!e.features?.length) return;
+      const p = e.features[0].properties as any;
+      const coords = (e.features[0].geometry as any).coordinates;
+      const level = Number(p.level) || 1;
+      const color = level >= 3 ? '#00ACC1' : level >= 2 ? '#26C6DA' : '#80DEEA';
+      popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
+        <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط بحري عسكري عام</div>
+        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي من ملاحظات AIS عامة مصنفة عسكريًا. لا تُعرض أسماء السفن أو MMSI أو السرعة أو الاتجاه أو أي مسار فردي.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
+          <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
+          <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
+        </div>
+        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
       </div>`);
     });
 
@@ -2318,6 +2389,21 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     })) : []);
   }, [mapReady, data.gdelt_events, (activeLayers as any).gdelt_events, setGeo]);
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const al = activeLayers as any;
+    setGeo('civil-unrest', al.civil_unrest && Array.isArray(data.civil_unrest) ? data.civil_unrest.map((e: any) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+      properties: {
+        name: e.name, country: e.country, quad: e.quad, quad_label: e.quad_label,
+        event_code: e.event_code, root_code: e.root_code, event_category: e.event_category,
+        event_label_ar: e.event_label_ar, corroboration: e.corroboration, precision: e.precision,
+        tone: e.tone, goldstein: e.goldstein, articles: e.articles, sources: e.sources, url: e.url, date: e.date,
+      },
+    })) : []);
+  }, [mapReady, data.civil_unrest, (activeLayers as any).civil_unrest, setGeo]);
+
   /* ── Cloudflare Radar: outages ── */
   useEffect(() => {
     if (!mapReady) return;
@@ -2539,7 +2625,21 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('maritime', activeLayers.maritime && data.maritime_ports ? data.maritime_ports.map((p: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { name: p.name, country: p.country, type: p.type, volume: p.volume, fleet: p.fleet, rank: p.rank } })) : []);
     setGeo('maritime-choke', activeLayers.maritime && data.maritime_chokepoints ? data.maritime_chokepoints.map((c: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { name: c.name, traffic: c.traffic, risk: c.risk } })) : []);
     setGeo('maritime-ships', activeLayers.maritime && data.maritime_ships ? data.maritime_ships.map((s: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] }, properties: { name: s.name || s.mmsi?.toString(), type: s.type || 'cargo', speed: s.speed, heading: s.heading, destination: s.destination, flag: s.flag } })) : []);
-  }, [mapReady, data.maritime_ports, data.maritime_chokepoints, data.maritime_ships, activeLayers.maritime, setGeo]);
+    setGeo('naval-activity', (activeLayers as any).naval_activity && Array.isArray(data.naval_activity) ? data.naval_activity.map((cell: any) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [cell.lng, cell.lat] },
+      properties: {
+        level: cell.level,
+        activity: cell.activity,
+        approximate_count: cell.approximate_count,
+        cell_degrees: cell.cell_degrees,
+        precision: cell.precision,
+        time_precision: cell.time_precision,
+        observed_at_bucket: cell.observed_at_bucket,
+        reporting_mode: cell.reporting_mode,
+      },
+    })) : []);
+  }, [mapReady, data.maritime_ports, data.maritime_chokepoints, data.maritime_ships, data.naval_activity, activeLayers.maritime, (activeLayers as any).naval_activity, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;
