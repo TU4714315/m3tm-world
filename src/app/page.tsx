@@ -27,6 +27,7 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import ArcGISPanel from '@/components/ArcGISPanel';
+import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -79,14 +80,14 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
+  flights: true, private: true, jets: true, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
-  cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
+  cables: true, sdk_sea: true, sdk_air: true, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
-  cf_outages: false, cf_attacks: false, app_news: true, alert_pins: true, country_borders: true,
+  cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
 };
 
 const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
@@ -94,7 +95,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'flights', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'flights', 'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -1361,13 +1362,8 @@ export default function Dashboard() {
               />
             </div>
 
-                        {/* ── M3TM.WORLD logo — transparent alpha version, original colors preserved ── */}
-                                    <img
-                                      dir="ltr"
-                                      src="/branding/m3tm-world-logo-transparent.png"
-                                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                                      className="w-64 md:w-80 h-auto object-contain rounded-md mb-3 z-[2]"
-                                    />
+                        {/* M3TM.WORLD vector brand — true transparent background, no raster halo */}
+                                    <WorldBrandMark variant="hero" className="mb-3 z-[2]" />
 
             {/* ── Subtitle — typewriter reveal ── */}
             <div className="overflow-hidden mb-8 z-[2]">
@@ -1605,12 +1601,7 @@ export default function Dashboard() {
             {/* ── HEADER ── */}
       <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
         <div dir="ltr" className="flex items-center gap-3 w-fit">
-          <img
-                      dir="ltr"
-                      src="/branding/m3tm-world-logo-transparent.png"
-                      alt="M3TM.WORLD — خريطة عالمية للبيانات الحية"
-                      className="w-[110px] md:w-[150px] max-w-full h-auto object-contain shrink-0 rounded-[5px]"
-                    />
+          <WorldBrandMark variant="header" className="shrink-0" />
           <div dir="rtl" className="hidden sm:flex flex-col items-start gap-0.5 pr-1">
             <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">بيانات عامة · مصادر منشورة · عرض مباشر</span>
           </div>
