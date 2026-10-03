@@ -513,13 +513,18 @@ export default function Dashboard() {
       .then(p => {
         if (!p) return;
         const configured = Boolean(p.configured);
-        setCapabilities(current => ({ ...current, cloudflare: configured }));
+        const fallbackAvailable = Boolean(p.fallback_available);
+        setCapabilities(current => ({ ...current, cloudflare: configured || fallbackAvailable }));
         dataRef.current = {
           ...dataRef.current,
           cloudflare_source_status: {
-            status: configured ? 'configured' : 'not_configured',
+            status: configured ? 'configured' : fallbackAvailable ? 'active_fallback' : 'not_configured',
             configured,
-            provider: String(p.source || 'Cloudflare Radar'),
+            fallback_active: !configured && fallbackAvailable,
+            provider: configured
+              ? String(p.source || 'Cloudflare Radar')
+              : String(p.fallback_source || 'GDELT 2.0 + abuse.ch Feodo Tracker'),
+            source_mode: configured ? 'cloudflare-radar' : fallbackAvailable ? 'public-fallback' : 'unavailable',
             timestamp: new Date().toISOString(),
           },
         };
@@ -980,15 +985,19 @@ export default function Dashboard() {
       }));
     }
 
-    // Cloudflare Radar — one request backs both layers
+    // Network events — Cloudflare Radar when configured, otherwise factual public fallbacks.
     if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
       loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
         cloudflare_source_status: {
-          status: d.configured === false ? 'not_configured' : d.partial ? 'partial' : 'active',
-          configured: d.configured !== false,
+          status: d.fallback_active ? 'active_fallback' : d.configured === false ? 'not_configured' : d.partial ? 'partial' : 'active',
+          configured: d.configured === true,
+          fallback_active: d.fallback_active === true,
           provider: d.source ?? 'Cloudflare Radar',
+          source_mode: d.source_mode ?? (d.fallback_active ? 'public-fallback' : 'cloudflare-radar'),
+          cloudflare_status: d.cloudflare_status ?? (d.configured ? 'active' : 'not_configured'),
+          providers: d.providers ?? {},
           timestamp: d.timestamp ?? new Date().toISOString(),
           partial: d.partial === true,
         },
