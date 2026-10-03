@@ -34,14 +34,25 @@ function nearestAllowed(raw: string | null, allowed: readonly number[], fallback
   , allowed[0] ?? fallback);
 }
 
+function durableProfile(quads: number[], minArticles: number, limit: number): string | null {
+  const quadKey = quads.join(',');
+  if (quadKey === '' && minArticles === 1 && limit === 600) return 'default';
+  if (quadKey === '4' && minArticles === 2 && limit === 600) return 'conflict';
+  if (quadKey === '3,4' && minArticles === 2 && limit === 1000) return 'conflict-unrest';
+  return null;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   const quads = parseQuads(searchParams.get('quad'));
   const minArticles = nearestAllowed(searchParams.get('min_articles'), ALLOWED_MIN_ARTICLES, 1);
   const limit = Math.min(MAX_LIMIT, nearestAllowed(searchParams.get('limit'), ALLOWED_LIMITS, 600));
-  const cacheKey = 'm3tm:public:gdelt-events:v2:' + (quads.join('-') || 'all') + ':' + minArticles + ':' + limit;
-  const previous = await durableGetJson<any>(cacheKey);
+  const profile = durableProfile(quads, minArticles, limit);
+  const cacheKey = profile ? `m3tm:public:gdelt-events:v3:${profile}` : null;
+  const previous = cacheKey
+    ? await durableGetJson<any>(cacheKey)
+    : { value: null, backend: 'miss' as const };
 
   try {
     const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit });
@@ -66,7 +77,7 @@ export async function GET(req: Request) {
       durable_cache_configured: durableCacheConfigured(),
       cache_backend: previous.backend,
     };
-    if (publicEvents.length > 0) payload.cache_backend = await durableSetJson(cacheKey, payload, 60 * 60);
+    if (cacheKey && publicEvents.length > 0) payload.cache_backend = await durableSetJson(cacheKey, payload, 60 * 60);
 
     return NextResponse.json(
       payload,
