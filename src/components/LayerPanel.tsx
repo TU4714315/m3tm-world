@@ -227,6 +227,7 @@ function statusArabic(value: unknown): string {
     case 'not_configured': return 'غير مهيأ';
     case 'unavailable': return 'غير متاح';
     case 'empty': return 'لا بيانات';
+    case 'not_used': return 'غير مستخدم';
     case 'partial': return 'جزئي';
     default: return value ? String(value) : 'لم يُفحص';
   }
@@ -349,7 +350,8 @@ function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloud
         <div className="mt-1 text-cyan-200/70">
           Cloudflare Radar يعمل جزئيًا؛ يُستخدم البديل العام فقط للقسم المتعذر.
           {' '}Radar/الأحداث: {statusArabic(source.providers?.cloudflare_outages)} · Radar/التهديدات: {statusArabic(source.providers?.cloudflare_attacks)}
-          {' '}· GDELT: {statusArabic(source.providers?.gdelt)} · abuse.ch: {statusArabic(source.providers?.abuse_ch)}.
+          {source.fallback_sections?.outages === true && <> · GDELT: {statusArabic(source.providers?.gdelt)}</>}
+          {source.fallback_sections?.attacks === true && <> · abuse.ch: {statusArabic(source.providers?.abuse_ch)}</>}.
         </div>
       )}
       {kind === 'cloudflare' && source.configured === false && source.fallback_active !== true && (
