@@ -505,8 +505,8 @@ export default function Dashboard() {
     if (!isEmbeddedFrame && p.has('layers')) {
       setActiveLayers(prev => restoreLayerState(prev, p));
     }
-    // Probe credential-gated feeds without exposing credentials. Keep their
-    // controls visible as disabled/غير مهيأ when configuration is missing.
+    // Probe credential-gated feeds without exposing credentials. Provider
+    // readiness is status only and never overrides the user's layer selection.
     fetch('/api/cloudflare-radar?probe=1', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : null))
       .then(p => {
@@ -523,7 +523,6 @@ export default function Dashboard() {
           },
         };
         setDataVersion(v => v + 1);
-        if (!configured) setActiveLayers(prev => ({ ...prev, cf_outages: false, cf_attacks: false }));
       })
       .catch(() => {
         dataRef.current = {
