@@ -127,10 +127,17 @@ describe('public feed readiness projection', () => {
         status: 'active_fallback',
         configured: false,
         fallback_active: true,
+        fallback_sections: { outages: true, attacks: false, secret: 'strip-me' },
         provider: 'GDELT 2.0 + abuse.ch Feodo Tracker',
         source_mode: 'public-fallback',
         cloudflare_status: 'not_configured',
-        providers: { gdelt: 'active', abuse_ch: 'active', secret_backend: 'strip-me' },
+        providers: {
+          cloudflare_outages: 'not_configured',
+          cloudflare_attacks: 'not_configured',
+          gdelt: 'active',
+          abuse_ch: 'active',
+          secret_backend: 'strip-me',
+        },
         timestamp: '2026-09-30T22:00:00Z',
         internalEndpoint: 'http://10.0.0.8',
       },
@@ -148,10 +155,16 @@ describe('public feed readiness projection', () => {
       status: 'active_fallback',
       configured: false,
       fallback_active: true,
+      fallback_sections: { outages: true, attacks: false },
       provider: 'GDELT 2.0 + abuse.ch Feodo Tracker',
       source_mode: 'public-fallback',
       cloudflare_status: 'not_configured',
-      providers: { gdelt: 'active', abuse_ch: 'active' },
+      providers: {
+        cloudflare_outages: 'not_configured',
+        cloudflare_attacks: 'not_configured',
+        gdelt: 'active',
+        abuse_ch: 'active',
+      },
     });
     const serialized = JSON.stringify(result);
     for (const forbidden of ['never-public', 'internal deployment detail', '10.0.0.8', 'strip-me', 'secret_backend']) {
