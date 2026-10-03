@@ -323,8 +323,8 @@ export async function GET(req: Request) {
       source_mode: fallbackActive ? 'mixed' : 'cloudflare-radar',
       cloudflare_status: outagesRes.ok && attacksRes.ok ? 'active' : 'partial',
       providers: {
-        cloudflare_outages: outagesRes.ok ? 'active' : 'unavailable',
-        cloudflare_attacks: attacksRes.ok ? 'active' : 'unavailable',
+        cloudflare_outages: outagesRes.ok ? stateFor(cloudflareOutages, false) : 'unavailable',
+        cloudflare_attacks: attacksRes.ok ? stateFor(cloudflareAttackOrigins, false) : 'unavailable',
         ...fallback.providers,
       },
       ...(partial ? { partial: true } : {}),
