@@ -956,6 +956,8 @@ export default function Dashboard() {
         conflict_live_events: d.liveEvents ?? [],
         conflict_source_status: d.sourceStatus ?? null,
         conflict_category_counts: d.categoryCounts ?? {},
+        conflict_data_state: d.dataState ?? 'live',
+        conflict_served_at: d.servedAt ?? d.timestamp ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
@@ -1033,6 +1035,8 @@ export default function Dashboard() {
         conflict_live_events: d.liveEvents ?? [],
         conflict_source_status: d.sourceStatus ?? null,
         conflict_category_counts: d.categoryCounts ?? {},
+        conflict_data_state: d.dataState ?? 'live',
+        conflict_served_at: d.servedAt ?? d.timestamp ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
