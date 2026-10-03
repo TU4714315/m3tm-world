@@ -370,9 +370,11 @@ function parseGdeltDate(dateAdded: string, sqlDate: string): string {
 export interface FetchOptions {
   /** Keep only these QuadClass values. Empty means keep all. */
   quads?: number[];
+  /** Keep only event codes that start with one of these prefixes. Empty means keep all. */
+  eventCodePrefixes?: string[];
   /** Drop events backed by fewer than this many articles. */
   minArticles?: number;
-  /** Maximum events to return, newest-by-file-order first. */
+  /** Maximum events to return after all filters, newest-by-file-order first. */
   limit?: number;
 }
 
@@ -385,7 +387,7 @@ export interface GdeltEventsResult {
 }
 
 export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
-  const { quads = [], minArticles = 1, limit = 600 } = opts;
+  const { quads = [], eventCodePrefixes = [], minArticles = 1, limit = 600 } = opts;
 
   const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
 
@@ -418,9 +420,14 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     const quad = Number(c[COL.quadClass]) || 0;
     if (quads.length > 0 && !quads.includes(quad)) continue;
 
+    // Apply event-code selection before the result limit. Otherwise a busy
+    // export can fill the limit with unrelated QuadClass rows and hide a
+    // matching event later in the same 15-minute file.
+    const eventCode = c[COL.eventCode] || '';
+    if (eventCodePrefixes.length > 0 && !eventCodePrefixes.some(prefix => eventCode.startsWith(prefix))) continue;
+
     const actor1Lat = Number(c[COL.actor1GeoLat]);
     const actor1Lng = Number(c[COL.actor1GeoLong]);
-    const eventCode = c[COL.eventCode] || '';
     const rootCode = c[COL.eventRootCode] || '';
     const sources = Number(c[COL.numSources]) || 0;
     const semantics = classifyPublicEvent(eventCode, rootCode, quad, sources, articles);
