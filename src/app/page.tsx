@@ -1067,6 +1067,26 @@ export default function Dashboard() {
         },
       })), 1800000));
     }
+
+    // Network-event monitor: refresh source-backed public observations without
+    // depending on a Cloudflare credential. Cloudflare remains preferred when configured.
+    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/cloudflare-radar', d => ({
+        cf_outages: d.outages ?? [],
+        cf_attack_origins: d.attack_origins ?? [],
+        cloudflare_source_status: {
+          status: d.fallback_active ? 'active_fallback' : d.configured === false ? 'not_configured' : d.partial ? 'partial' : 'active',
+          configured: d.configured === true,
+          fallback_active: d.fallback_active === true,
+          provider: d.source ?? 'Cloudflare Radar',
+          source_mode: d.source_mode ?? (d.fallback_active ? 'public-fallback' : 'cloudflare-radar'),
+          cloudflare_status: d.cloudflare_status ?? (d.configured ? 'active' : 'not_configured'),
+          providers: d.providers ?? {},
+          timestamp: d.timestamp ?? new Date().toISOString(),
+          partial: d.partial === true,
+        },
+      }), undefined, { skipWhenHidden: true }), 180000));
+    }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
 
