@@ -280,10 +280,8 @@ export async function GET(req: Request) {
     });
   }
 
-  const fallbackPromise = fetchPublicFallback();
-
   if (!cloudflareConfigured) {
-    const fallback = await fallbackPromise;
+    const fallback = await fetchPublicFallback();
     return NextResponse.json(
       {
         configured: false,
@@ -304,7 +302,7 @@ export async function GET(req: Request) {
   }
 
   const signal = AbortSignal.timeout(20000);
-  const [outagesRes, attacksRes, fallback] = await Promise.all([
+  const [outagesRes, attacksRes] = await Promise.all([
     radarFetch('/annotations/outages?limit=50&format=json', signal).then(
       value => ({ ok: true as const, value }),
       () => ({ ok: false as const, value: null })
@@ -313,7 +311,6 @@ export async function GET(req: Request) {
       value => ({ ok: true as const, value }),
       () => ({ ok: false as const, value: null })
     ),
-    fallbackPromise,
   ]);
 
   const cloudflareOutages = outagesRes.ok ? mapCloudflareOutages(outagesRes.value) : [];
@@ -321,9 +318,17 @@ export async function GET(req: Request) {
 
   const useOutageFallback = !outagesRes.ok;
   const useAttackFallback = !attacksRes.ok;
+  const fallbackActive = useOutageFallback || useAttackFallback;
+  const fallback = fallbackActive
+    ? await fetchPublicFallback()
+    : {
+        networkEvents: [] as PublicNetworkEvent[],
+        threatIndicators: [] as PublicThreatIndicator[],
+        providers: { gdelt: 'empty' as const, abuse_ch: 'empty' as const },
+        errors: [] as string[],
+      };
   const outages = useOutageFallback ? fallback.networkEvents : cloudflareOutages;
   const attack_origins = useAttackFallback ? fallback.threatIndicators : cloudflareAttackOrigins;
-  const fallbackActive = useOutageFallback || useAttackFallback;
 
   return NextResponse.json(
     {
