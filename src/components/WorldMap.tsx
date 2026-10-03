@@ -2805,6 +2805,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         description: `${z.descriptionAr || z.description || ''}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
         sourceUrl: z.sourceUrl || '',
         eventCount: z.eventCount || 0,
+        dominantKind: z.dominantKind || 'other',
+        activityBand: z.activityBand || 'quiet',
+        dataState: data.conflict_data_state || 'live',
       },
     }));
     const events = (data.conflict_live_events || [])
@@ -2830,10 +2833,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           ageDays: e.ageDays ?? null,
           timePrecision: e.timePrecision ?? null,
           recencyWeight: e.recencyWeight ?? 0.45,
+          precision: e.precision || 'unknown',
+          dataState: data.conflict_data_state || 'live',
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
-  }, [mapReady, data.conflict_zones, data.conflict_live_events, setGeo]);
+  }, [mapReady, data.conflict_zones, data.conflict_live_events, data.conflict_data_state, setGeo]);
 
 
   // Visibility
@@ -2849,6 +2854,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     if (!anySat) { satRowsRef.current = []; satLayerRef.current?.setPoints([]); }
     setVis(['gdelt-incident-halo','gdelt-incident-icons'], activeLayers.global_incidents);
     setVis(['gdelt-event-halo','gdelt-event-icons'], (activeLayers as any).gdelt_events);
+    setVis(['civil-unrest-halo','civil-unrest-icons'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
 
@@ -2861,6 +2867,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
     setVis(['fl-military-halo','fl-military'], activeLayers.military);
     setVis(['military-activity-halo','military-activity-dots','military-activity-label'], (activeLayers as any).military_activity);
+    setVis(['naval-activity-halo','naval-activity-dots','naval-activity-label'], (activeLayers as any).naval_activity);
     setVis(['military-satellite-activity-halo','military-satellite-activity-dots','military-satellite-activity-label'], (activeLayers as any).sat_military);
     setVis(['cctv-glow','cctv-dots','cctv-label'], activeLayers.cctv);
     setVis(['fires-heat'], activeLayers.fires);
