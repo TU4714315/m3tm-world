@@ -256,9 +256,9 @@ interface PublicMilitaryActivitySnapshot {
   observed_at: string;
 }
 
-function buildPublicMilitaryActivity(flights: any[]): PublicMilitaryActivityCell[] {
+function buildPublicMilitaryActivity(flights: any[], observedAtMs = Date.now()): PublicMilitaryActivityCell[] {
   const observedAtBucket = new Date(
-    Math.floor(Date.now() / PUBLIC_MILITARY_TIME_BUCKET_MS) * PUBLIC_MILITARY_TIME_BUCKET_MS
+    Math.floor(observedAtMs / PUBLIC_MILITARY_TIME_BUCKET_MS) * PUBLIC_MILITARY_TIME_BUCKET_MS
   ).toISOString();
   const buckets = new Map<string, { lat: number; lng: number; count: number }>();
   for (const flight of flights) {
@@ -297,8 +297,11 @@ function annotateMilitaryTrend(
   current: PublicMilitaryActivityCell[],
   previous: PublicMilitaryActivityCell[],
   observedAt: string,
+  now = Date.now(),
 ): PublicMilitaryActivityCell[] {
   const previousById = new Map(previous.map(cell => [cell.id, cell]));
+  const observedMs = Date.parse(observedAt);
+  const ageSeconds = Number.isFinite(observedMs) ? Math.max(0, Math.round((now - observedMs) / 1000)) : 0;
   return current.map(cell => {
     const prior = previousById.get(cell.id);
     const trend: PublicMilitaryActivityCell['trend'] = !prior
@@ -308,7 +311,7 @@ function annotateMilitaryTrend(
         : cell.level < prior.level
           ? 'down'
           : 'steady';
-    return { ...cell, trend, data_state: 'live', observed_at: observedAt, age_seconds: 0 };
+    return { ...cell, trend, data_state: 'live', observed_at: observedAt, age_seconds: ageSeconds };
   });
 }
 
@@ -578,7 +581,7 @@ export async function GET(req: Request) {
     const militaryObservedAtMs = osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
     const observedAt = new Date(militaryObservedAtMs).toISOString();
     const previousMilitary = await durableGetJson<PublicMilitaryActivitySnapshot>(PUBLIC_MILITARY_CACHE_KEY);
-    let militaryActivity = buildPublicMilitaryActivity(military);
+    let militaryActivity = buildPublicMilitaryActivity(military, militaryObservedAtMs);
     let militaryActivityCacheBackend: string = previousMilitary.backend;
     let militaryActivityStale = false;
 
@@ -639,7 +642,11 @@ export async function GET(req: Request) {
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
       flight_source_status: {
-        status: (!militaryActivityStale && militaryActivity.length) || commercial.length || privateFl.length || jets.length ? 'active' : 'empty',
+        status: commercial.length || privateFl.length || jets.length || (!militaryActivityStale && militaryActivity.length)
+          ? 'active'
+          : militaryActivityStale
+            ? 'degraded'
+            : 'empty',
         provider: source,
         providers: {
           adsbfi_mil: milCount,
