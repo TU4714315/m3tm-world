@@ -26,6 +26,11 @@ describe('fetchGdeltEvents', () => {
     expect(classifyPublicEvent('1832', '18', 4, 1, 1).event_category).toBe('bombing');
     expect(classifyPublicEvent('190', '19', 4, 2, 2).event_category).toBe('armed_clash');
     expect(classifyPublicEvent('200', '20', 4, 1, 1).event_category).toBe('mass_violence');
+    expect(classifyPublicEvent('141', '14', 3, 2, 4)).toMatchObject({
+      event_category: 'civil_unrest',
+      event_label_ar: 'احتجاج أو اضطراب مدني مُبلّغ عنه',
+      corroboration: 'multi-source-report',
+    });
   });
 
   it('builds generalized public event links without representing a movement trajectory', () => {
