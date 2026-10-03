@@ -62,6 +62,42 @@ const publicMilitaryActivityCells = (value: unknown) => list(value).flatMap((raw
   }];
 });
 
+const publicNavalActivityCells = (value: unknown) => list(value).flatMap((raw) => {
+  const cell = record(raw);
+  const lat = finite(cell.lat);
+  const lng = finite(cell.lng);
+  if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return [];
+  return [{
+    id: stringOrNull(cell.id),
+    lat,
+    lng,
+    level: finite(cell.level),
+    activity: stringOrNull(cell.activity),
+    approximate_count: stringOrNull(cell.approximate_count),
+    cell_degrees: finite(cell.cell_degrees),
+    precision: stringOrNull(cell.precision),
+    time_precision: stringOrNull(cell.time_precision),
+    observed_at_bucket: stringOrNull(cell.observed_at_bucket),
+    reporting_mode: stringOrNull(cell.reporting_mode),
+  }];
+});
+
+const publicNavalActivityMeta = (value: unknown) => {
+  const meta = record(value);
+  return {
+    mode: stringOrNull(meta.mode),
+    source_mode: stringOrNull(meta.source_mode),
+    cell_degrees: finite(meta.cell_degrees),
+    minimum_group: finite(meta.minimum_group),
+    time_precision: stringOrNull(meta.time_precision),
+    identifiers_exposed: meta.identifiers_exposed === true,
+    exact_tracks_exposed: meta.exact_tracks_exposed === true,
+    speed_heading_exposed: meta.speed_heading_exposed === true,
+    unobserved_vessels_inferred: meta.unobserved_vessels_inferred === true,
+    absence_semantics: stringOrNull(meta.absence_semantics),
+  };
+};
+
 const publicMilitarySatelliteCells = (value: unknown) => list(value).flatMap((raw) => {
   const cell = record(raw);
   const lat = finite(cell.lat);
@@ -168,6 +204,7 @@ const publicMaritimeSourceStatus = (value: unknown) => {
       configured: ais.configured === true,
       provider: stringOrNull(ais.provider),
       public_ships: finite(ais.public_ships),
+      military_public_cells: finite(ais.military_public_cells),
       latest_observed_at: stringOrNull(ais.latest_observed_at),
       latest_observation_age_s: finite(ais.latest_observation_age_s),
       persistence: stringOrNull(ais.persistence),
@@ -215,6 +252,8 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     maritime_ports: list(data.maritime_ports),
     maritime_chokepoints: list(data.maritime_chokepoints),
     maritime_ships: list(data.maritime_ships).filter(s => !vesselIsMilitary(s)),
+    naval_activity: publicNavalActivityCells(data.naval_activity),
+    naval_activity_meta: publicNavalActivityMeta(data.naval_activity_meta),
     maritime_source_status: publicMaritimeSourceStatus(data.maritime_source_status),
     maritime_source: stringOrNull(data.maritime_source),
     maritime_timestamp: stringOrNull(data.maritime_timestamp),
@@ -235,6 +274,7 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     cloudflare_source_status: publicCloudflareSourceStatus(data.cloudflare_source_status),
     gdelt: list(data.gdelt),
     gdelt_events: list(data.gdelt_events),
+    civil_unrest: list(data.civil_unrest),
     reported_routes: list(data.reported_routes),
     reported_routes_meta: data.reported_routes_meta || null,
     conflict_zones: list(data.conflict_zones),
