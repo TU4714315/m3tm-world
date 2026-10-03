@@ -230,10 +230,20 @@ const publicMaritimeSourceStatus = (value: unknown) => {
 
 const publicCloudflareSourceStatus = (value: unknown) => {
   const status = record(value);
+  const providers = record(status.providers);
   return {
     status: stringOrNull(status.status),
     configured: status.configured === true,
+    fallback_active: status.fallback_active === true,
     provider: stringOrNull(status.provider),
+    source_mode: stringOrNull(status.source_mode),
+    cloudflare_status: stringOrNull(status.cloudflare_status),
+    providers: {
+      cloudflare_outages: stringOrNull(providers.cloudflare_outages),
+      cloudflare_attacks: stringOrNull(providers.cloudflare_attacks),
+      gdelt: stringOrNull(providers.gdelt),
+      abuse_ch: stringOrNull(providers.abuse_ch),
+    },
     timestamp: stringOrNull(status.timestamp),
     partial: status.partial === true,
   };
