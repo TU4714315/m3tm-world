@@ -322,14 +322,14 @@ export async function GET() {
   const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
   const servedAt = new Date().toISOString();
   try {
-    const { events: liveEvents, eventsByRegion, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
+    const { events: liveEvents, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
 
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
       const zoneEvents = liveEvents.filter(event =>
         event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
         event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
       );
-      const eventCount = eventsByRegion[zone.id] || 0;
+      const eventCount = zoneEvents.length;
       const eventKinds = summarizeKinds(zoneEvents);
       const dominantKind = Object.entries(eventKinds).sort((a, b) => b[1] - a[1])[0]?.[0] || 'other';
 
