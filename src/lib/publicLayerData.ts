@@ -239,6 +239,31 @@ const publicCloudflareSourceStatus = (value: unknown) => {
   };
 };
 
+
+const publicAirSdkEntities = (...values: unknown[]) => {
+  const flights = values.flatMap(list).flatMap((raw) => {
+    const flight = record(raw);
+    const lat = finite(flight.lat);
+    const lng = finite(flight.lng);
+    if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return [];
+    return [{ lat, lng }];
+  });
+  if (!flights.length) return [];
+  const step = Math.max(1, Math.ceil(flights.length / 60));
+  return flights
+    .filter((_, index) => index % step === 0)
+    .slice(0, 60)
+    .map(({ lat, lng }) => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+      properties: {
+        domain: 'AIR',
+        name: 'رصد جوي عام',
+        source: 'ADS-B / OpenSky',
+      },
+    }));
+};
+
 export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unknown[] = []) {
   return {
     live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : list(data.live_feeds),
@@ -296,6 +321,6 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
     frontlines_meta: data.frontlines_meta || null,
     earthquakes: list(data.earthquakes),
-    sdk_entities: [],
+    sdk_entities: publicAirSdkEntities(data.commercial_flights, data.private_flights, data.private_jets),
   };
 }
