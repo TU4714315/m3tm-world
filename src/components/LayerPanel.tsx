@@ -222,7 +222,7 @@ function statusArabic(value: unknown): string {
     case 'ok': case 'active': return 'نشط';
     case 'configured': return 'مهيأ';
     case 'connecting': return 'جارٍ الاتصال';
-    case 'configured_no_data': return 'مهيأ · لا رصد حي';
+    case 'configured_no_data': return 'مهيأ · لا توجد بيانات حاليًا';
     case 'not_configured': return 'غير مهيأ';
     case 'unavailable': return 'غير متاح';
     case 'empty': return 'لا بيانات';
@@ -337,7 +337,7 @@ function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloud
       </div>
       {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
       {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ النشاط العسكري البحري يُعرض كتجميع إقليمي فقط، ولا توجد أسماء/MMSI/سرعة/اتجاه/مسارات دقيقة.</div>}
-      {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ لا تُعرض بيانات انقطاع أو هجمات حتى إضافة اعتماد Radar: Read على الخادم.</div>}
+      {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ الطبقة متاحة وغير مقفلة، وستعرض البيانات تلقائيًا عند توفر اعتماد Radar: Read على الخادم.</div>}
     </div>
   );
 }
@@ -453,6 +453,29 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     return found ? total : null;
   };
 
+  const getLayerStatus = (layer: LayerDef, isActive: boolean, count: number | null): string => {
+    if (!isActive) return 'متوقف';
+
+    if (layer.requires) {
+      const capability = capabilities[layer.requires];
+      if (capability === false) return 'غير مهيأ';
+      if (capability !== true) return 'يفحص';
+    }
+
+    if (['flights', 'private', 'jets', 'sdk_air'].includes(layer.key)) {
+      if (!data?.flight_source_status) return 'جارٍ التحميل';
+      if ((count ?? 0) === 0) return 'لا توجد بيانات';
+    }
+
+    if (layer.key === 'naval_activity') {
+      const ais = data?.maritime_source_status?.ais;
+      if (ais?.configured === false || ais?.status === 'not_configured') return 'غير مهيأ';
+      if (ais && (count ?? 0) === 0) return 'لا توجد بيانات';
+    }
+
+    return 'نشط';
+  };
+
   /* ── MOBILE ── */
   if (isMobile) {
     return (
@@ -484,7 +507,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                     </span>
                     <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                      {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
+                      {getLayerStatus(layer, !!isLayerActive, count)}
                     </span>
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
@@ -684,7 +707,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
                             </span>
                             <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                              {capabilityUnavailable ? (capabilities[layer.requires as string] === false ? 'غير مهيأ' : 'يفحص') : isLayerActive ? 'نشط' : 'متوقف'}
+                              {getLayerStatus(layer, !!isLayerActive, count)}
                             </span>
                             {count !== null && (
                               <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>

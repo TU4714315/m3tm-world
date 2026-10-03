@@ -18,6 +18,10 @@ describe('WORLD public defaults and branding', () => {
     expect(page).not.toContain('/branding/m3tm-world-logo-transparent.png');
     expect(brand).toContain('<svg');
     expect(brand).toContain('bg-transparent');
+    expect(brand).toContain('بيانات عالمية · مصادر منشورة · عرض حي');
+    expect(brand).toContain('ellipse');
+    expect(brand).toContain('m3tm-gold');
     expect(brand).not.toContain('<img');
+    expect(brand).not.toContain('<rect');
   });
 });
