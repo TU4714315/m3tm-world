@@ -12,6 +12,12 @@ describe('public layer readiness messaging', () => {
     expect(panel).toContain("case 'active_fallback': return 'نشط · مصدر عام بديل'");
     expect(panel).toContain("layer.key === 'cf_outages' || layer.key === 'cf_attacks'");
     expect(panel).toContain('بنية C2 مرصودة لا بلد المهاجم');
+    expect(panel).toContain("source.source_mode === 'public-fallback'");
+    expect(panel).toContain("source.source_mode === 'mixed'");
+    expect(panel).toContain("source?.fallback_sections?.outages === true");
+    expect(panel).toContain("source?.fallback_sections?.attacks === true");
+    expect(panel).toContain("fallbackState === 'unavailable'");
+    expect(panel).toContain("cloudflareState === 'unavailable'");
   });
 
   it('keeps provider availability as status text rather than a disabled control', () => {

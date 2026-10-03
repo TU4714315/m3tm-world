@@ -370,9 +370,11 @@ function parseGdeltDate(dateAdded: string, sqlDate: string): string {
 export interface FetchOptions {
   /** Keep only these QuadClass values. Empty means keep all. */
   quads?: number[];
+  /** Keep only event codes that start with one of these prefixes. Empty means keep all. */
+  eventCodePrefixes?: string[];
   /** Drop events backed by fewer than this many articles. */
   minArticles?: number;
-  /** Maximum events to return, newest-by-file-order first. */
+  /** Maximum events to return after all filters, newest-by-file-order first. */
   limit?: number;
 }
 
@@ -384,20 +386,8 @@ export interface GdeltEventsResult {
   scanned: number;
 }
 
-export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
-  const { quads = [], minArticles = 1, limit = 600 } = opts;
-
-  const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
-
-  const exportUrl = manifest
-    .split('\n')
-    .map(l => l.trim())
-    .find(l => l.includes('.export.CSV.zip'))
-    ?.split(/\s+/)
-    .pop();
-  if (!exportUrl) throw new Error('No export archive listed in lastupdate.txt');
-
-  const { csv, url: resolvedUrl } = await fetchExportWithFallback(exportUrl);
+export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
+  const { quads = [], eventCodePrefixes = [], minArticles = 1, limit = 600 } = opts;
   const rows = csv.split('\n');
   const events: GdeltEvent[] = [];
 
@@ -409,7 +399,6 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
 
     const lat = Number(c[COL.actionGeoLat]);
     const lng = Number(c[COL.actionGeoLong]);
-    // Ungeocoded rows carry empty coordinates; 0,0 is the null-island artefact.
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
 
     const articles = Number(c[COL.numArticles]) || 0;
@@ -418,9 +407,13 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     const quad = Number(c[COL.quadClass]) || 0;
     if (quads.length > 0 && !quads.includes(quad)) continue;
 
+    // Event-code filtering belongs before the result limit. This guarantees a
+    // busy export cannot crowd out the monitored category with unrelated rows.
+    const eventCode = c[COL.eventCode] || '';
+    if (eventCodePrefixes.length > 0 && !eventCodePrefixes.some(prefix => eventCode.startsWith(prefix))) continue;
+
     const actor1Lat = Number(c[COL.actor1GeoLat]);
     const actor1Lng = Number(c[COL.actor1GeoLong]);
-    const eventCode = c[COL.eventCode] || '';
     const rootCode = c[COL.eventRootCode] || '';
     const sources = Number(c[COL.numSources]) || 0;
     const semantics = classifyPublicEvent(eventCode, rootCode, quad, sources, articles);
@@ -452,9 +445,26 @@ export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEv
     });
   }
 
+  return { events, scanned: rows.length };
+}
+
+export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
+  const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
+
+  const exportUrl = manifest
+    .split('\n')
+    .map(l => l.trim())
+    .find(l => l.includes('.export.CSV.zip'))
+    ?.split(/\s+/)
+    .pop();
+  if (!exportUrl) throw new Error('No export archive listed in lastupdate.txt');
+
+  const { csv, url: resolvedUrl } = await fetchExportWithFallback(exportUrl);
+  const { events, scanned } = parseGdeltEventsCsv(csv, opts);
+
   return {
     events,
     window: resolvedUrl.split('/').pop() || '',
-    scanned: rows.length,
+    scanned,
   };
 }

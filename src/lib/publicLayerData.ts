@@ -231,10 +231,15 @@ const publicMaritimeSourceStatus = (value: unknown) => {
 const publicCloudflareSourceStatus = (value: unknown) => {
   const status = record(value);
   const providers = record(status.providers);
+  const fallbackSections = record(status.fallback_sections);
   return {
     status: stringOrNull(status.status),
     configured: status.configured === true,
     fallback_active: status.fallback_active === true,
+    fallback_sections: {
+      outages: fallbackSections.outages === true,
+      attacks: fallbackSections.attacks === true,
+    },
     provider: stringOrNull(status.provider),
     source_mode: stringOrNull(status.source_mode),
     cloudflare_status: stringOrNull(status.cloudflare_status),

@@ -1610,15 +1610,44 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
-    // ── Cloudflare Radar: internet outage ──
+    // ── Public network events / Cloudflare Radar ──
     map.on('click', 'cf-outage-dots', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
+      const source = String(p.source || 'Cloudflare Radar');
+      const isReportedCyber = p.event_type === 'REPORTED_CYBER_EVENT' || source.startsWith('GDELT');
+      const src = urlSafe(p.url);
+
+      if (isReportedCyber) {
+        const accent = '#00D7E8';
+        const precision = p.precision === 'generalized-0.25deg'
+          ? 'موقع عام مُعمّم إلى 0.25°'
+          : 'موقع منشور';
+        popup(coords, `
+        <div style="${pStyle}border:1px solid ${accent}66;min-width:255px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
+            <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">حدث سيبراني مُبلّغ عنه</span>
+          </div>
+          <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name || 'موقع منشور')}</div>
+          ${p.description ? `<div style="color:#9B978E;font-size:10px;line-height:1.6;margin-bottom:8px;">${htmlEsc(p.description)}</div>` : ''}
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
+            <span style="opacity:0.6;">التصنيف</span><span style="color:#E8E6E0;">${htmlEsc(p.cause || 'CAMEO 176')}</span>
+            <span style="opacity:0.6;">الدقة</span><span style="color:#E8E6E0;">${precision}</span>
+            <span style="opacity:0.6;">التاريخ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start || '').slice(0, 16).replace('T', ' '))}</span>
+          </div>
+          <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#6E7777;">
+            ${htmlEsc(source)} · بلاغ منشور لا يعني تحققًا مستقلاً من M3TM.WORLD ولا يثبت انقطاعًا شاملاً للشبكة.
+          </div>
+          ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
+        </div>`);
+        return;
+      }
+
       // MapLibre serialises feature properties, so booleans can arrive as strings.
       const ongoing = p.ongoing === true || p.ongoing === 'true';
       const accent = ongoing ? '#FFB300' : '#8B7325';
-      const src = urlSafe(p.url);
       popup(coords, `
       <div style="${pStyle}border:1px solid ${accent}66;min-width:250px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -1635,21 +1664,44 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <span style="opacity:0.6;">بدأ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start).slice(0, 16).replace('T', ' '))}</span>
           ${p.end ? `<span style="opacity:0.6;">انتهى</span><span style="color:#E8E6E0;">${htmlEsc(String(p.end).slice(0, 16).replace('T', ' '))}</span>` : ''}
         </div>
-        <div style="margin-top:8px;font-size:9px;color:#5C5A54;">Cloudflare Radar</div>
+        <div style="margin-top:8px;font-size:9px;color:#5C5A54;">${htmlEsc(source)}</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">تفاصيل الرصد</a>` : ''}
       </div>`);
     });
 
-    // ── Cloudflare Radar: attack origin share ──
+    // ── Network threat indicators / Cloudflare Layer 3 ──
     map.on('click', 'cf-attack-dots', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
       const coords = (e.features[0].geometry as any).coordinates;
+      const source = String(p.source || 'Cloudflare Radar');
+      const isObservedC2 = p.indicator_type === 'observed-c2-infrastructure' || source.includes('Feodo');
+
+      if (isObservedC2) {
+        popup(coords, `
+        <div style="${pStyle}border:1px solid rgba(0,215,232,0.42);min-width:245px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="width:7px;height:7px;border-radius:50%;background:#00D7E8;box-shadow:0 0 8px #00D7E8;"></span>
+            <span style="color:#00D7E8;font-size:10px;font-weight:700;letter-spacing:0.08em;">بنية C2 مرصودة</span>
+          </div>
+          <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name || p.country)}</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
+            <span style="opacity:0.6;">الرصدات</span><span style="color:#E8E6E0;font-weight:700;">${htmlEsc(p.observations || 0)}</span>
+            <span style="opacity:0.6;">الحصة</span><span style="color:#7BE7EF;font-weight:700;">${htmlEsc(p.share)}%</span>
+            <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
+          </div>
+          <div style="margin-top:8px;font-size:9px;color:#6E7777;line-height:1.5;">
+            ${htmlEsc(source)} · الحصة من بنية C2 المرصودة في العينة العامة. البلد يصف موقع البنية المرصودة ولا يمثل إسنادًا لهوية أو بلد المهاجم.
+          </div>
+        </div>`);
+        return;
+      }
+
       popup(coords, `
       <div style="${pStyle}border:1px solid rgba(255,61,61,0.4);min-width:230px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:#FF3D3D;box-shadow:0 0 8px #FF3D3D;"></span>
-          <span style="color:#FF3D3D;font-size:10px;font-weight:700;letter-spacing:0.15em;">مصدر هجوم طبقة 3</span>
+          <span style="color:#FF3D3D;font-size:10px;font-weight:700;letter-spacing:0.08em;">مصدر حركة هجمات طبقة 3</span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name)}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
@@ -1657,7 +1709,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;line-height:1.5;">
-          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر · Cloudflare Radar
+          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر · ${htmlEsc(source)}
         </div>
       </div>`);
     });

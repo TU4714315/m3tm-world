@@ -338,9 +338,18 @@ function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloud
       </div>
       {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
       {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ النشاط العسكري البحري يُعرض كتجميع إقليمي فقط، ولا توجد أسماء/MMSI/سرعة/اتجاه/مسارات دقيقة.</div>}
-      {kind === 'cloudflare' && source.fallback_active === true && (
+      {kind === 'cloudflare' && source.source_mode === 'public-fallback' && (
         <div className="mt-1 text-cyan-200/70">
-          Cloudflare Radar غير مهيأ حاليًا؛ الرصد العام البديل نشط من GDELT وabuse.ch. أحداث GDELT بلاغات منشورة، ومؤشرات Feodo تمثل بنية C2 مرصودة لا بلد المهاجم.
+          Cloudflare Radar غير مهيأ؛ البديل العام يعمل بحسب حالة كل مصدر:
+          {' '}GDELT: {statusArabic(source.providers?.gdelt)} · abuse.ch: {statusArabic(source.providers?.abuse_ch)}.
+          {' '}بلاغات GDELT أحداث منشورة، ومؤشرات Feodo تمثل بنية C2 مرصودة لا بلد المهاجم.
+        </div>
+      )}
+      {kind === 'cloudflare' && source.source_mode === 'mixed' && (
+        <div className="mt-1 text-cyan-200/70">
+          Cloudflare Radar يعمل جزئيًا؛ يُستخدم البديل العام فقط للقسم المتعذر.
+          {' '}Radar/الأحداث: {statusArabic(source.providers?.cloudflare_outages)} · Radar/التهديدات: {statusArabic(source.providers?.cloudflare_attacks)}
+          {' '}· GDELT: {statusArabic(source.providers?.gdelt)} · abuse.ch: {statusArabic(source.providers?.abuse_ch)}.
         </div>
       )}
       {kind === 'cloudflare' && source.configured === false && source.fallback_active !== true && (
@@ -483,7 +492,19 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
 
     if (layer.key === 'cf_outages' || layer.key === 'cf_attacks') {
       const source = data?.cloudflare_source_status;
-      if (source?.fallback_active === true) return (count ?? 0) > 0 ? 'نشط · مصدر عام' : 'لا توجد بيانات';
+      const isOutageLayer = layer.key === 'cf_outages';
+      const usesFallback = isOutageLayer
+        ? source?.fallback_sections?.outages === true
+        : source?.fallback_sections?.attacks === true;
+      const fallbackState = isOutageLayer ? source?.providers?.gdelt : source?.providers?.abuse_ch;
+      const cloudflareState = isOutageLayer ? source?.providers?.cloudflare_outages : source?.providers?.cloudflare_attacks;
+
+      if (usesFallback) {
+        if (fallbackState === 'unavailable') return 'غير متاح';
+        if (fallbackState === 'empty') return 'لا توجد بيانات';
+        return (count ?? 0) > 0 ? 'نشط · مصدر عام' : 'لا توجد بيانات';
+      }
+      if (cloudflareState === 'unavailable') return 'غير متاح';
       if (source?.configured === false || source?.status === 'not_configured') return 'غير مهيأ';
       if (source && (count ?? 0) === 0) return 'لا توجد بيانات';
     }
