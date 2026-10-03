@@ -9,7 +9,7 @@ describe('public WORLD source-backed layer projection', () => {
       maritime_ports: [{ id: 'port-1' }], maritime_chokepoints: [{ id: 'choke-1' }],
       submarine_cables: [{ id: 'cable-1' }], balloons: [{ id: 'balloon-1' }],
       radiation: [{ id: 'station-1' }], cf_outages: [{ id: 'outage-1' }],
-      earthquakes: [{ id: 'quake-1' }], gdelt_events: [{ id: 'event-1' }], civil_unrest: [{ id: 'unrest-1' }], civil_unrest: [{ id: 'unrest-1' }],
+      earthquakes: [{ id: 'quake-1' }], gdelt_events: [{ id: 'event-1' }], civil_unrest: [{ id: 'unrest-1' }],
       conflict_live_events: [{ id: 'conflict-1' }], live_feeds: [{ id: 'feed-1' }],
     };
     const publicData = buildPublicLayerData(source);
@@ -37,8 +37,6 @@ describe('public WORLD source-backed layer projection', () => {
       commercial_flights: [{ id: 'civil-1' }],
       military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5, icao24: 'should-strip', token: 'strip-me' }],
       military_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, internalEndpoint: 'http://10.0.0.4' },
-      naval_activity: [{ id: 'naval-cell', lat: 3, lng: 105, approximate_count: '2-4', mmsi: '123456789', name: 'strip-me-naval', speed: 20 }],
-      naval_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, speed_heading_exposed: false, secret: 'strip-me-naval-meta' },
       flight_source_status: { status: 'active', exact_military_tracks_exposed: false, hostToken: 'strip-me' },
       military_satellite_activity: [{ lat: 20, lng: 30, approximate_count: '3-5', noradId: '99999', name: 'strip-me' }],
       naval_activity: [{ id: 'naval-cell', lat: 3, lng: 105, level: 1, approximate_count: '2-4', cell_degrees: 6, mmsi: 'should-strip', name: 'strip-me', speed: 22, heading: 180 }],
@@ -54,9 +52,6 @@ describe('public WORLD source-backed layer projection', () => {
     expect(result.military_activity[0]).toMatchObject({ id: 'aggregate-cell', lat: 24, lng: 48 });
     expect(result.military_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false });
     expect(result.flight_source_status).toMatchObject({ status: 'active', exact_military_tracks_exposed: false });
-    expect(result.naval_activity).toHaveLength(1);
-    expect(result.naval_activity[0]).toMatchObject({ id: 'naval-cell', lat: 3, lng: 105, approximate_count: '2-4' });
-    expect(result.naval_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, speed_heading_exposed: false });
     expect(result.military_satellite_activity[0]).toMatchObject({ lat: 20, lng: 30, approximate_count: '3-5' });
     expect(result.naval_activity[0]).toMatchObject({ id: 'naval-cell', lat: 3, lng: 105, approximate_count: '2-4', cell_degrees: 6 });
     expect(result.naval_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, speed_heading_exposed: false });
@@ -68,7 +63,7 @@ describe('public WORLD source-backed layer projection', () => {
     ]));
     expect(result.sdk_entities).toEqual([]);
     const serialized = JSON.stringify(result);
-    for (const forbidden of ['sensitive-track', 'sensitive-satellite', 'should-strip', 'strip-me', 'strip-me-naval', 'strip-me-naval-meta', '123456789', '10.0.0.4', '10.0.0.5', '99999']) {
+    for (const forbidden of ['sensitive-track', 'sensitive-satellite', 'should-strip', 'strip-me', '10.0.0.4', '10.0.0.5', '10.0.0.6', '99999']) {
       expect(serialized).not.toContain(forbidden);
     }
   });
