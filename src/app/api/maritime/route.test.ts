@@ -10,9 +10,9 @@ interface Ship {
 
 const ships = () => (globalThis as unknown as { shipsCache: Map<number, Ship> }).shipsCache;
 
-function addShip(mmsi: number, lat: number, lng: number) {
+function addShip(mmsi: number, lat: number, lng: number, type = 'cargo') {
   ships().set(mmsi, {
-    id: mmsi, mmsi, lat, lng, speed: 0, type: 'cargo',
+    id: mmsi, mmsi, lat, lng, speed: 0, type,
     name: `SHIP-${mmsi}`, timestamp: Date.now(),
   });
 }
@@ -64,6 +64,34 @@ describe('GET /api/maritime', () => {
       exact_military_tracks_exposed: false,
     });
     expect(JSON.stringify(body)).not.toContain('test-only-not-returned');
+  });
+
+  it('publishes only coarse naval activity when multiple military AIS observations share a region', async () => {
+    process.env.AIS_API_KEY = 'test-only-not-returned';
+    addShip(1001, 1.2, 103.8, 'military');
+    addShip(1002, 1.4, 103.9, 'military');
+
+    const body = await (await GET()).json();
+
+    expect(body.total_ships).toBe(0);
+    expect(body.naval_activity).toHaveLength(1);
+    expect(body.naval_activity[0]).toMatchObject({
+      precision: 'coarse-regional',
+      reporting_mode: 'public-ais-aggregate',
+      approximate_count: '2-4',
+      cell_degrees: 6,
+    });
+    expect(body.naval_activity_meta).toMatchObject({
+      identifiers_exposed: false,
+      exact_tracks_exposed: false,
+      speed_heading_exposed: false,
+      unobserved_vessels_inferred: false,
+    });
+    expect(body.source_status.ais.military_public_cells).toBe(1);
+    const encoded = JSON.stringify(body.naval_activity);
+    expect(encoded).not.toContain('1001');
+    expect(encoded).not.toContain('1002');
+    expect(encoded).not.toContain('SHIP-');
   });
 
   it('still counts the ships sitting off a port', async () => {
