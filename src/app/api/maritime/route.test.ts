@@ -94,6 +94,18 @@ describe('GET /api/maritime', () => {
     expect(encoded).not.toContain('SHIP-');
   });
 
+  it('withholds unclassified exact AIS rows until a civilian type is known', async () => {
+    process.env.AIS_API_KEY = 'test-only-not-returned';
+    ships().set(77, {
+      id: 77, mmsi: 77, lat: 1.25, lng: 103.82, speed: 7,
+      type: undefined as unknown as string, name: 'UNKNOWN-77', timestamp: Date.now(),
+    });
+    const body = await (await GET()).json();
+    expect(body.total_ships).toBe(0);
+    expect(JSON.stringify(body.ships)).not.toContain('UNKNOWN-77');
+    expect(JSON.stringify(body.ships)).not.toContain('77');
+  });
+
   it('still counts the ships sitting off a port', async () => {
     addShip(1, 1.26, 103.84); // on top of Singapore
     const body = await (await GET()).json();
