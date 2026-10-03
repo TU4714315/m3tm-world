@@ -51,8 +51,8 @@ interface PublicThreatIndicator {
   /** Percentage of currently observed Feodo rows in this country. */
   share: number;
   observations: number;
-  indicator_type: 'observed-c2-infrastructure';
-  source: 'abuse.ch Feodo Tracker';
+  indicator_type: 'observed-c2-infrastructure' | 'cloudflare-layer3-origin-share';
+  source: 'abuse.ch Feodo Tracker' | 'Cloudflare Radar';
 }
 
 interface RawAnnotation {
@@ -165,8 +165,8 @@ function mapCloudflareAttackOrigins(result: RadarResult): PublicThreatIndicator[
       lat: c[1],
       share: Number(Number(r?.value).toFixed(2)) || 0,
       observations: 0,
-      indicator_type: 'observed-c2-infrastructure',
-      source: 'abuse.ch Feodo Tracker',
+      indicator_type: 'cloudflare-layer3-origin-share',
+      source: 'Cloudflare Radar',
     });
   }
   return out;
