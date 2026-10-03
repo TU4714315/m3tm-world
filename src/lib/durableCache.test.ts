@@ -24,6 +24,20 @@ describe('durableCache', () => {
     expect(result.value).toEqual({ ok: true });
   });
 
+  it('never mixes a partial Upstash pair with KV credentials', async () => {
+    process.env.UPSTASH_REDIS_REST_URL = 'https://partial-upstash.example.test';
+    process.env.KV_REST_API_URL = 'https://kv.example.test';
+    process.env.KV_REST_API_TOKEN = 'kv-token';
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ result: 'OK' }), { status: 200 }));
+
+    expect(durableCacheConfigured()).toBe(true);
+    expect(await durableSetJson('pair', { ok: true }, 30)).toBe('redis');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://kv.example.test');
+    expect((fetchMock.mock.calls[0][1]?.headers as Record<string, string>).Authorization).toBe('Bearer kv-token');
+  });
+
   it('uses the Upstash-compatible REST command form when configured', async () => {
     process.env.UPSTASH_REDIS_REST_URL = 'https://cache.example.test';
     process.env.UPSTASH_REDIS_REST_TOKEN = 'server-only-token';
