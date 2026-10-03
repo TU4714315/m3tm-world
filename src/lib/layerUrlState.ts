@@ -1,12 +1,13 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '3';
+export const LAYER_URL_SCHEMA = '4';
 
-/** Public-awareness layers promoted to default-on in v3. Old bookmarks could not
+/** Public-awareness layers promoted to default-on in v4. Old bookmarks could not
  * express these defaults reliably, so they are enabled once during migration.
- * Once a URL is serialized as v3, explicit user off-choices are preserved. */
-const V3_DEFAULT_ON_LAYERS = new Set([
+ * Once a URL is serialized as v4, explicit user off-choices are preserved. */
+const V4_DEFAULT_ON_LAYERS = new Set([
   'app_news', 'country_borders',
   'military_activity', 'maritime', 'naval_activity',
+  'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks',
   'conflict_zones', 'conflict_density', 'frontlines', 'reported_routes',
   'gdelt_events', 'civil_unrest', 'alert_pins', 'global_incidents',
 ]);
@@ -19,11 +20,11 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   if (raw === null) return defaults;
   const active = new Set(raw.split(',').filter(Boolean));
   const schema = params.get('layers_v');
-  const migrateToV3 = schema !== LAYER_URL_SCHEMA;
+  const migrateToV4 = schema !== LAYER_URL_SCHEMA;
   const restored = { ...defaults };
   for (const key of Object.keys(defaults)) {
     (restored as Record<string, boolean>)[key] = active.has(key)
-      || (migrateToV3 && V3_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
+      || (migrateToV4 && V4_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
   }
   return restored;
 }
