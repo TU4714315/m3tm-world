@@ -13,7 +13,7 @@ const defaults = {
 
 describe('versioned WORLD layer bookmarks', () => {
   it('migrates old bookmarks to the v4 public-awareness defaults', () => {
-    const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=4&layers=flights'));
+    const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=3&layers=flights'));
     expect(restored.flights).toBe(true);
     expect(restored.cctv).toBe(false);
     expect(restored.military_activity).toBe(true);
