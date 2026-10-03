@@ -124,9 +124,13 @@ describe('public feed readiness projection', () => {
         reference: { status: 'active', provider: 'M3TM.WORLD curated static reference', ports: 50, chokepoints: 10 },
       },
       cloudflare_source_status: {
-        status: 'not_configured',
+        status: 'active_fallback',
         configured: false,
-        provider: 'Cloudflare Radar',
+        fallback_active: true,
+        provider: 'GDELT 2.0 + abuse.ch Feodo Tracker',
+        source_mode: 'public-fallback',
+        cloudflare_status: 'not_configured',
+        providers: { gdelt: 'active', abuse_ch: 'active', secret_backend: 'strip-me' },
         timestamp: '2026-09-30T22:00:00Z',
         internalEndpoint: 'http://10.0.0.8',
       },
@@ -141,12 +145,16 @@ describe('public feed readiness projection', () => {
       exact_military_tracks_exposed: false,
     });
     expect(result.cloudflare_source_status).toMatchObject({
-      status: 'not_configured',
+      status: 'active_fallback',
       configured: false,
-      provider: 'Cloudflare Radar',
+      fallback_active: true,
+      provider: 'GDELT 2.0 + abuse.ch Feodo Tracker',
+      source_mode: 'public-fallback',
+      cloudflare_status: 'not_configured',
+      providers: { gdelt: 'active', abuse_ch: 'active' },
     });
     const serialized = JSON.stringify(result);
-    for (const forbidden of ['never-public', 'internal deployment detail', '10.0.0.8']) {
+    for (const forbidden of ['never-public', 'internal deployment detail', '10.0.0.8', 'strip-me', 'secret_backend']) {
       expect(serialized).not.toContain(forbidden);
     }
   });
