@@ -2416,7 +2416,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       properties: {
         country: o.country, country_name: o.country_name, scope: o.scope, cause: o.cause,
         event_type: o.event_type, description: o.description, start: o.start, end: o.end,
-        ongoing: !!o.ongoing, url: o.url,
+        ongoing: !!o.ongoing, url: o.url, source: o.source || 'public network event',
+        precision: o.precision || '',
       },
     })) : []);
   }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, setGeo]);
@@ -2428,7 +2429,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('cf-attacks', al.cf_attacks && data.cf_attack_origins ? data.cf_attack_origins.map((a: any) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
-      properties: { country: a.country, country_name: a.country_name, share: a.share },
+      properties: {
+        country: a.country, country_name: a.country_name, share: a.share,
+        observations: a.observations || 0,
+        indicator_type: a.indicator_type || '',
+        source: a.source || 'public network threat indicator',
+      },
     })) : []);
   }, [mapReady, data.cf_attack_origins, (activeLayers as any).cf_attacks, setGeo]);
 

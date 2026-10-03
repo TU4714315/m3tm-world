@@ -9,6 +9,9 @@ describe('public layer readiness messaging', () => {
     expect(panel).toContain("if ((count ?? 0) === 0) return 'لا توجد بيانات'");
     expect(panel).toContain("return 'غير مهيأ'");
     expect(panel).toContain('الطبقة متاحة وغير مقفلة');
+    expect(panel).toContain("case 'active_fallback': return 'نشط · مصدر عام بديل'");
+    expect(panel).toContain("layer.key === 'cf_outages' || layer.key === 'cf_attacks'");
+    expect(panel).toContain('بنية C2 مرصودة لا بلد المهاجم');
   });
 
   it('keeps provider availability as status text rather than a disabled control', () => {

@@ -145,8 +145,8 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'انقطاعات الإنترنت', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'مصادر الهجمات', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
+      { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'Cloudflare Radar عند تهيئته؛ وإلا أحداث سيبرانية منشورة من GDELT CAMEO 176. لا يُفترض أن كل بلاغ يمثل انقطاعًا شاملاً.', dataKey: 'cf_outages', requires: 'cloudflare' },
+      { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'Cloudflare Layer 3 عند تهيئته؛ وإلا تجميع بلدي لبنية C2 المرصودة من abuse.ch/Feodo. البلد هو موقع البنية المرصودة وليس إسنادًا لهوية المهاجم.', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
@@ -223,6 +223,7 @@ function statusArabic(value: unknown): string {
     case 'configured': return 'مهيأ';
     case 'connecting': return 'جارٍ الاتصال';
     case 'configured_no_data': return 'مهيأ · لا توجد بيانات حاليًا';
+    case 'active_fallback': return 'نشط · مصدر عام بديل';
     case 'not_configured': return 'غير مهيأ';
     case 'unavailable': return 'غير متاح';
     case 'empty': return 'لا بيانات';
@@ -337,7 +338,14 @@ function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloud
       </div>
       {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
       {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ النشاط العسكري البحري يُعرض كتجميع إقليمي فقط، ولا توجد أسماء/MMSI/سرعة/اتجاه/مسارات دقيقة.</div>}
-      {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ الطبقة متاحة وغير مقفلة، وستعرض البيانات تلقائيًا عند توفر اعتماد Radar: Read على الخادم.</div>}
+      {kind === 'cloudflare' && source.fallback_active === true && (
+        <div className="mt-1 text-cyan-200/70">
+          Cloudflare Radar غير مهيأ حاليًا؛ الرصد العام البديل نشط من GDELT وabuse.ch. أحداث GDELT بلاغات منشورة، ومؤشرات Feodo تمثل بنية C2 مرصودة لا بلد المهاجم.
+        </div>
+      )}
+      {kind === 'cloudflare' && source.configured === false && source.fallback_active !== true && (
+        <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ الطبقة متاحة وغير مقفلة، وستعرض البيانات تلقائيًا عند توفر اعتماد Radar: Read على الخادم.</div>
+      )}
     </div>
   );
 }
@@ -471,6 +479,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       const ais = data?.maritime_source_status?.ais;
       if (ais?.configured === false || ais?.status === 'not_configured') return 'غير مهيأ';
       if (ais && (count ?? 0) === 0) return 'لا توجد بيانات';
+    }
+
+    if (layer.key === 'cf_outages' || layer.key === 'cf_attacks') {
+      const source = data?.cloudflare_source_status;
+      if (source?.fallback_active === true) return (count ?? 0) > 0 ? 'نشط · مصدر عام' : 'لا توجد بيانات';
+      if (source?.configured === false || source?.status === 'not_configured') return 'غير مهيأ';
+      if (source && (count ?? 0) === 0) return 'لا توجد بيانات';
     }
 
     return 'نشط';
