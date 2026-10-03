@@ -22,7 +22,8 @@ const cyberEvent = {
 };
 
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.clearAllMocks();
+  vi.mocked(fetchGdeltEvents).mockReset();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
