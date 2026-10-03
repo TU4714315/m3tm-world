@@ -1,8 +1,15 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '2';
+export const LAYER_URL_SCHEMA = '3';
 
-/** These layers did not exist in pre-v2 shared URLs, and are default-on today. */
-const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders']);
+/** Public-awareness layers promoted to default-on in v3. Old bookmarks could not
+ * express these defaults reliably, so they are enabled once during migration.
+ * Once a URL is serialized as v3, explicit user off-choices are preserved. */
+const V3_DEFAULT_ON_LAYERS = new Set([
+  'app_news', 'country_borders',
+  'military_activity', 'maritime', 'naval_activity',
+  'conflict_zones', 'conflict_density', 'frontlines', 'reported_routes',
+  'gdelt_events', 'civil_unrest', 'alert_pins', 'global_incidents',
+]);
 
 export function restoreLayerState<T extends Record<string, boolean>>(
   defaults: T,
@@ -11,15 +18,12 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   const raw = params.get('layers');
   if (raw === null) return defaults;
   const active = new Set(raw.split(',').filter(Boolean));
-  // A pre-v2 bookmark has no way to opt a not-yet-existing layer in or out.
-  // Restore new public defaults only if NEITHER newly added key was present.
-  // From v2 onward, missing keys unambiguously mean the user turned them off.
-  const legacyBookmark = !params.has('layers_v')
-    && ![...LEGACY_ADDED_LAYERS].some(key => active.has(key));
+  const schema = params.get('layers_v');
+  const migrateToV3 = schema !== LAYER_URL_SCHEMA;
   const restored = { ...defaults };
   for (const key of Object.keys(defaults)) {
     (restored as Record<string, boolean>)[key] = active.has(key)
-      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key]);
+      || (migrateToV3 && V3_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
   }
   return restored;
 }

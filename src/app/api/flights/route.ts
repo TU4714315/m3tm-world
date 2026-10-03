@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary } from '@/lib/flightSummary';
 
 export const maxDuration = 60;
@@ -229,10 +230,35 @@ function classifyFlight(f: any) {
 const PUBLIC_MILITARY_CELL_DEG = 6;
 const PUBLIC_MILITARY_MIN_GROUP = 2;
 const PUBLIC_MILITARY_TIME_BUCKET_MS = 30 * 60 * 1000;
+const PUBLIC_MILITARY_CACHE_KEY = 'm3tm:public:military-activity:v2';
+const PUBLIC_MILITARY_CACHE_TTL_SECONDS = 60 * 60;
 
-function buildPublicMilitaryActivity(flights: any[]) {
+interface PublicMilitaryActivityCell {
+  id: string;
+  lat: number;
+  lng: number;
+  level: number;
+  activity: string;
+  approximate_count: string;
+  cell_degrees: number;
+  precision: 'coarse-regional';
+  time_precision: '30-minute-bucket';
+  observed_at_bucket: string;
+  reporting_mode: 'public-adsb-aggregate';
+  trend?: 'new' | 'up' | 'steady' | 'down';
+  data_state?: 'live' | 'cached-stale';
+  observed_at?: string;
+  age_seconds?: number;
+}
+
+interface PublicMilitaryActivitySnapshot {
+  cells: PublicMilitaryActivityCell[];
+  observed_at: string;
+}
+
+function buildPublicMilitaryActivity(flights: any[], observedAtMs = Date.now()): PublicMilitaryActivityCell[] {
   const observedAtBucket = new Date(
-    Math.floor(Date.now() / PUBLIC_MILITARY_TIME_BUCKET_MS) * PUBLIC_MILITARY_TIME_BUCKET_MS
+    Math.floor(observedAtMs / PUBLIC_MILITARY_TIME_BUCKET_MS) * PUBLIC_MILITARY_TIME_BUCKET_MS
   ).toISOString();
   const buckets = new Map<string, { lat: number; lng: number; count: number }>();
   for (const flight of flights) {
@@ -259,12 +285,45 @@ function buildPublicMilitaryActivity(flights: any[]) {
       activity: level === 3 ? 'مرتفع' : level === 2 ? 'متوسط' : 'محدود',
       approximate_count: bucket.count >= 10 ? '10+' : bucket.count >= 5 ? '5-9' : '2-4',
       cell_degrees: PUBLIC_MILITARY_CELL_DEG,
-      precision: 'coarse-regional',
-      time_precision: '30-minute-bucket',
+      precision: 'coarse-regional' as const,
+      time_precision: '30-minute-bucket' as const,
       observed_at_bucket: observedAtBucket,
-      reporting_mode: 'public-adsb-aggregate',
+      reporting_mode: 'public-adsb-aggregate' as const,
     }];
   });
+}
+
+function annotateMilitaryTrend(
+  current: PublicMilitaryActivityCell[],
+  previous: PublicMilitaryActivityCell[],
+  observedAt: string,
+  now = Date.now(),
+): PublicMilitaryActivityCell[] {
+  const previousById = new Map(previous.map(cell => [cell.id, cell]));
+  const observedMs = Date.parse(observedAt);
+  const ageSeconds = Number.isFinite(observedMs) ? Math.max(0, Math.round((now - observedMs) / 1000)) : 0;
+  return current.map(cell => {
+    const prior = previousById.get(cell.id);
+    const trend: PublicMilitaryActivityCell['trend'] = !prior
+      ? 'new'
+      : cell.level > prior.level
+        ? 'up'
+        : cell.level < prior.level
+          ? 'down'
+          : 'steady';
+    return { ...cell, trend, data_state: 'live', observed_at: observedAt, age_seconds: ageSeconds };
+  });
+}
+
+function staleMilitaryCells(snapshot: PublicMilitaryActivitySnapshot, now: number): PublicMilitaryActivityCell[] {
+  const observed = Date.parse(snapshot.observed_at);
+  const ageSeconds = Number.isFinite(observed) ? Math.max(0, Math.round((now - observed) / 1000)) : 0;
+  return snapshot.cells.map(cell => ({
+    ...cell,
+    data_state: 'cached-stale',
+    observed_at: snapshot.observed_at,
+    age_seconds: ageSeconds,
+  }));
 }
 
 let cachedData: any = null;
@@ -376,6 +435,7 @@ export async function GET(req: Request) {
     const allRaw: any[] = [];
     const seenHex = new Set<string>();
     let source: string;
+    let milProviderHealthy = false;
 
     // ── Phase 1 + 2 in parallel: global military feed AND OpenSky simultaneously ──
     // Running them together keeps total wall-clock time to max(mil_feed, opensky)
@@ -406,6 +466,7 @@ export async function GET(req: Request) {
       if (milRes.value.ok) {
         try {
           const data = await milRes.value.json();
+          milProviderHealthy = Array.isArray(data.ac);
           ingestAc(data.ac || [], allRaw, seenHex);
         } catch (e) {
           console.warn('[OSIRIS] adsb.fi mil parse error:', e);
@@ -517,7 +578,24 @@ export async function GET(req: Request) {
       }
     }
 
-    const militaryActivity = buildPublicMilitaryActivity(military);
+    const militaryObservedAtMs = osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
+    const observedAt = new Date(militaryObservedAtMs).toISOString();
+    const previousMilitary = await durableGetJson<PublicMilitaryActivitySnapshot>(PUBLIC_MILITARY_CACHE_KEY);
+    let militaryActivity = buildPublicMilitaryActivity(military, militaryObservedAtMs);
+    let militaryActivityCacheBackend: string = previousMilitary.backend;
+    let militaryActivityStale = false;
+
+    if (militaryActivity.length > 0) {
+      militaryActivity = annotateMilitaryTrend(militaryActivity, previousMilitary.value?.cells ?? [], observedAt);
+      militaryActivityCacheBackend = await durableSetJson(
+        PUBLIC_MILITARY_CACHE_KEY,
+        { cells: militaryActivity, observed_at: observedAt },
+        PUBLIC_MILITARY_CACHE_TTL_SECONDS,
+      );
+    } else if (!milProviderHealthy && previousMilitary.value?.cells?.length) {
+      militaryActivity = staleMilitaryCells(previousMilitary.value, Date.now());
+      militaryActivityStale = true;
+    }
 
     return {
       commercial_flights: commercial,
@@ -535,6 +613,12 @@ export async function GET(req: Request) {
         time_precision: '30-minute-bucket',
         identifiers_exposed: false,
         exact_tracks_exposed: false,
+        trend_basis: 'aggregate-cell-level-only',
+        provider_healthy: milProviderHealthy,
+        stale_fallback: militaryActivityStale,
+        observed_at: militaryActivity[0]?.observed_at ?? observedAt,
+        cache_backend: militaryActivityCacheBackend,
+        durable_cache_configured: durableCacheConfigured(),
         unobserved_aircraft_inferred: false,
         observation_model: 'observed-only',
         absence_semantics: 'not-observed-does-not-mean-absent',
@@ -551,16 +635,22 @@ export async function GET(req: Request) {
       // is visible in the payload rather than silently emptying the map.
       providers: {
         adsbfi_mil:      milCount,
+        adsbfi_mil_healthy: milProviderHealthy,
         adsbfi_regional: openSkyWorked ? 0 : allRaw.length - milCount,
         opensky:         osSnapshot.length,
         opensky_auth:    hasOpenSkyCreds(),
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
       flight_source_status: {
-        status: militaryActivity.length || commercial.length || privateFl.length || jets.length ? 'active' : 'empty',
+        status: commercial.length || privateFl.length || jets.length || (!militaryActivityStale && militaryActivity.length)
+          ? 'active'
+          : militaryActivityStale
+            ? 'degraded'
+            : 'empty',
         provider: source,
         providers: {
           adsbfi_mil: milCount,
+          adsbfi_mil_healthy: milProviderHealthy,
           adsbfi_regional: openSkyWorked ? 0 : allRaw.length - milCount,
           opensky: osSnapshot.length,
           opensky_auth: hasOpenSkyCreds(),

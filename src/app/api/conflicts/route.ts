@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { fetchAcledPublicEvents } from '@/lib/acled';
+import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,9 @@ interface ConflictZone {
   events: ConflictEvent[];
   eventCount: number;
   lastUpdated: string;
+  eventKinds?: Record<string, number>;
+  dominantKind?: string;
+  activityBand?: 'quiet' | 'elevated' | 'active';
 }
 
 interface ConflictEvent {
@@ -50,6 +54,15 @@ interface ConflictEvent {
   ageDays: number | null;
   timePrecision: number | null;
   recencyWeight: number;
+}
+
+const CONFLICT_CACHE_KEY = 'm3tm:public:conflicts:v3';
+const CONFLICT_CACHE_TTL_SECONDS = 60 * 60;
+
+function summarizeKinds(events: ConflictEvent[]) {
+  const counts: Record<string, number> = {};
+  for (const event of events) counts[event.type || 'other'] = (counts[event.type || 'other'] || 0) + 1;
+  return counts;
 }
 
 // Known active conflict zones (anchors — enriched with live data)
@@ -306,14 +319,19 @@ async function fetchAllLiveConflictData(): Promise<{
 }
 
 export async function GET() {
+  const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
+  const servedAt = new Date().toISOString();
   try {
-    const { events: liveEvents, eventsByRegion, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
+    const { events: liveEvents, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
 
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
       const zoneEvents = liveEvents.filter(event =>
         event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
         event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
       );
+      const eventCount = zoneEvents.length;
+      const eventKinds = summarizeKinds(zoneEvents);
+      const dominantKind = Object.entries(eventKinds).sort((a, b) => b[1] - a[1])[0]?.[0] || 'other';
 
       return {
         id: zone.id,
@@ -327,8 +345,11 @@ export async function GET() {
         sourceUrl: 'https://www.gdeltproject.org/',
         region: zone.region,
         events: zoneEvents.slice(0, 40),
-        eventCount: eventsByRegion[zone.id] || 0,
-        lastUpdated: new Date().toISOString(),
+        eventCount,
+        eventKinds,
+        dominantKind,
+        activityBand: eventCount >= 10 ? 'active' : eventCount >= 3 ? 'elevated' : 'quiet',
+        lastUpdated: servedAt,
       };
     });
 
@@ -337,7 +358,7 @@ export async function GET() {
       return acc;
     }, {});
 
-    return NextResponse.json({
+    const payload = {
       zones,
       liveEvents: liveEvents.slice(0, 800),
       totalZones: zones.length,
@@ -345,7 +366,7 @@ export async function GET() {
       activeWarzones: zones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: zones.filter(zone => zone.eventCount > 0).length,
       categoryCounts,
-      timestamp: new Date().toISOString(),
+      timestamp: servedAt,
       source: 'GDELT 2.0 + optional ACLED fusion',
       sourceWindow: gdeltWindow,
       sourceRowsScanned: gdeltScanned,
@@ -353,13 +374,30 @@ export async function GET() {
       sourceMode: 'multi-source-public-conflict-layer',
       coordinatePrecision: 'generalized-0.25deg',
       refreshInterval: 300,
-    }, {
+      dataState: 'live',
+      durableCacheConfigured: durableCacheConfigured(),
+      cacheBackend: previous.backend,
+    };
+
+    payload.cacheBackend = await durableSetJson(CONFLICT_CACHE_KEY, payload, CONFLICT_CACHE_TTL_SECONDS);
+
+    return NextResponse.json(payload, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
       },
     });
   } catch (error) {
     console.error('[OSIRIS] Conflict API error:', error);
+
+    if (previous.value) {
+      return NextResponse.json({
+        ...previous.value,
+        dataState: 'cached-stale',
+        cacheBackend: previous.backend,
+        durableCacheConfigured: durableCacheConfigured(),
+        servedAt,
+      }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+    }
 
     // Keep contextual zones visible if GDELT is temporarily unavailable, but do
     // not manufacture "live" events or synthetic coordinates.
@@ -376,7 +414,7 @@ export async function GET() {
       region: zone.region,
       events: [],
       eventCount: 0,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: servedAt,
     }));
 
     return NextResponse.json({
@@ -387,11 +425,14 @@ export async function GET() {
       activeWarzones: fallbackZones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: 0,
       categoryCounts: {},
-      timestamp: new Date().toISOString(),
+      timestamp: servedAt,
       source: 'context-only-fallback',
       sourceMode: 'no-live-events',
       coordinatePrecision: 'none',
       refreshInterval: 300,
+      dataState: 'static-only',
+      durableCacheConfigured: durableCacheConfigured(),
+      cacheBackend: 'miss',
     }, {
       headers: { 'Cache-Control': 'no-store' },
     });

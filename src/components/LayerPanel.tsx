@@ -77,6 +77,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Ship,
     layers: [
       { key: 'maritime', label: 'الملاحة البحرية العامة', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
+      { key: 'naval_activity', label: 'نشاط بحري عسكري عام', dataKey: 'naval_activity', description: 'تجميع إقليمي من AIS عام عند توفره؛ لا أسماء سفن أو MMSI أو سرعة/اتجاه أو مسارات دقيقة' },
     ],
   },
   {
@@ -127,6 +128,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'رموز مميزة حسب النوع: ضربة، مسيّرة، صاروخ، دفاع جوي، قتال بري، حدث بحري أو معدات؛ كلها كما يذكرها الناشر وبإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', description: 'رمز مختلف للزلزال والفيضان والإعصار والبركان والحريق والجفاف عند توفر نوع الحدث من المصدر', dataKey: 'gdelt' },
       { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO مع رموز مستقلة للأسلحة الجوية والثقيلة والتفجيرات والاشتباكات والاعتداءات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
+      { key: 'civil_unrest', label: 'احتجاجات واضطرابات مُبلّغ عنها', description: 'أحداث CAMEO 14 المنشورة والمحددة الموقع؛ لا تُعامل الاحتجاجات تلقائيًا كعنف', dataKey: 'civil_unrest' },
     ],
   },
   {
@@ -236,6 +238,7 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
   const gdelt = data?.conflict_source_status?.gdelt?.status;
   const acled = data?.conflict_source_status?.acled?.status;
   const frontlines = data?.frontlines_meta?.status;
+  const conflictState = String(data?.conflict_data_state || '');
   const fieldAlertLabels: Record<string, string> = {
     strike: 'ضربات/قصف', drone: 'مسيّرات', missile: 'صواريخ/قذائف',
     air_defence: 'دفاع جوي', ground: 'قتال بري', maritime: 'أحداث بحرية', equipment: 'معدات/أسلحة',
@@ -247,9 +250,11 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
       return acc;
     }, {});
   const fieldEntries = Object.entries(fieldCounts).filter(([, value]) => Number(value) > 0);
-  if (!entries.length && !fieldEntries.length && !gdelt && !acled && !frontlines) return null;
+  const unrestCount = Array.isArray(data?.civil_unrest) ? data.civil_unrest.length : 0;
+  if (!entries.length && !fieldEntries.length && !unrestCount && !gdelt && !acled && !frontlines && !conflictState) return null;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/50">
+      {conflictState === 'cached-stale' && <div className="mb-1.5 rounded border border-amber-300/20 bg-amber-300/[0.04] px-1.5 py-1 text-amber-200/80">طبقة النزاع تعرض آخر لقطة مخزنة؛ المصدر الحي متعذر مؤقتًا.</div>}
       <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1">
         {gdelt && <span>GDELT: <b className="text-white/70">{statusArabic(gdelt)}</b></span>}
         {acled && <span>ACLED: <b className="text-white/70">{statusArabic(acled)}</b></span>}
@@ -276,6 +281,7 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
           </div>
         </div>
       )}
+      {unrestCount > 0 && <div className="mt-1.5 text-amber-200/70">احتجاجات/اضطرابات منشورة: {unrestCount.toLocaleString('ar-SA')}</div>}
       {data?.conflict_summary?.timestamp && <div className="mt-1 text-white/30">آخر تحديث طبقة النزاع: {String(data.conflict_summary.timestamp)}</div>}
       <div className="mt-1.5 text-white/30">التصنيف: بلاغات أحداث عامة حسب CAMEO ومصادر منشورة. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
     </div>
@@ -290,9 +296,14 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   const adsbMil = Number(source?.providers?.adsbfi_mil || 0);
   const openSky = Number(source?.providers?.opensky || 0);
   const openSkyAge = Number(source?.providers?.opensky_age_s);
+  const stale = meta?.stale_fallback === true;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      <div className={stale ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
+        البيانات: {stale ? 'آخر لقطة عامة مخزنة · المصدر الحي متعذر مؤقتًا' : 'رصد حي/مجمّع'}
+        {meta?.cache_backend ? ' · التخزين ' + String(meta.cache_backend) : ''}
+      </div>
       {source && (
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
           <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>
@@ -315,15 +326,17 @@ function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloud
   const provider = String(source.provider || (kind === 'maritime' ? 'AISStream.io' : 'Cloudflare Radar'));
   const updated = source.latest_observed_at || source.timestamp || data?.maritime_timestamp || null;
   const age = Number(source.latest_observation_age_s);
+  const navalCells = kind === 'maritime' && Array.isArray(data?.naval_activity) ? data.naval_activity.length : 0;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <div className="flex flex-wrap gap-x-2 gap-y-1">
         <span>المصدر: <b className="text-white/60">{provider}</b></span>
         <span>الحالة: <b className="text-white/60">{statusArabic(source.status)}</b></span>
         {Number.isFinite(age) && <span>عمر آخر رصد: <b className="text-white/60">{age < 60 ? `${Math.round(age)} ث` : `${Math.round(age / 60)} د`}</b></span>}
+        {kind === 'maritime' && <span>خلايا نشاط بحري عسكري عام: <b className="text-white/60">{navalCells.toLocaleString('ar-SA')}</b></span>}
       </div>
       {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
-      {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ السطح العام لا يعرض مسارات بحرية عسكرية دقيقة.</div>}
+      {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ النشاط العسكري البحري يُعرض كتجميع إقليمي فقط، ولا توجد أسماء/MMSI/سرعة/اتجاه/مسارات دقيقة.</div>}
       {kind === 'cloudflare' && source.configured === false && <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ لا تُعرض بيانات انقطاع أو هجمات حتى إضافة اعتماد Radar: Read على الخادم.</div>}
     </div>
   );

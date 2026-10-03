@@ -79,13 +79,13 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true,
+  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
-  terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true,
+  terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: false, cf_attacks: false, app_news: true, alert_pins: true, country_borders: true,
 };
 
@@ -94,7 +94,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'earthquakes', 'flights', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'flights', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -104,11 +104,11 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
 
 // Public controls expose only generalized military awareness. Exact military tracks and internal OSINT tools stay outside this surface.
 const PUBLIC_EMBED_LAYER_KEYS = [
-  'flights', 'military_activity', 'private', 'jets', 'maritime',
+  'flights', 'military_activity', 'private', 'jets', 'maritime', 'naval_activity',
   'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
   'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
-  'reported_routes', 'global_incidents', 'gdelt_events', 'cables',
+  'reported_routes', 'global_incidents', 'gdelt_events', 'civil_unrest', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval',
   'malware', 'cf_outages', 'cf_attacks', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
   'terrain_elevation', 'terrain_etopo_2022',
@@ -860,11 +860,13 @@ export default function Dashboard() {
       layerFetchedRef.current.add('fires');
     }
     // Maritime
-    if ((activeLayers.maritime || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
+    if ((activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
       fetchEndpoint('/api/maritime', d => ({
         maritime_ports: d.ports ?? [],
         maritime_chokepoints: d.chokepoints ?? [],
         maritime_ships: d.ships ?? [],
+        naval_activity: d.naval_activity ?? [],
+        naval_activity_meta: d.naval_activity_meta ?? null,
         maritime_source_status: d.source_status ?? null,
         maritime_source: d.source ?? 'M3TM maritime reference',
         maritime_timestamp: d.timestamp ?? null,
@@ -936,13 +938,17 @@ export default function Dashboard() {
       }));
     }
 
-    // GDELT 2.0 material-conflict events only.
-    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
-        gdelt_events: d.events ?? [],
-        reported_routes: d.reported_routes ?? [],
-        reported_routes_meta: d.reported_routes_meta ?? null,
-      }));
+    // GDELT 2.0 source-backed conflict + protest/civil-unrest reports.
+    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes || (activeLayers as any).civil_unrest) {
+      loadLayerOnce('gdelt_events', '/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
+        const events = Array.isArray(d.events) ? d.events : [];
+        return {
+          gdelt_events: events.filter((event: any) => event?.quad === 4 && event?.event_category !== 'civil_unrest'),
+          civil_unrest: events.filter((event: any) => event?.event_category === 'civil_unrest'),
+          reported_routes: d.reported_routes ?? [],
+          reported_routes_meta: d.reported_routes_meta ?? null,
+        };
+      });
     }
     if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       loadLayerOnce('conflicts', '/api/conflicts', d => ({
@@ -950,6 +956,8 @@ export default function Dashboard() {
         conflict_live_events: d.liveEvents ?? [],
         conflict_source_status: d.sourceStatus ?? null,
         conflict_category_counts: d.categoryCounts ?? {},
+        conflict_data_state: d.dataState ?? 'live',
+        conflict_served_at: d.servedAt ?? d.timestamp ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
@@ -995,7 +1003,8 @@ export default function Dashboard() {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
+      const flightPollMs = activeLayers.military_activity ? 120000 : 300000;
+      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), flightPollMs));
     }
 
     if ((activeLayers as any).cyber_attacks) {
@@ -1009,12 +1018,16 @@ export default function Dashboard() {
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
     }
-    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=4&min_articles=2&limit=800', d => ({
-        gdelt_events: d.events ?? [],
-        reported_routes: d.reported_routes ?? [],
-        reported_routes_meta: d.reported_routes_meta ?? null,
-      })), 300000));
+    if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes || (activeLayers as any).civil_unrest) {
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
+        const events = Array.isArray(d.events) ? d.events : [];
+        return {
+          gdelt_events: events.filter((event: any) => event?.quad === 4 && event?.event_category !== 'civil_unrest'),
+          civil_unrest: events.filter((event: any) => event?.event_category === 'civil_unrest'),
+          reported_routes: d.reported_routes ?? [],
+          reported_routes_meta: d.reported_routes_meta ?? null,
+        };
+      }), 300000));
     }
     if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
@@ -1022,6 +1035,8 @@ export default function Dashboard() {
         conflict_live_events: d.liveEvents ?? [],
         conflict_source_status: d.sourceStatus ?? null,
         conflict_category_counts: d.categoryCounts ?? {},
+        conflict_data_state: d.dataState ?? 'live',
+        conflict_served_at: d.servedAt ?? d.timestamp ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
@@ -1049,7 +1064,7 @@ export default function Dashboard() {
   // Maritime earns a fast cadence only while live vessels are actually arriving.
   // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
   useEffect(() => {
-    if (!(activeLayers.maritime || activeLayers.sdk_sea)) return;
+    if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -1057,7 +1072,9 @@ export default function Dashboard() {
       maritime_ports: d.ports ?? [],
       maritime_chokepoints: d.chokepoints ?? [],
       maritime_ships: d.ships ?? [],
-      maritime_source_status: d.source_status ?? null,
+        naval_activity: d.naval_activity ?? [],
+        naval_activity_meta: d.naval_activity_meta ?? null,
+        maritime_source_status: d.source_status ?? null,
       maritime_source: d.source ?? 'M3TM maritime reference',
       maritime_timestamp: d.timestamp ?? null,
     });
@@ -1065,10 +1082,11 @@ export default function Dashboard() {
     const schedule = () => {
       if (cancelled) return;
       const liveShips = Array.isArray(dataRef.current.maritime_ships) ? dataRef.current.maritime_ships.length : 0;
+      const navalCells = Array.isArray(dataRef.current.naval_activity) ? dataRef.current.naval_activity.length : 0;
       timer = setTimeout(async () => {
         await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
-      }, liveShips > 0 ? 10_000 : 300_000);
+      }, liveShips > 0 ? 10_000 : navalCells > 0 ? 60_000 : 300_000);
     };
     schedule();
 
@@ -1076,7 +1094,7 @@ export default function Dashboard() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activeLayers.maritime, activeLayers.sdk_sea, fetchEndpoint]);
+  }, [activeLayers.maritime, activeLayers.naval_activity, activeLayers.sdk_sea, fetchEndpoint]);
   /* ── LIVE MALWARE — pushed over SSE while the layer is on ──
      Detections arrive when URLhaus reports them rather than on a timer, so
      there is no poll interval to tune and no request that re-downloads the

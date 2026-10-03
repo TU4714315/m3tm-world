@@ -99,6 +99,7 @@ export type PublicConflictCategory =
   | 'armed_clash'
   | 'mass_violence'
   | 'assault'
+  | 'civil_unrest'
   | 'material_conflict'
   | 'other';
 
@@ -117,7 +118,9 @@ export interface PublicEventSemantics {
  * These labels describe what the source record reports; they do not assert
  * independent verification by M3TM.WORLD. CAMEO 195* is aerial weapons,
  * 194* heavy weapons/artillery/tanks/rockets, 183* bombing/explosives,
- * root 19 fighting, root 20 mass violence and root 18 assault.
+ * root 19 fighting, root 20 mass violence, root 18 assault and root 14
+ * protest/civil unrest. Protest records remain descriptive reports; they are
+ * not automatically treated as violence.
  */
 export function classifyPublicEvent(
   eventCode: string,
@@ -147,6 +150,9 @@ export function classifyPublicEvent(
   } else if (rootCode === '18') {
     event_category = 'assault';
     event_label_ar = 'اعتداء مسلح مُبلّغ عنه';
+  } else if (rootCode === '14') {
+    event_category = 'civil_unrest';
+    event_label_ar = 'احتجاج أو اضطراب مدني مُبلّغ عنه';
   } else if (quad === 4) {
     event_category = 'material_conflict';
     event_label_ar = 'حدث نزاع مادي مُبلّغ عنه';
