@@ -238,6 +238,7 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
   const gdelt = data?.conflict_source_status?.gdelt?.status;
   const acled = data?.conflict_source_status?.acled?.status;
   const frontlines = data?.frontlines_meta?.status;
+  const conflictState = String(data?.conflict_data_state || '');
   const fieldAlertLabels: Record<string, string> = {
     strike: 'ضربات/قصف', drone: 'مسيّرات', missile: 'صواريخ/قذائف',
     air_defence: 'دفاع جوي', ground: 'قتال بري', maritime: 'أحداث بحرية', equipment: 'معدات/أسلحة',
@@ -250,9 +251,10 @@ function ConflictEvidenceStatus({ data }: { data: any }) {
     }, {});
   const fieldEntries = Object.entries(fieldCounts).filter(([, value]) => Number(value) > 0);
   const unrestCount = Array.isArray(data?.civil_unrest) ? data.civil_unrest.length : 0;
-  if (!entries.length && !fieldEntries.length && !unrestCount && !gdelt && !acled && !frontlines) return null;
+  if (!entries.length && !fieldEntries.length && !unrestCount && !gdelt && !acled && !frontlines && !conflictState) return null;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/50">
+      {conflictState === 'cached-stale' && <div className="mb-1.5 rounded border border-amber-300/20 bg-amber-300/[0.04] px-1.5 py-1 text-amber-200/80">طبقة النزاع تعرض آخر لقطة مخزنة؛ المصدر الحي متعذر مؤقتًا.</div>}
       <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1">
         {gdelt && <span>GDELT: <b className="text-white/70">{statusArabic(gdelt)}</b></span>}
         {acled && <span>ACLED: <b className="text-white/70">{statusArabic(acled)}</b></span>}
