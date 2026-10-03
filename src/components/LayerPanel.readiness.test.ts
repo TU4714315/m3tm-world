@@ -14,6 +14,9 @@ describe('public layer readiness messaging', () => {
     expect(panel).toContain('بنية C2 مرصودة لا بلد المهاجم');
     expect(panel).toContain("source.source_mode === 'public-fallback'");
     expect(panel).toContain("source.source_mode === 'mixed'");
+    expect(panel).toContain("source.fallback_sections?.outages === true");
+    expect(panel).toContain("source.fallback_sections?.attacks === true");
+    expect(panel).toContain("case 'not_used': return 'غير مستخدم'");
     expect(panel).toContain("source?.fallback_sections?.outages === true");
     expect(panel).toContain("source?.fallback_sections?.attacks === true");
     expect(panel).toContain("fallbackState === 'unavailable'");

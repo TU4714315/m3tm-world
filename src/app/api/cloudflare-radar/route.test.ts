@@ -95,6 +95,33 @@ describe('public network-event endpoint', () => {
     });
   });
 
+  it('reports successful zero-row Cloudflare sections as empty', async () => {
+    vi.stubEnv('CLOUDFLARE_API_TOKEN', 'server-only-test-token');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/annotations/outages')) return Response.json({ success: true, result: { annotations: [] } });
+      if (url.includes('/attacks/layer3/top/locations/origin')) return Response.json({ success: true, result: { top_0: [] } });
+      throw new Error(`unexpected fetch: ${url}`);
+    }));
+
+    const body = await (await GET(new Request('http://localhost/api/cloudflare-radar'))).json();
+
+    expect(body).toMatchObject({
+      configured: true,
+      fallback_active: false,
+      source_mode: 'cloudflare-radar',
+      providers: {
+        cloudflare_outages: 'empty',
+        cloudflare_attacks: 'empty',
+        gdelt: 'not_used',
+        abuse_ch: 'not_used',
+      },
+      total_outages: 0,
+      total_attack_origins: 0,
+    });
+    expect(vi.mocked(fetchGdeltEvents)).not.toHaveBeenCalled();
+  });
+
   it('uses only the attack fallback when Cloudflare outages succeed and attack-origin fails', async () => {
     vi.stubEnv('CLOUDFLARE_API_TOKEN', 'server-only-test-token');
     vi.mocked(fetchGdeltEvents).mockResolvedValue({
