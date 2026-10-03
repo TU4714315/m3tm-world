@@ -16,6 +16,6 @@ describe('LayerPanel provider-state UX', () => {
     const pageSource = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
 
     expect(pageSource).not.toContain("if (!configured) setActiveLayers(prev => ({ ...prev, cf_outages: false, cf_attacks: false }))");
-    expect(pageSource).toContain('Provider readiness is status only');
+    expect(pageSource).toContain("readiness is status only and never overrides the user's layer selection.");
   });
 });
