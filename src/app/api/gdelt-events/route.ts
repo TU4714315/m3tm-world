@@ -27,6 +27,7 @@ function parseQuads(raw: string | null): number[] {
 }
 
 function nearestAllowed(raw: string | null, allowed: readonly number[], fallback: number): number {
+  if (raw === null || raw.trim() === '') return fallback;
   const requested = Number(raw);
   if (!Number.isFinite(requested)) return fallback;
   return allowed.reduce((best, value) =>
