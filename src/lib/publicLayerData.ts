@@ -59,6 +59,10 @@ const publicMilitaryActivityCells = (value: unknown) => list(value).flatMap((raw
     time_precision: stringOrNull(cell.time_precision),
     observed_at_bucket: stringOrNull(cell.observed_at_bucket),
     reporting_mode: stringOrNull(cell.reporting_mode),
+    trend: stringOrNull(cell.trend),
+    data_state: stringOrNull(cell.data_state),
+    observed_at: stringOrNull(cell.observed_at),
+    age_seconds: finite(cell.age_seconds),
   }];
 });
 
@@ -130,6 +134,11 @@ const publicMilitaryActivityMeta = (value: unknown) => {
     observation_model: stringOrNull(meta.observation_model),
     absence_semantics: stringOrNull(meta.absence_semantics),
     known_limitations: stringList(meta.known_limitations),
+    provider_healthy: meta.provider_healthy === true,
+    stale_fallback: meta.stale_fallback === true,
+    observed_at: stringOrNull(meta.observed_at),
+    cache_backend: stringOrNull(meta.cache_backend),
+    durable_cache_configured: meta.durable_cache_configured === true,
   };
 };
 
