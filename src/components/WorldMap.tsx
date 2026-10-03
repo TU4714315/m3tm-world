@@ -2416,7 +2416,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       properties: {
         country: o.country, country_name: o.country_name, scope: o.scope, cause: o.cause,
         event_type: o.event_type, description: o.description, start: o.start, end: o.end,
-        ongoing: !!o.ongoing, url: o.url,
+        ongoing: !!o.ongoing, url: o.url, source: o.source || 'public network event',
+        precision: o.precision || '',
       },
     })) : []);
   }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, setGeo]);
