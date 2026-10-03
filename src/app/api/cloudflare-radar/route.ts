@@ -1,22 +1,31 @@
 import { NextResponse } from 'next/server';
 import { centroidFor } from '@/lib/countryCentroids';
+import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
- * OSIRIS — Cloudflare Radar (internet disruption + attack origin)
- * Source: https://radar.cloudflare.com/  (API docs: developers.cloudflare.com/radar)
+ * Public network-event feed.
  *
- * Requires CLOUDFLARE_API_TOKEN — a free Cloudflare account token scoped to
- * "Radar: Read". Fails closed: with no token the route reports itself
- * unconfigured and the map layer stays hidden, mirroring /api/scanner.
+ * Preferred provider: Cloudflare Radar, when CLOUDFLARE_API_TOKEN is injected
+ * server-side with Radar: Read.
  *
- * The token is read server-side only and is never included in a response.
+ * Public fallback when that credential is not available:
+ *   - GDELT 2.0 CAMEO 176 records: source-reported cyber attacks / hostile
+ *     network shutdown events with generalized ActionGeo coordinates.
+ *   - abuse.ch Feodo Tracker: country-level aggregate of observed C2
+ *     infrastructure. No IPs are returned to this layer and the country is NOT
+ *     asserted to be the attacker's origin.
+ *
+ * Provider state remains explicit in the payload so the UI never labels
+ * fallback data as Cloudflare data.
  */
 
 const RADAR_BASE = 'https://api.cloudflare.com/client/v4/radar';
+const FEODO_URL = 'https://feodotracker.abuse.ch/downloads/ipblocklist.json';
 
-interface RadarOutage {
+interface PublicNetworkEvent {
   id: string;
   lat: number;
   lng: number;
@@ -30,19 +39,22 @@ interface RadarOutage {
   end: string | null;
   ongoing: boolean;
   url: string;
+  source: string;
+  precision?: string;
 }
 
-interface RadarAttackOrigin {
+interface PublicThreatIndicator {
   country: string;
   country_name: string;
   lat: number;
   lng: number;
-  /** Share of observed layer-3 attack traffic, as a percentage. */
+  /** Percentage of currently observed Feodo rows in this country. */
   share: number;
+  observations: number;
+  indicator_type: 'observed-c2-infrastructure';
+  source: 'abuse.ch Feodo Tracker';
 }
 
-/* Minimal shapes for the slices of the Radar payload we consume. Everything is
-   optional because Cloudflare adds and reorders fields between API versions. */
 interface RawAnnotation {
   id?: string;
   locations?: string[];
@@ -71,6 +83,16 @@ interface RadarResult {
   top0?: RawTopLocation[];
 }
 
+interface FallbackResult {
+  networkEvents: PublicNetworkEvent[];
+  threatIndicators: PublicThreatIndicator[];
+  providers: {
+    gdelt: 'active' | 'empty' | 'unavailable';
+    abuse_ch: 'active' | 'empty' | 'unavailable';
+  };
+  errors: string[];
+}
+
 function isConfigured() {
   return Boolean(process.env.CLOUDFLARE_API_TOKEN);
 }
@@ -86,7 +108,6 @@ async function radarFetch(path: string, signal: AbortSignal): Promise<RadarResul
   });
   if (!res.ok) throw new Error(`Radar ${path} responded ${res.status}`);
   const json = await res.json();
-  // Cloudflare wraps everything in { success, errors, result }.
   if (json?.success === false) {
     const detail = json?.errors?.[0]?.message || 'unknown error';
     throw new Error(`Radar ${path} rejected the request: ${detail}`);
@@ -94,12 +115,11 @@ async function radarFetch(path: string, signal: AbortSignal): Promise<RadarResul
   return json?.result ?? {};
 }
 
-function mapOutages(result: RadarResult): RadarOutage[] {
+function mapCloudflareOutages(result: RadarResult): PublicNetworkEvent[] {
   const annotations = result?.annotations ?? [];
-  const out: RadarOutage[] = [];
+  const out: PublicNetworkEvent[] = [];
 
   for (const a of annotations) {
-    // An annotation can name several locations; emit one marker per located country.
     const codes: string[] = Array.isArray(a?.locations) ? a.locations : [];
     const names: Record<string, string> = {};
     for (const d of a?.locationsDetails ?? []) {
@@ -123,16 +143,16 @@ function mapOutages(result: RadarResult): RadarOutage[] {
         end: a?.endDate || null,
         ongoing: !a?.endDate,
         url: a?.linkedUrl || '',
+        source: 'Cloudflare Radar',
       });
     }
   }
   return out;
 }
 
-function mapAttackOrigins(result: RadarResult): RadarAttackOrigin[] {
-  // Top-N endpoints return the series under `top_0`.
+function mapCloudflareAttackOrigins(result: RadarResult): PublicThreatIndicator[] {
   const rows = result?.top_0 ?? result?.top0 ?? [];
-  const out: RadarAttackOrigin[] = [];
+  const out: PublicThreatIndicator[] = [];
 
   for (const r of rows) {
     const code = r?.originCountryAlpha2 ?? r?.clientCountryAlpha2 ?? r?.originCountry;
@@ -144,66 +164,184 @@ function mapAttackOrigins(result: RadarResult): RadarAttackOrigin[] {
       lng: c[0],
       lat: c[1],
       share: Number(Number(r?.value).toFixed(2)) || 0,
+      observations: 0,
+      indicator_type: 'observed-c2-infrastructure',
+      source: 'abuse.ch Feodo Tracker',
     });
   }
   return out;
 }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
+async function fetchGdeltNetworkEvents(): Promise<PublicNetworkEvent[]> {
+  const { events } = await fetchGdeltEvents({ quads: [4], minArticles: 1, limit: 2000 });
+  return events
+    .filter(event => String(event.event_code || '').startsWith('176'))
+    .slice(0, 120)
+    .map(event => {
+      const e = toPublicGdeltEvent(event);
+      return {
+        id: `gdelt-cyber-${e.id}`,
+        lat: e.lat,
+        lng: e.lng,
+        country: e.country || '',
+        country_name: e.country || e.name || 'موقع منشور',
+        scope: 'بلاغ حدث سيبراني منشور',
+        event_type: 'REPORTED_CYBER_EVENT',
+        cause: 'CAMEO_176',
+        description: e.event_label_ar || 'هجوم سيبراني مُبلّغ عنه',
+        start: e.date,
+        end: e.date,
+        ongoing: false,
+        url: e.url || '',
+        source: 'GDELT 2.0 · CAMEO 176',
+        precision: e.precision,
+      };
+    });
+}
 
-  // Capability probe — lets the UI decide whether to show the layer without
-  // provoking an upstream call. Always 200 so it is cheap and unambiguous.
-  if (searchParams.get('probe') === '1') {
-    return NextResponse.json({ configured: isConfigured(), source: 'Cloudflare Radar' });
+async function fetchObservedThreatIndicators(signal: AbortSignal): Promise<PublicThreatIndicator[]> {
+  const res = await fetch(FEODO_URL, {
+    signal,
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'M3TM.WORLD/1.0 public-network-events',
+    },
+  });
+  if (!res.ok) throw new Error(`Feodo responded ${res.status}`);
+
+  const raw = await res.json();
+  const rows = Array.isArray(raw) ? raw : [];
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    const code = String(row?.country || '').trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code) || !centroidFor(code)) continue;
+    counts.set(code, (counts.get(code) || 0) + 1);
   }
 
-  if (!isConfigured()) {
+  const total = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+  if (!total) return [];
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 35)
+    .flatMap(([code, observations]) => {
+      const c = centroidFor(code);
+      if (!c) return [];
+      return [{
+        country: code,
+        country_name: code,
+        lng: c[0],
+        lat: c[1],
+        share: Number(((observations / total) * 100).toFixed(2)),
+        observations,
+        indicator_type: 'observed-c2-infrastructure' as const,
+        source: 'abuse.ch Feodo Tracker' as const,
+      }];
+    });
+}
+
+async function fetchPublicFallback(): Promise<FallbackResult> {
+  const signal = AbortSignal.timeout(20000);
+  const [gdeltRes, feodoRes] = await Promise.allSettled([
+    fetchGdeltNetworkEvents(),
+    fetchObservedThreatIndicators(signal),
+  ]);
+
+  const networkEvents = gdeltRes.status === 'fulfilled' ? gdeltRes.value : [];
+  const threatIndicators = feodoRes.status === 'fulfilled' ? feodoRes.value : [];
+  const errors: string[] = [];
+
+  if (gdeltRes.status === 'rejected') errors.push('gdelt unavailable');
+  if (feodoRes.status === 'rejected') errors.push('abuse.ch unavailable');
+
+  return {
+    networkEvents,
+    threatIndicators,
+    providers: {
+      gdelt: gdeltRes.status === 'rejected' ? 'unavailable' : networkEvents.length ? 'active' : 'empty',
+      abuse_ch: feodoRes.status === 'rejected' ? 'unavailable' : threatIndicators.length ? 'active' : 'empty',
+    },
+    errors,
+  };
+}
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const cloudflareConfigured = isConfigured();
+
+  if (searchParams.get('probe') === '1') {
+    return NextResponse.json({
+      configured: cloudflareConfigured,
+      fallback_available: true,
+      source: 'Cloudflare Radar',
+      fallback_source: 'GDELT 2.0 + abuse.ch Feodo Tracker',
+    });
+  }
+
+  const fallbackPromise = fetchPublicFallback();
+
+  if (!cloudflareConfigured) {
+    const fallback = await fallbackPromise;
     return NextResponse.json(
       {
         configured: false,
-        outages: [],
-        attack_origins: [],
-        error: 'Cloudflare Radar not configured',
-        hint: 'Set CLOUDFLARE_API_TOKEN (Cloudflare account → API Tokens → Radar: Read) in .env',
+        fallback_active: true,
+        outages: fallback.networkEvents,
+        attack_origins: fallback.threatIndicators,
+        total_outages: fallback.networkEvents.length,
+        total_attack_origins: fallback.threatIndicators.length,
+        source: 'GDELT 2.0 + abuse.ch Feodo Tracker',
+        source_mode: 'public-fallback',
+        cloudflare_status: 'not_configured',
+        providers: fallback.providers,
+        ...(fallback.errors.length ? { partial: true, errors: fallback.errors } : {}),
+        timestamp: new Date().toISOString(),
       },
-      { status: 503 }
+      { headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300' } }
     );
   }
 
   const signal = AbortSignal.timeout(20000);
-
-  // Degrade per-section rather than all-or-nothing: one endpoint failing should
-  // not blank the whole layer.
-  const [outagesRes, attacksRes] = await Promise.allSettled([
-    radarFetch('/annotations/outages?limit=50&format=json', signal),
-    radarFetch('/attacks/layer3/top/locations/origin?limit=25&format=json', signal),
+  const [outagesRes, attacksRes, fallback] = await Promise.all([
+    radarFetch('/annotations/outages?limit=50&format=json', signal).then(
+      value => ({ ok: true as const, value }),
+      () => ({ ok: false as const, value: null })
+    ),
+    radarFetch('/attacks/layer3/top/locations/origin?limit=25&format=json', signal).then(
+      value => ({ ok: true as const, value }),
+      () => ({ ok: false as const, value: null })
+    ),
+    fallbackPromise,
   ]);
 
-  const outages = outagesRes.status === 'fulfilled' ? mapOutages(outagesRes.value) : [];
-  const attack_origins = attacksRes.status === 'fulfilled' ? mapAttackOrigins(attacksRes.value) : [];
+  const cloudflareOutages = outagesRes.ok ? mapCloudflareOutages(outagesRes.value) : [];
+  const cloudflareAttackOrigins = attacksRes.ok ? mapCloudflareAttackOrigins(attacksRes.value) : [];
 
-  const errors: string[] = [];
-  if (outagesRes.status === 'rejected') errors.push(`outages: ${outagesRes.reason?.message ?? 'failed'}`);
-  if (attacksRes.status === 'rejected') errors.push(`attack_origins: ${attacksRes.reason?.message ?? 'failed'}`);
-
-  if (outages.length === 0 && attack_origins.length === 0 && errors.length > 0) {
-    console.error('[OSIRIS] Cloudflare Radar fetch failed:', errors.join('; '));
-    return NextResponse.json(
-      { configured: true, outages: [], attack_origins: [], error: 'Cloudflare Radar unavailable', errors },
-      { status: 502 }
-    );
-  }
+  const useOutageFallback = !outagesRes.ok;
+  const useAttackFallback = !attacksRes.ok;
+  const outages = useOutageFallback ? fallback.networkEvents : cloudflareOutages;
+  const attack_origins = useAttackFallback ? fallback.threatIndicators : cloudflareAttackOrigins;
+  const fallbackActive = useOutageFallback || useAttackFallback;
 
   return NextResponse.json(
     {
       configured: true,
+      fallback_active: fallbackActive,
       outages,
       attack_origins,
       total_outages: outages.length,
       total_attack_origins: attack_origins.length,
-      ...(errors.length > 0 ? { partial: true, errors } : {}),
-      source: 'Cloudflare Radar',
+      source: fallbackActive ? 'Cloudflare Radar + public fallback' : 'Cloudflare Radar',
+      source_mode: fallbackActive ? 'mixed' : 'cloudflare-radar',
+      cloudflare_status: outagesRes.ok && attacksRes.ok ? 'active' : 'partial',
+      providers: {
+        cloudflare_outages: outagesRes.ok ? 'active' : 'unavailable',
+        cloudflare_attacks: attacksRes.ok ? 'active' : 'unavailable',
+        ...(fallbackActive ? fallback.providers : {}),
+      },
+      ...(fallbackActive ? { partial: true } : {}),
       timestamp: new Date().toISOString(),
     },
     { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } }
