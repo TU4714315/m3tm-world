@@ -7,6 +7,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
 }){
   const summary=useMemo(()=>regionalPublicSignals(data),[data]);
   const sourceTime=publishedAt??gdeltWindowTime(data.conflict_source_status?.gdelt?.window||'');
+  const preliminary=summary.events.filter(e=>!e.multiplePublishers).length;
+  const multiple=summary.events.length-preliminary;
+  const air=summary.events.filter(e=>e.category==='aerial_attack').length;
+  const clash=summary.events.filter(e=>['heavy_weapons','armed_clash','bombing','material_conflict','mass_violence','assault'].includes(e.category)).length;
+  const unrest=summary.events.filter(e=>e.category==='civil_unrest').length;
   const time=(v:string|null|undefined)=>v&&Number.isFinite(Date.parse(v))
     ?new Date(v).toLocaleString('ar-SA',{timeZone:'UTC',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC':'غير معلوم';
   return <section dir="rtl" aria-label="موجز الشرق الأوسط" className="glass-panel pointer-events-auto max-h-[min(70dvh,600px)] w-full overflow-y-auto styled-scrollbar rounded-lg border border-white/10 p-3 text-white">
@@ -20,17 +25,30 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <div className="rounded bg-white/5 p-2"><strong className="text-lg text-amber-300">{summary.airRegions}</strong><p className="text-[10px]">مناطق جوية مجمّعة</p></div>
       <div className="rounded bg-white/5 p-2"><strong className="text-lg text-amber-300">{summary.seaRegions}</strong><p className="text-[10px]">مناطق بحرية مجمّعة</p></div>
     </div>
-    <p className="mt-2 text-[10px] text-white/60">تاريخ دفعة المصدر: {time(sourceTime)} · {stale?'مخزون سابق':'حسب المصدر المنشور'}</p>
+    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]" aria-label="مجموعات الأدلة حسب الترميز الآلي">
+      <span className="rounded-md bg-slate-400/15 border border-slate-300/20 px-2 py-1 text-slate-100">أولي · {preliminary}</span>
+      <span className="rounded-md bg-amber-300/10 border border-amber-300/25 px-2 py-1 text-amber-100">عدة ناشرين · {multiple}</span>
+      <span className="rounded-md bg-red-400/10 px-2 py-1 text-red-100">جوي · {air}</span>
+      <span className="rounded-md bg-orange-400/10 px-2 py-1 text-orange-100">نزاعات · {clash}</span>
+      <span className="rounded-md bg-yellow-400/10 px-2 py-1 text-yellow-100">اضطرابات · {unrest}</span>
+    </div>
+    <p className="mt-2 text-[11px] text-white/70">تاريخ دفعة المصدر: {time(sourceTime)} · {stale?'مخزون سابق':'حسب المصدر المنشور'}</p>
     <p className="mt-1 text-[10px] leading-relaxed text-white/65">
-      ACLED: {data.conflict_source_status?.acled?.status==='ok'?'متصل — مؤشرات إقليمية':
+      ACLED: {data.conflict_source_status?.acled?.status==='ok'?(Number(data.conflict_source_status?.acled?.events)>0?'متصل — سجلات تُستخدم في مؤشرات إقليمية':'متصل؛ لا سجلات مطابقة متاحة حاليًا'):
         data.conflict_source_status?.acled?.status==='cached-stale'?'آخر بيانات محفوظة، تحديث المصدر غير متاح':
         data.conflict_source_status?.acled?.status==='not_configured'?'غير مهيأ — حساب myACLED مطلوب':
         data.conflict_source_status?.acled?.status==='unavailable'?'غير متاح حاليًا':'قيد الفحص'}.
       {' '}<a href="https://acleddata.com/" target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">المصدر ACLED</a>؛
       تفاصيل الأحداث أدناه مستمدة من GDELT ولا تتوقف على حساب ACLED.
     </p>
-    <div className="mt-2 divide-y divide-white/10">{summary.events.slice(0,8).map(e=><div key={e.id} className="py-2">
-      <div className="text-[11px]">{e.title}</div>
+    <p className="mt-1 text-[10px] text-white/60">تعدد الناشرين لا يثبت استقلال مصادر الأخبار ولا وقوع الحادثة؛ افتح المصدر للتحقق.</p>
+    <div className="mt-2 divide-y divide-white/10">{summary.events.slice(0,14).map(e=><div key={e.id} className="py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[12px] leading-5 font-medium">{e.title}</div>
+        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${e.multiplePublishers ? 'border-orange-300/40 text-orange-200' : 'border-slate-300/40 text-slate-200'}`}>
+          {e.multiplePublishers ? 'عدة ناشرين' : 'أولي'}
+        </span>
+      </div>
       {e.actors.length>0 && <div className="mt-1 text-[10px] text-amber-100/80">
         الجهات المذكورة في ترميز الخبر (دون إثبات المسؤولية): {e.actors.join(' / ')}
       </div>}

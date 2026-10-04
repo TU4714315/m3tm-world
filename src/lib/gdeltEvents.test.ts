@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGdeltReportedRoutes, classifyPublicEvent, fetchGdeltEvents, parseGdeltEventsCsv, QUAD_LABELS, toPublicGdeltEvent, type GdeltEvent } from './gdeltEvents';
+import { buildGdeltReportedRoutes, classifyPublicEvent, publisherCoverage, fetchGdeltEvents, parseGdeltEventsCsv, QUAD_LABELS, toPublicGdeltEvent, type GdeltEvent } from './gdeltEvents';
 
 /**
  * Live integration test — opt in with RUN_LIVE_TESTS=1 (hits the real GDELT
@@ -52,6 +52,20 @@ describe('fetchGdeltEvents', () => {
     const missing=columns.slice();
     missing[6]='UNKNOWN';missing[16]='';
     expect(toPublicGdeltEvent(parseGdeltEventsCsv(missing.join('\t')).events[0]).reported_actor1).toBeUndefined();
+  });
+
+  it('normalizes legacy cached publisher labels using counts alone', () => {
+    expect(publisherCoverage(1)).toBe('single-source-report');
+    expect(publisherCoverage(2)).toBe('multi-source-report');
+    expect(publisherCoverage(undefined)).toBe('single-source-report');
+  });
+
+  it('does not mistake syndicated article volume for multiple independent sources', () => {
+    const report = classifyPublicEvent('195', '19', 4, 1, 24);
+    expect(report.event_category).toBe('aerial_attack');
+    expect(report.corroboration).toBe('single-source-report');
+    expect(classifyPublicEvent('195', '19', 4, 2, 2).corroboration)
+      .toBe('multi-source-report');
   });
 
   it('applies event-code prefixes before the result limit', () => {

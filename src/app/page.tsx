@@ -28,6 +28,7 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
+import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -432,6 +433,7 @@ export default function Dashboard() {
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
+  const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
@@ -1504,7 +1506,8 @@ export default function Dashboard() {
           terrainFocus={terrainFocus}
           terrainRetry={terrainRetry}
           onTerrainStatusChange={setTerrainStatus}
-          mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'} 
+          mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'}
+          satelliteVisual={satelliteVisual} 
           onEntityClick={handleEntityClick} 
           onMouseCoords={handleMouseCoords} 
           onRightClick={embedMode ? undefined : handleRightClick}
@@ -1632,6 +1635,38 @@ export default function Dashboard() {
         </div>
 
 
+        {/* One-touch regional operations layout, independent of source layers. */}
+        <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.90)] p-1.5 shadow-[0_8px_32px_rgba(0,0,0,.4)]" aria-label="عرض الرصد ووضوح القمر الصناعي">
+          <button type="button" onClick={() => {
+              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
+              if (isMobile) setMobilePanel('intel');
+              setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
+            }}
+            className="rounded-md border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20 focus-visible:ring-2 focus-visible:ring-cyan-300"
+            title="خريطة داكنة مسطّحة، تركيز الشرق الأوسط، موجز الأدلة المنشورة — لا يغيّر المصادر">
+            <MapPinned className="inline h-3.5 w-3.5 ms-1"/> مرصد الشرق الأوسط
+          </button>
+          {mapStyle === 'satellite' && <>
+            <span className="px-1 text-[11px] font-semibold text-white/80">إضاءة الصورة</span>
+            {(Object.keys(SATELLITE_VISUAL_PRESETS) as SatelliteVisualPreset[]).map(mode => (
+              <button type="button" key={mode} onClick={() => setSatelliteVisual(mode)}
+                title={SATELLITE_VISUAL_PRESETS[mode].descriptionAr}
+                aria-pressed={satelliteVisual === mode}
+                className={`rounded-md px-2 py-1.5 text-[11px] focus-visible:ring-2 focus-visible:ring-cyan-300 ${satelliteVisual === mode ? 'bg-amber-300/25 font-bold text-amber-100 ring-1 ring-amber-300/60' : 'text-white/70 hover:bg-white/15'}`}>
+                {SATELLITE_VISUAL_PRESETS[mode].labelAr}
+              </button>
+            ))}
+          </>}
+        </div>
+        {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <div dir="rtl"
+          className="pointer-events-none max-w-[min(92vw,460px)] rounded-md border border-white/15 bg-black/75 px-2.5 py-1.5 text-[11px] leading-5 text-white/90" aria-label="دليل رموز الأحداث">
+          <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
+          <span className="mx-2 text-white/30">|</span>
+          <span className="text-orange-300 font-semibold">⬡ عدة ناشرين</span>
+          <span className="mx-2 text-white/30">|</span>
+          <span className="text-amber-200">● رقم = مجموعة تقارير</span>
+          <span className="block text-[10px] text-white/60">الترميز والموقع آليان؛ لا تعني الرموز وقوع هجوم مؤكدًا.</span>
+        </div>}
         {/* Scale Bar */}
         {!isMobile && (
           <div className="pl-0.5">

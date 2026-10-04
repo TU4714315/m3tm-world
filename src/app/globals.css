@@ -349,6 +349,19 @@ html:has(.docs-root) body {
    ═══════════════════════════════════════════════════════════════ */
 .maplibregl-popup-content { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
 .maplibregl-popup-tip { display: none !important; }
+/* Readability on satellite sand/night. Scope to event cards, not the entire
+   MapLibre canvas: canvas filters would recolor source credibility badges. */
+.m3tm-event-card {
+  font-family: var(--font-body), system-ui, sans-serif !important;
+  line-height: 1.55;
+  color: #f1f5fa;
+  max-width: min(390px, calc(100vw - 34px));
+  box-shadow: 0 14px 50px rgba(0,0,0,0.5);
+}
+.m3tm-event-card [style*="font-size:9px"] { font-size: 11px !important; line-height: 1.6 !important; }
+.m3tm-event-card [style*="font-size:10px"] { font-size: 12px !important; line-height: 1.5 !important; }
+.m3tm-event-card [style*="opacity:0.6"] { opacity: 0.85 !important; }
+@media (max-width:640px) { .m3tm-event-card { padding: 12px !important; min-width: 0 !important; } }
 /* Live data-source credits: current CARTO/OSM, selected Esri imagery, zoom-gated
    Mapzen DEM, and optional NOAA 2022 relief. Never hide provider attribution. */
 .maplibregl-ctrl-attrib {

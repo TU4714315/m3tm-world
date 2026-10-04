@@ -108,6 +108,12 @@ export type PublicConflictCategory =
 
 export type PublicCorroboration = 'single-source-report' | 'multi-source-report';
 
+/** Classifies publisher count only, including legacy durable fallback payloads.
+ *  Syndicated article volume cannot establish independent corroboration. */
+export function publisherCoverage(sources: unknown): PublicCorroboration {
+  return Number(sources) >= 2 ? 'multi-source-report' : 'single-source-report';
+}
+
 export interface PublicEventSemantics {
   event_category: PublicConflictCategory;
   event_label_ar: string;
@@ -164,7 +170,10 @@ export function classifyPublicEvent(
   return {
     event_category,
     event_label_ar,
-    corroboration: sources >= 2 || articles >= 3 ? 'multi-source-report' : 'single-source-report',
+    // Several articles can be syndicated by the same publisher. Do not
+    // upgrade a single-source report to multi-source on article volume alone.
+    // Even distinct publishers do not constitute independent verification.
+    corroboration: publisherCoverage(sources),
     precision: 'gdelt-actiongeo-reported',
   };
 }

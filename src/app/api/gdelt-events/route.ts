@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildGdeltReportedRoutes, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
+import { buildGdeltReportedRoutes, publisherCoverage, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { gdeltWindowTime, isMiddleEastBelt } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
@@ -97,6 +97,12 @@ export async function GET(req: Request) {
     if (previous.value) {
       return NextResponse.json({
         ...previous.value,
+        // Old durable payloads were saved with articles>=3 treated as
+        // multi-source. Correct the labels even when upstream is unavailable.
+        events: Array.isArray(previous.value.events)
+          ? previous.value.events.map((event:any) => ({
+              ...event, corroboration: publisherCoverage(event.sources),
+            })) : [],
         data_state: 'cached-stale',
         cache_backend: previous.backend,
         durable_cache_configured: durableCacheConfigured(),
