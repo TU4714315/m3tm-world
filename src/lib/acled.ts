@@ -30,6 +30,12 @@ export interface AcledPublicEvent {
   timePrecision: number | null;
 }
 
+/** ACLED releases edited event records weekly, not a 15-minute incident feed.
+ * Source update publication and underlying event dates have distinct clocks. */
+export const ACLED_EVENT_WINDOW_DAYS = 35;
+export const ACLED_PUBLICATION_WINDOW_DAYS = 10;
+export const ACLED_RECENT_OCCURRENCE_DAYS = 7;
+
 export interface AcledFetchResult {
   status: 'ok' | 'not_configured' | 'unavailable' | 'cached-stale';
   events: AcledPublicEvent[];
@@ -42,6 +48,8 @@ export interface AcledFetchResult {
     providerTotal: number | null;
     pages: number;
     broadProbeRows: number | null;
+    eventWindowDays: number;
+    publicationWindowDays: number;
   };
 }
 
@@ -134,8 +142,8 @@ function isoDateOnly(date: Date): string {
 /** Only same-column alternatives: mixing sub_event_type in an event_type OR
  * causes backend-dependent filtering. Mob violence belongs to Riots and is
  * then selected precisely by sub_event_type in the normalizer. */
-export function acledEventQuery(start: Date, end: Date, pageSize: number): URLSearchParams {
-  return new URLSearchParams({
+export function acledEventQuery(start: Date, end: Date, pageSize: number, publishedSince?: Date): URLSearchParams {
+  const params = new URLSearchParams({
     _format: 'json',
     event_date: `${isoDateOnly(start)}|${isoDateOnly(end)}`,
     event_date_where: 'BETWEEN',
@@ -151,9 +159,17 @@ export function acledEventQuery(start: Date, end: Date, pageSize: number): URLSe
       'source','source_scale','fatalities','timestamp',
     ].join('|'),
   });
+  if (publishedSince) {
+    params.set('timestamp', String(Math.floor(publishedSince.getTime() / 1000)));
+    params.set('timestamp_where', '>=');
+  }
+  return params;
 }
 
-async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
+async function fetchFreshAcledPublicEvents(
+  days = ACLED_EVENT_WINDOW_DAYS, limit = 1000,
+  publicationDays = ACLED_PUBLICATION_WINDOW_DAYS,
+): Promise<AcledFetchResult> {
   let token: string | null;
   try {
     token = await getAcledToken();
@@ -177,8 +193,13 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
 
   const end = new Date();
   const start = new Date(end.getTime() - Math.max(1, days - 1) * 86400000);
+  const publicationStart = new Date(end.getTime() - Math.max(1, publicationDays) * 86400000);
   const pageSize = Math.max(100, Math.min(1000, limit));
-  const params = acledEventQuery(start, end, pageSize);
+  // A weekly release may publish on Mon/Tue reports *occurring* before
+  // the past 7 days (for example Friday in the preceding week). Query
+  // recently uploaded/edited records using timestamp and bound occurrence
+  // to 35 days. Never present an old event date as a new incident.
+  const params = acledEventQuery(start, end, pageSize, publicationStart);
 
   try {
     const rows: any[] = [];
@@ -220,14 +241,15 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
       cursor = String(nextCursor);
     }
 
-    // If the filtered dataset returns no rows, perform a *bounded* date-only
-    // count probe. Never redistribute probe rows. This differentiates a
-    // provider/account recency gap from an over-restrictive event-type query.
-    // It runs only on empty windows, not on every active map refresh.
+    // A bounded occurrence-date-only diagnostic on an empty publication
+    // window distinguishes a weekly release/data access gap from a content
+    // filter. Do not return raw event rows or provider identifiers publicly.
     if (rows.length === 0) {
       try {
         const probe = new URLSearchParams(params);
         probe.delete('event_type');
+        probe.delete('timestamp');
+        probe.delete('timestamp_where');
         probe.set('limit', '25');
         probe.set('cursor', '0');
         const res = await fetch(`https://acleddata.com/api/acled/read?${probe}`, {
@@ -296,14 +318,16 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
         providerTotal,
         pages,
         broadProbeRows,
+        eventWindowDays: days,
+        publicationWindowDays: publicationDays,
       },
       message: events.length ? undefined
         : rows.length ? 'ACLED returned records but none qualified as mapped conflict events.'
         : broadProbeRows && broadProbeRows > 0
-          ? 'ACLED date window contains records; the event-type filter returned none.'
+          ? 'Older event records are accessible, but no matching records were newly published or updated in the publication window.'
           : broadProbeRows === 0
-            ? 'ACLED returned no accessible records for the requested date window.'
-            : 'ACLED returned no records for this query; the date-only probe was inconclusive.',
+            ? 'ACLED returned no accessible events in the extended occurrence window.'
+            : 'ACLED returned no recently published records; occurrence-only probe was inconclusive.',
     };
   } catch (error) {
     return {
@@ -320,19 +344,22 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
 type AcledCache = { key: string; storedAt: number; result: AcledFetchResult };
 let goodSnapshot: AcledCache | null = null;
 let inflightSnapshot: { key: string; value: Promise<AcledFetchResult> } | null = null;
-export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
+export async function fetchAcledPublicEvents(
+  days = ACLED_EVENT_WINDOW_DAYS, limit = 1000,
+  publicationDays = ACLED_PUBLICATION_WINDOW_DAYS,
+): Promise<AcledFetchResult> {
   if (!process.env.ACLED_ACCESS_TOKEN &&
       !(process.env.ACLED_USERNAME && process.env.ACLED_PASSWORD)) {
     return { status: 'not_configured', events: [], lastUpdateHours: null,
       message: 'An authorized myACLED account is required (server-side OAuth).' };
   }
-  const key = String(days) + '/' + String(limit);
+  const key = String(days) + '/' + String(limit) + '/' + String(publicationDays);
   if (goodSnapshot?.key === key && Date.now() - goodSnapshot.storedAt < 15 * 60_000) {
     return goodSnapshot.result;
   }
   if (inflightSnapshot?.key === key) return inflightSnapshot.value;
   const promise = (async (): Promise<AcledFetchResult> => {
-    const result = await fetchFreshAcledPublicEvents(days, limit);
+    const result = await fetchFreshAcledPublicEvents(days, limit, publicationDays);
     if (result.status === 'ok') {
       goodSnapshot = { key, result, storedAt: Date.now() };
       return result;

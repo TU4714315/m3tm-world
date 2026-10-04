@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { acledEventQuery, classifyAcledEvent } from './acled';
+import {
+  acledEventQuery, classifyAcledEvent,
+  ACLED_EVENT_WINDOW_DAYS, ACLED_PUBLICATION_WINDOW_DAYS,
+} from './acled';
 
 describe('classifyAcledEvent', () => {
   it('creates a documented inclusive date query with only same-column OR types', () => {
@@ -11,6 +14,20 @@ describe('classifyAcledEvent', () => {
     expect(params.get('fields')).toContain('latitude');
     expect(params.get('limit')).toBe('250');
     expect(params.get('with_total')).toBe('true');
+  });
+
+  it('filters publication upload time separately from occurrence date', () => {
+    const pub = new Date('2026-09-24T16:00:00Z');
+    const q = acledEventQuery(
+      new Date('2026-09-01T00:00:00Z'),
+      new Date('2026-10-04T00:00:00Z'),
+      300, pub,
+    );
+    expect(q.get('event_date')).toBe('2026-09-01|2026-10-04');
+    expect(q.get('timestamp')).toBe(String(Math.floor(pub.getTime()/1000)));
+    expect(q.get('timestamp_where')).toBe('>=');
+    expect(ACLED_EVENT_WINDOW_DAYS).toBeGreaterThan(7);
+    expect(ACLED_PUBLICATION_WINDOW_DAYS).toBeGreaterThan(7);
   });
 
   it('maps public ACLED sub-event types into stable map categories', () => {

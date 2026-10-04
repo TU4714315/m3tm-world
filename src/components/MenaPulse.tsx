@@ -34,7 +34,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     </div>
     <p className="mt-2 text-[11px] text-white/70">تاريخ دفعة المصدر: {time(sourceTime)} · {stale?'مخزون سابق':'حسب المصدر المنشور'}</p>
     <p className="mt-1 text-[10px] leading-relaxed text-white/65">
-      ACLED: {data.conflict_source_status?.acled?.status==='ok'?(Number(data.conflict_source_status?.acled?.events)>0?'متصل — سجلات تُستخدم في مؤشرات إقليمية':'متصل؛ لا سجلات مطابقة متاحة حاليًا'):
+      ACLED: {data.conflict_source_status?.acled?.status==='ok'
+        ?(Number(data.conflict_source_status?.acled?.events)>0
+          ? `${data.conflict_source_status.acled.events} سجلاً منشورًا أو محدّثًا خلال ${data.conflict_source_status.acled.publicationWindowDays || 10} أيام، عن وقائع في آخر ${data.conflict_source_status.acled.eventWindowDays || 35} يومًا. مؤشرات إقليمية مرجعية وليست رصدًا لحظيًا`
+          :'متصل؛ لا سجلات مطابقة في فترة النشر الحالية'):
+
         data.conflict_source_status?.acled?.status==='cached-stale'?'آخر بيانات محفوظة، تحديث المصدر غير متاح':
         data.conflict_source_status?.acled?.status==='not_configured'?'غير مهيأ — حساب myACLED مطلوب':
         data.conflict_source_status?.acled?.status==='unavailable'?'غير متاح حاليًا':'قيد الفحص'}.
