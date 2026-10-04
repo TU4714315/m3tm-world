@@ -1,9 +1,16 @@
-# ACLED, GDELT and event attribution in M3TM.WORLD
+# ACLED / GDELT — production data contract (verified 2026-10-04)
 
-ACLED is currently not configured in production: `/api/conflicts` reports `sourceStatus.acled.status=not_configured`; the health endpoint confirms missing server credentials. It is an independent third-party service and requires a myACLED account with OAuth access. Use authorized server-only `ACLED_USERNAME` and `ACLED_PASSWORD` in Vercel Production; an access token is valid around 24 hours and is not an enduring substitute for OAuth. No credentials may be stored in GitHub, map HTML, client environment, logs or URL parameters.
+## Verified status
+- The owner activated `ACLED_USERNAME` and `ACLED_PASSWORD` as Vercel **Production Secret** environment variables; never copy these values to GitHub, logs, browser bundles, or this file.
+- The deployed `/api/health?deep=1` reported ACLED configured and authenticated, and `/api/conflicts` returned `sourceStatus.acled.status=ok`, **events=0** at SHA `1b1e0cd18a801e260930d8f8e36b05ac9bd8c44f`.
+- OAuth success is **not** evidence of available event rows. ACLED is curated and not equivalent to a live military telemetry feed.
+- The remaining external diagnosis is provider **date coverage/account entitlement** versus a query filter returning no records. The adapter now exposes bounded numeric `sourceStatus.acled.diagnostics` (`sourceRows`, `acceptedRows`, `providerTotal`, `pages`, `broadProbeRows`). The optional date-only probe never publishes ACLED raw rows or sensitive response metadata.
+- Source 7-day conflict types: Battles, Explosions/Remote violence, Violence against civilians, and Riots (only Mob violence retained locally); do not combine unrelated `sub_event_type` OR terms inside the `event_type` query field. Cursor pagination stays bounded.
+- If the upstream 7-day window is empty, keep **0** with an explicit reason; do not fabricate a prior event, silently stretch the date window, or call an empty feed live.
 
-Licensing: https://acleddata.com/eula and https://acleddata.com/attributionpolicy restrict re-publication of reconstructable raw ACLED rows. The world-public conflict route uses derived aggregate counts by published region over a seven-day period, with ACLED attribution. Any raw ACLED research requires proper license and restricted server-side workflow.
+## Public output and license
+ACLED use is subject to <https://acleddata.com/eula> and <https://acleddata.com/attributionpolicy>. The public route uses seven-day **derived regional counts** with the source attribution; raw reconstructable licensed records, exact unit tracks, and provider credentials must not enter public API responses.
+GDELT publishes independent coded news reports; names of CAMEO actors are reported mentions, not automatically proven responsibility. Public positions are generalized; independent evidence thresholds should be explicit.
 
-GDELT 2.0 CAMEO names (Actor1Name and Actor2Name) refer to *parties mentioned in published news coding*, not a verified determination of attack responsibility, nor locations of any currently active unit. The map shows these actor labels when actually present, together with a source link, event date, CAMEO class and public generalized location. Raw ActorGeo and precise military tracks remain excluded from the public feed.
-
-Latency and fallback: ACLED responses have a bounded optional wait in the conflicts route. Warm-instance caching for 15 minutes coalesces concurrent requests and a provider error may return the last successful snapshot with an explicit `cached-stale` label. GDELT and the worldwide conflict/report layers remain independent of the ACLED account.
+## Verification
+Check `/api/health?deep=1`, `/api/conflicts`, and `/api/gdelt-events` against deployed SHA. When `sourceRows=0,broadProbeRows>0`, investigate the event filter; when both are zero, check last ACLED publication, permitted account recency/countries and API service without exposing a secret. Validate tests with `npm test`, `npx tsc --noEmit --incremental false`, and `npm run build`. Keep both layers even if ACLED temporarily returns no matches.

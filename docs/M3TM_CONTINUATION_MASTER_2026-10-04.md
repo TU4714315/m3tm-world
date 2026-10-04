@@ -1,0 +1,34 @@
+# M3TM — MASTER CONTINUATION / خريطة الاستكمال (2026-10-04)
+
+> **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
+
+## Commands & actual baseline
+- WORLD `TU4714315/m3tm-world` → `https://m3tm-world.vercel.app`. Protected `main` baseline `1b1e0cd18a801e260930d8f8e36b05ac9bd8c44f` from merged PR #58. The baseline production passed Vercel deploy, reported `health=operational`, conflicts/GDELT `live`, ACLED OAuth `ok` with **0 ACLED event rows**. Sample counts (2026-10-04): 45 conflict items, 83 GDELT, 82 single-publisher and 1 multiple-publisher report. Counts change.
+- APP `TU4714315/m3tm-app`, `https://m3tm.app`. Protected `main` at inspection `3124d9a3470c64760964798276d48b2427b46c48`. First read `AGENTS.md`, `docs/M3TM_EXECUTION_CONTRACT.md`, and `docs/AI_HANDOFF.md`; APP contract scopes current work to P0 Reliability/Auth and P1 Consolidation. Do not introduce a new public operational shell.
+- Local WORLD worktree has historically been dirty; **never** reset, clean, stash, checkout over or publish its changes without `git status --short --branch`. The latest direct workspace command returned `Tool exec_command not found`; use isolated GitHub branches if local status cannot be established.
+- Tests: `npx tsc --noEmit --incremental false`, `npm test`, `npm run build`; Vercel Preview and protected merge gate; production `/api/health?deep=1`, `/api/conflicts`, `/api/gdelt-events`, plus WebGL desktop/mobile view.
+
+## Product specification
+- Maximize source-backed **fresh reporting of the Middle East/Red Sea**, global coverage preserved; aim to match/exceed WorldMonitor's information organization and measured alert latency, not copy its branding or unlicensed code. Assess feed freshness by original publication time, deduplication, geographic certainty and publisher independence.
+- All public layers, notably `military_activity`, `naval_activity`, `maritime`, `conflict_zones`, `conflict_density`, `frontlines`, `reported_routes`, `gdelt_events`, `civil_unrest`, `global_incidents`, `app_news`, `alert_pins`, flights/satellites/cameras and borders, stay enabled as user choices permit. Fix weak layers rather than delete them.
+- Public reporting has clear Arabic evidence levels: `أولي` = 1 publisher, `عدة ناشرين` = >=2 publishers (not independent confirmation), `مرجعي` = curated published record, `موضع تقريبي` = generalized location. Use concise, confident language without inventing certainty or assuming user intent. Military unit-level live paths/identifiers and local private OSINT remain outside public WORLD.
+- Existing PR #58 supports 3 raster grades `أصلي/رصد/مضاء`, MENA focus button, evidence desk, GDELT/unrest clustering, duplicate-symbol suppression, mobile intel panel and NOAA layering. Do not regress. APP↔WORLD origin-validated `hello/ready/sync/select` 35s contract stays intact.
+
+## Merged/release lineage (do not redo)
+- #41 CCTV/security, main merge `637222286fe1eb5c5f3524fe18c7000d595972ad`.
+- #55 Vercel policy: only `qa/**` auto-deploy disabled, `feat/**`, `fix/**`, `main` still deploy; `docs/M3TM_VERCEL_RELEASE_POLICY_2026.md`.
+- #57 source-coded published actor labels, ACLED derived 7-day regional output, source transparency, merge `98cb401cbe895af213ab01d3b25b167f528f43d4`.
+- #58 satellite imagery presets, MENA observatory, one/multiple-publisher treatment, client dedup, mobile and NOAA fixes, merge `1b1e0cd18a801e260930d8f8e36b05ac9bd8c44f`; all CI gates green.
+- Current work repairs ACLED optional event-type filter and adds aggregate diagnostics. Read `docs/ACLED_PUBLIC_SOURCE_CONTRACT_2026-10-04.md` for source semantics and limitations. The source may remain empty owing to upstream recency/license; do not fake records.
+
+## Open ordered work and objective acceptance
+1. **P0 ACLED zero rows:** inspect `sourceStatus.acled.diagnostics` after deployment; distinguish primary `sourceRows` vs `broadProbeRows`, then provider recency/account restrictions versus parse errors. ACLED is not a live flight feed and must comply with its EULA; GDELT independently remains operational.
+2. **P0 reporting relevance/freshness:** compare GDELT batch timestamp to displayed item dates, country-specific false positives, CAMEO ActorGeo/ActionGeo, duplicates and independent corroboration. Add tests for known Makkah CAMEO-195 ambiguity. No invented event coordinates.
+3. **P1 visual intelligence:** improve MENA responsive timelines, country/zone priority, route density, high-contrast map labels and intuitive badges; compare objective latency/coverage with WorldMonitor via the same window and geography. Keep all source APIs and all map layers.
+4. **P1 cross-site identity:** WORLD historically exposes an upstream Horus eye favicon while APP uses its own `public/favicon-m3.svg`/M3TM-branded mark. Align **browser/search icon** to APP's canonical brand without mistaking screenshot mockups for the owner's personal photograph. If a particular personal photo is intended, request its exact source after scanning assets; do not invent one.
+5. **APP scope:** respect APP's separate stabilisation contract, private/public separation, Host-Agent permissions and `docs/AI_HANDOFF.md` auto-generator. Do not write handoff by hand in APP or enable OSINT tools publicly.
+6. **Release:** isolate branch, tests, Vercel Preview, resolve review findings, squash merge only once on all green checks, verify deployed `main` SHA, GDELT & conflicts & ACLED diagnostics, 2D/3D and mobile, source attribution, no secret leakage. Document any still-blocked item truthfully.
+
+## Safety & quota
+- No cloud/browser to localhost; no credential printing, fake targets or made-up live telemetry. Never expose ACLED credentials, OAuth tokens, raw licensed event rows or exact operational military tracks.
+- Do not force push, remove features, bypass required reviewers or create Vercel no-op preview/deploy loops. `qa/**` remains quota-friendly.

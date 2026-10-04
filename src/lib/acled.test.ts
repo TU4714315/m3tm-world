@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { classifyAcledEvent } from './acled';
+import { acledEventQuery, classifyAcledEvent } from './acled';
 
 describe('classifyAcledEvent', () => {
+  it('creates a documented inclusive date query with only same-column OR types', () => {
+    const params = acledEventQuery(new Date('2026-09-28T00:00:00Z'), new Date('2026-10-04T00:00:00Z'), 250);
+    expect(params.get('event_date')).toBe('2026-09-28|2026-10-04');
+    expect(params.get('event_date_where')).toBe('BETWEEN');
+    expect(params.get('event_type')).toContain(':OR:event_type=Riots');
+    expect(params.get('event_type')).not.toContain('sub_event_type=');
+    expect(params.get('fields')).toContain('latitude');
+    expect(params.get('limit')).toBe('250');
+    expect(params.get('with_total')).toBe('true');
+  });
+
   it('maps public ACLED sub-event types into stable map categories', () => {
     expect(classifyAcledEvent('Explosions/Remote violence', 'Air/drone strike')).toEqual({
       category: 'aerial_attack',
