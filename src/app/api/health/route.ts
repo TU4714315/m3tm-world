@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 type SourceStatus =
   | 'active'
+  | 'restricted'
   | 'configured'
   | 'not_configured'
   | 'anonymous_fallback'
@@ -83,6 +84,13 @@ async function probeAcled(): Promise<{
     }),
   ]);
 
+  if (result.status === 'restricted_recency') {
+    return {
+      status: 'restricted',
+      detail: 'ACLED OAuth is valid; event data access is limited to historical periods by account entitlement.',
+      sampledEvents: 0,
+    };
+  }
   if (result.status === 'ok') {
     return {
       status: 'active',

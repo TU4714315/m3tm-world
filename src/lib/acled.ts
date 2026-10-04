@@ -37,10 +37,15 @@ export const ACLED_PUBLICATION_WINDOW_DAYS = 10;
 export const ACLED_RECENT_OCCURRENCE_DAYS = 7;
 
 export interface AcledFetchResult {
-  status: 'ok' | 'not_configured' | 'unavailable' | 'cached-stale';
+  status: 'ok' | 'restricted_recency' | 'not_configured' | 'unavailable' | 'cached-stale';
   events: AcledPublicEvent[];
   lastUpdateHours: number | null;
   message?: string;
+  /** Public source availability only: never return arbitrary ACLED restrictions. */
+  access?: {
+    latestPermittedEventDate: string | null;
+    recentAccessRestricted: boolean;
+  };
   /** Aggregate diagnostics only; never expose licensed event records or credentials. */
   diagnostics?: {
     sourceRows: number;
@@ -139,6 +144,23 @@ function isoDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** ACLED attaches query entitlement limits to successful JSON responses.
+ * Sanitize to a single date: no user, account, region, role, or other
+ * restrictions are persisted or exposed through the WORLD public API. */
+export function acledRecencyEntitlement(restrictions: unknown, requestedStart: Date) {
+  const value = restrictions && typeof restrictions === 'object'
+    ? (restrictions as {date_recency?: unknown}).date_recency : undefined;
+  const candidate = value && typeof value === 'object'
+    ? (value as {date?: unknown}).date : undefined;
+  const date = typeof candidate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate)
+    && Number.isFinite(Date.parse(candidate + 'T00:00:00Z'))
+    ? candidate : null;
+  return {
+    latestPermittedEventDate: date,
+    recentAccessRestricted: Boolean(date && date < isoDateOnly(requestedStart)),
+  };
+}
+
 /** Only same-column alternatives: mixing sub_event_type in an event_type OR
  * causes backend-dependent filtering. Mob violence belongs to Riots and is
  * then selected precisely by sub_event_type in the normalizer. */
@@ -208,6 +230,7 @@ async function fetchFreshAcledPublicEvents(
     let pages = 0;
     let providerTotal: number | null = null;
     let broadProbeRows: number | null = null;
+    let access: AcledFetchResult['access'];
 
     for (let page = 0; page < 6 && rows.length < 5000; page += 1) {
       params.set('cursor', cursor);
@@ -222,6 +245,7 @@ async function fetchFreshAcledPublicEvents(
       if (!res.ok) throw new Error(`ACLED API returned ${res.status}`);
 
       const json = await res.json();
+      access = acledRecencyEntitlement(json?.data_query_restrictions, start);
       if (json?.success === false || (json?.status && Number(json.status) >= 400)) {
         throw new Error(`ACLED API status ${json?.status ?? 'unknown'}`);
       }
@@ -244,7 +268,7 @@ async function fetchFreshAcledPublicEvents(
     // A bounded occurrence-date-only diagnostic on an empty publication
     // window distinguishes a weekly release/data access gap from a content
     // filter. Do not return raw event rows or provider identifiers publicly.
-    if (rows.length === 0) {
+    if (rows.length === 0 && !access?.recentAccessRestricted) {
       try {
         const probe = new URLSearchParams(params);
         probe.delete('event_type');
@@ -309,9 +333,11 @@ async function fetchFreshAcledPublicEvents(
     });
 
     return {
-      status: 'ok',
+      status: events.length===0 && access?.recentAccessRestricted
+        ? 'restricted_recency' : 'ok',
       events,
       lastUpdateHours,
+      access,
       diagnostics: {
         sourceRows: rows.length,
         acceptedRows: events.length,
@@ -322,6 +348,8 @@ async function fetchFreshAcledPublicEvents(
         publicationWindowDays: publicationDays,
       },
       message: events.length ? undefined
+        : access?.recentAccessRestricted
+          ? 'Account event-date entitlement excludes the requested recent period; historical ACLED data remain available according to the account license.'
         : rows.length ? 'ACLED returned records but none qualified as mapped conflict events.'
         : broadProbeRows && broadProbeRows > 0
           ? 'Older event records are accessible, but no matching records were newly published or updated in the publication window.'
@@ -360,7 +388,7 @@ export async function fetchAcledPublicEvents(
   if (inflightSnapshot?.key === key) return inflightSnapshot.value;
   const promise = (async (): Promise<AcledFetchResult> => {
     const result = await fetchFreshAcledPublicEvents(days, limit, publicationDays);
-    if (result.status === 'ok') {
+    if (result.status === 'ok' || result.status === 'restricted_recency') {
       goodSnapshot = { key, result, storedAt: Date.now() };
       return result;
     }

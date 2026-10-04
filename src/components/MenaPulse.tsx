@@ -39,6 +39,8 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
           ? `${data.conflict_source_status.acled.events} سجلاً منشورًا أو محدّثًا خلال ${data.conflict_source_status.acled.publicationWindowDays || 10} أيام، عن وقائع في آخر ${data.conflict_source_status.acled.eventWindowDays || 35} يومًا. مؤشرات إقليمية مرجعية وليست رصدًا لحظيًا`
           :'متصل؛ لا سجلات مطابقة في فترة النشر الحالية'):
 
+        data.conflict_source_status?.acled?.status==='restricted_recency'
+          ? `وصول تاريخي مقيّد — آخر تاريخ وقائع تسمح به صلاحية الحساب: ${data.conflict_source_status.acled.access?.latestPermittedEventDate || 'غير معلوم'}. GDELT مستمر في الرصد الحديث`:
         data.conflict_source_status?.acled?.status==='cached-stale'?'آخر بيانات محفوظة، تحديث المصدر غير متاح':
         data.conflict_source_status?.acled?.status==='not_configured'?'غير مهيأ — حساب myACLED مطلوب':
         data.conflict_source_status?.acled?.status==='unavailable'?'غير متاح حاليًا':'قيد الفحص'}.
