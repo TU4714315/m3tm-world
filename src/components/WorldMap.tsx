@@ -520,7 +520,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
         'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.05,0.12], 'circle-blur': 0.8,
       }});
-      map.addLayer({ id: 'conflict-event-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], paint: {
+      map.addLayer({ id: 'conflict-event-halo', type: 'circle', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], paint: {
         'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,8, 45,11, 75,14, 100,18],
         'circle-color': ['match',['get','eventCategory'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
@@ -528,11 +528,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.045,['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.04, 0.4,0.08, 1,0.16]],
         'circle-blur': 0.65,
       }});
-      map.addLayer({ id: 'conflict-event-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], layout: {
-        'icon-image': ['match',['get','eventCategory'],
-          'aerial_attack','evt-air', 'heavy_weapons','evt-heavy', 'bombing','evt-bomb',
-          'armed_clash','evt-clash', 'mass_violence','evt-mass', 'assault','evt-assault',
-          'material_conflict','evt-conflict', 'evt-other'],
+      map.addLayer({ id: 'conflict-event-icons', type: 'symbol', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], layout: {
+        'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],
+          ['match',['get','eventCategory'],
+            'aerial_attack','evt-air-prelim','heavy_weapons','evt-heavy-prelim',
+            'bombing','evt-bomb-prelim','armed_clash','evt-clash-prelim',
+            'mass_violence','evt-mass-prelim','assault','evt-assault-prelim',
+            'material_conflict','evt-conflict-prelim','evt-other-prelim'],
+          ['match',['get','eventCategory'],
+            'aerial_attack','evt-air','heavy_weapons','evt-heavy',
+            'bombing','evt-bomb','armed_clash','evt-clash','mass_violence','evt-mass',
+            'assault','evt-assault','material_conflict','evt-conflict','evt-other']],
         'icon-size': ['interpolate',['linear'],['zoom'], 1,0.72, 5,0.84, 10,0.98],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }, paint: { 'icon-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.45,1] }});
@@ -790,10 +796,17 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-opacity': 0.10, 'circle-blur': 0.68,
       }});
       map.addLayer({ id: 'gdelt-event-icons', type: 'symbol', source: 'gdelt-events', filter:['!',['has','point_count']], layout: {
-        'icon-image': ['match',['get','event_category'],
-          'aerial_attack','evt-air', 'heavy_weapons','evt-heavy', 'bombing','evt-bomb',
-          'armed_clash','evt-clash', 'mass_violence','evt-mass', 'assault','evt-assault',
-          'material_conflict','evt-conflict', 'evt-other'],
+        'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],
+          ['match',['get','event_category'],
+            'aerial_attack','evt-air-prelim','heavy_weapons','evt-heavy-prelim',
+            'bombing','evt-bomb-prelim','armed_clash','evt-clash-prelim',
+            'mass_violence','evt-mass-prelim','assault','evt-assault-prelim',
+            'material_conflict','evt-conflict-prelim','evt-other-prelim'],
+          ['match',['get','event_category'],
+            'aerial_attack','evt-air','heavy_weapons','evt-heavy',
+            'bombing','evt-bomb','armed_clash','evt-clash',
+            'mass_violence','evt-mass','assault','evt-assault',
+            'material_conflict','evt-conflict','evt-other']],
         'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
@@ -803,7 +816,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-color': '#FFB300', 'circle-opacity': 0.11, 'circle-blur': 0.68,
       }});
       map.addLayer({ id: 'civil-unrest-icons', type: 'symbol', source: 'civil-unrest', filter:['!',['has','point_count']], layout: {
-        'icon-image': 'evt-unrest',
+        'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],'evt-unrest-prelim','evt-unrest'],
         'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
@@ -1054,9 +1067,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'circle-blur': 1,
         }});
         map.addLayer({ id: l.id, type: 'symbol', source: l.src, layout: {
-          'icon-image': l.icon, 'icon-size': ['interpolate',['linear'],['zoom'], 1,0.46, 5,0.76, 10,1.08],
-          'icon-rotate': ['get','heading'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-        }, paint: { 'icon-opacity': 0.94 }});
+          'icon-image':l.icon,
+          'icon-size':['interpolate',['linear'],['zoom'],1,0.4,4,0.56,6,0.74,10,1.08],
+          'icon-rotate':['get','heading'],'icon-rotation-alignment':'map',
+          'icon-allow-overlap':false,'icon-ignore-placement':false,'icon-padding':1,
+        },paint:{'icon-opacity':['interpolate',['linear'],['zoom'],1,0.74,4,0.82,10,0.96]}});
       });
 
       map.addLayer({ id: 'selected-flight-track-halo', type: 'line', source: 'selected-flight-track', layout: {
@@ -1433,7 +1448,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
+      'gdelt-event-clusters','civil-unrest-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1593,10 +1608,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const accent = EVENT_COLOR[String(p.event_category)] ?? '#9B978E';
       const src = urlSafe(p.url);
       const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية من عدة مصادر' : 'بلاغ من مصدر واحد';
+      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
       const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
-      <div style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
+      <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
+        <div style="padding:7px;margin-bottom:10px;background:rgba(146,174,191,0.12);border:1px solid rgba(146,174,191,0.24);border-radius:5px;color:#E6F0F5;line-height:1.65;font-size:11px;">
+          بلاغ مصنف آليًا، لا يثبت وقوع الحادثة في هذا الموقع.
+          قد يشير اسم المكان إلى ذكر جغرافي في الخبر، لا موقع واقعة مؤكد.
+        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
           <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'حدث نزاع مُبلّغ عنه')}</span>
@@ -1607,8 +1626,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
           <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
-          <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
-          <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
+          <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
+          <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
           <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
@@ -1616,6 +1635,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     })
 
+    // Clusters are publication counts, never verified air-strike locations.
+    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters']) {
+      map.on('click',layer,e=>{
+        const geom=e.features?.[0]?.geometry;
+        if (geom?.type !== 'Point') return;
+        map.easeTo({center:geom.coordinates as [number,number],
+          zoom:Math.min(map.getZoom()+2.1,9),duration:600});
+      });
+    }
     map.on('click', 'civil-unrest-icons', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;
@@ -1623,10 +1651,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const accent = '#FFB300';
       const src = urlSafe(p.url);
       const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية من عدة مصادر' : 'بلاغ من مصدر واحد';
+      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
       const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
-      <div style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
+      <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
+        <div style="padding:7px;margin-bottom:10px;background:rgba(146,174,191,0.12);border:1px solid rgba(146,174,191,0.24);border-radius:5px;color:#E6F0F5;line-height:1.65;font-size:11px;">
+          بلاغ مصنف آليًا، لا يثبت وقوع الحادثة في هذا الموقع.
+          قد يشير اسم المكان إلى ذكر جغرافي في الخبر، لا موقع واقعة مؤكد.
+        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
           <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'احتجاج أو اضطراب مدني مُبلّغ عنه')}</span>
@@ -1637,8 +1669,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
           <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
-          <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
-          <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
+          <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
+          <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
           <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
@@ -1942,7 +1974,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2911,6 +2943,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         dataState: data.conflict_data_state || 'live',
       },
     }));
+    // The GDELT archive is also read by /api/conflicts. Preserve both
+    // sources but render an identical report in only one symbol layer.
+    const publishedGdeltIds = new Set((Array.isArray(data.gdelt_events)?data.gdelt_events:[])
+      .map((entry:any)=>String(entry?.id??'')));
     const events = (data.conflict_live_events || [])
       .filter((e: any) => Number.isFinite(Number(e.lat)) && Number.isFinite(Number(e.lng)))
       .map((e: any) => ({
@@ -2924,6 +2960,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           sourceUrl: e.url || '',
           eventCategory: e.type || 'material_conflict',
           corroboration: e.corroboration || 'single-source-report',
+          duplicateGdelt: !!(activeLayers as any).gdelt_events &&
+            e.provider === 'GDELT' &&
+            publishedGdeltIds.has(String(e.id??'').replace(/^gdelt-/,'')),
           eventCode: e.eventCode || '',
           provider: e.provider || 'GDELT',
           providerCount: e.providerCount || 1,
@@ -2940,7 +2979,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
-  }, [mapReady, data.conflict_zones, data.conflict_live_events, data.conflict_data_state, setGeo]);
+  }, [mapReady, data.conflict_zones, data.conflict_live_events, data.gdelt_events, (activeLayers as any).gdelt_events, data.conflict_data_state, setGeo]);
 
 
   // Visibility
