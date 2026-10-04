@@ -54,6 +54,14 @@ describe('fetchGdeltEvents', () => {
     expect(toPublicGdeltEvent(parseGdeltEventsCsv(missing.join('\t')).events[0]).reported_actor1).toBeUndefined();
   });
 
+  it('does not mistake syndicated article volume for multiple independent sources', () => {
+    const report = classifyPublicEvent('195', '19', 4, 1, 24);
+    expect(report.event_category).toBe('aerial_attack');
+    expect(report.corroboration).toBe('single-source-report');
+    expect(classifyPublicEvent('195', '19', 4, 2, 2).corroboration)
+      .toBe('multi-source-report');
+  });
+
   it('applies event-code prefixes before the result limit', () => {
     const row = (id: string, eventCode: string) => {
       const cols = Array(61).fill('');

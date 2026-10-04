@@ -164,7 +164,10 @@ export function classifyPublicEvent(
   return {
     event_category,
     event_label_ar,
-    corroboration: sources >= 2 || articles >= 3 ? 'multi-source-report' : 'single-source-report',
+    // Several articles can be syndicated by the same publisher. Do not
+    // upgrade a single-source report to multi-source on article volume alone.
+    // Even distinct publishers do not constitute independent verification.
+    corroboration: sources >= 2 ? 'multi-source-report' : 'single-source-report',
     precision: 'gdelt-actiongeo-reported',
   };
 }
