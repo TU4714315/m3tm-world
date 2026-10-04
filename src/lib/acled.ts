@@ -35,6 +35,14 @@ export interface AcledFetchResult {
   events: AcledPublicEvent[];
   lastUpdateHours: number | null;
   message?: string;
+  /** Aggregate diagnostics only; never expose licensed event records or credentials. */
+  diagnostics?: {
+    sourceRows: number;
+    acceptedRows: number;
+    providerTotal: number | null;
+    pages: number;
+    broadProbeRows: number | null;
+  };
 }
 
 let cachedToken: string | null = null;
@@ -123,6 +131,28 @@ function isoDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Only same-column alternatives: mixing sub_event_type in an event_type OR
+ * causes backend-dependent filtering. Mob violence belongs to Riots and is
+ * then selected precisely by sub_event_type in the normalizer. */
+export function acledEventQuery(start: Date, end: Date, pageSize: number): URLSearchParams {
+  return new URLSearchParams({
+    _format: 'json',
+    event_date: `${isoDateOnly(start)}|${isoDateOnly(end)}`,
+    event_date_where: 'BETWEEN',
+    event_type: [
+      'Battles', 'Explosions/Remote violence',
+      'Violence against civilians', 'Riots',
+    ].map((name, index) => index ? `:OR:event_type=${name}` : name).join(''),
+    limit: String(pageSize),
+    with_total: 'true',
+    fields: [
+      'event_id_cnty','event_date','time_precision','event_type','sub_event_type',
+      'country','admin1','location','latitude','longitude','geo_precision',
+      'source','source_scale','fatalities','timestamp',
+    ].join('|'),
+  });
+}
+
 async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
   let token: string | null;
   try {
@@ -148,24 +178,15 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
   const end = new Date();
   const start = new Date(end.getTime() - Math.max(1, days - 1) * 86400000);
   const pageSize = Math.max(100, Math.min(1000, limit));
-  const params = new URLSearchParams({
-    _format: 'json',
-    event_date: `${isoDateOnly(start)}|${isoDateOnly(end)}`,
-    event_date_where: 'BETWEEN',
-    event_type: 'Battles:OR:event_type=Explosions/Remote violence:OR:event_type=Violence against civilians:OR:sub_event_type=Mob violence',
-    limit: String(pageSize),
-    with_total: 'true',
-    fields: [
-      'event_id_cnty','event_date','time_precision','event_type','sub_event_type',
-      'country','admin1','location','latitude','longitude','geo_precision',
-      'source','source_scale','fatalities','timestamp',
-    ].join('|'),
-  });
+  const params = acledEventQuery(start, end, pageSize);
 
   try {
     const rows: any[] = [];
     let cursor = '0';
     let lastUpdateHours: number | null = null;
+    let pages = 0;
+    let providerTotal: number | null = null;
+    let broadProbeRows: number | null = null;
 
     for (let page = 0; page < 6 && rows.length < 5000; page += 1) {
       params.set('cursor', cursor);
@@ -184,13 +205,45 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
         throw new Error(`ACLED API status ${json?.status ?? 'unknown'}`);
       }
 
-      if (Number.isFinite(Number(json?.last_update))) lastUpdateHours = Number(json.last_update);
+      if (json?.last_update != null && Number.isFinite(Number(json.last_update))) {
+        lastUpdateHours = Number(json.last_update);
+      }
+      if (json?.total_count != null && Number.isFinite(Number(json.total_count))) {
+        providerTotal = Math.max(0, Number(json.total_count));
+      }
       const pageRows = Array.isArray(json?.data) ? json.data : [];
+      pages += 1;
       rows.push(...pageRows);
 
       const nextCursor = json?.next_cursor;
       if (!nextCursor || pageRows.length < pageSize) break;
       cursor = String(nextCursor);
+    }
+
+    // If the filtered dataset returns no rows, perform a *bounded* date-only
+    // count probe. Never redistribute probe rows. This differentiates a
+    // provider/account recency gap from an over-restrictive event-type query.
+    // It runs only on empty windows, not on every active map refresh.
+    if (rows.length === 0) {
+      try {
+        const probe = new URLSearchParams(params);
+        probe.delete('event_type');
+        probe.set('limit', '25');
+        probe.set('cursor', '0');
+        const res = await fetch(`https://acleddata.com/api/acled/read?${probe}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          signal: AbortSignal.timeout(3500),
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const body = await res.json();
+          if (body?.success !== false && Array.isArray(body?.data)) {
+            broadProbeRows = body.data.length;
+          }
+        }
+      } catch {
+        // Diagnostic probe is optional and must never make GDELT fail.
+      }
     }
 
     const events: AcledPublicEvent[] = rows.flatMap((row: any) => {
@@ -237,6 +290,20 @@ async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<Acle
       status: 'ok',
       events,
       lastUpdateHours,
+      diagnostics: {
+        sourceRows: rows.length,
+        acceptedRows: events.length,
+        providerTotal,
+        pages,
+        broadProbeRows,
+      },
+      message: events.length ? undefined
+        : rows.length ? 'ACLED returned records but none qualified as mapped conflict events.'
+        : broadProbeRows && broadProbeRows > 0
+          ? 'ACLED date window contains records; the event-type filter returned none.'
+          : broadProbeRows === 0
+            ? 'ACLED returned no accessible records for the requested date window.'
+            : 'ACLED returned no records for this query; the date-only probe was inconclusive.',
     };
   } catch (error) {
     return {

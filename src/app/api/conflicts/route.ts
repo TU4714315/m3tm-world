@@ -330,6 +330,7 @@ async function fetchAllLiveConflictData(): Promise<{
         status: acledResult.status,
         events: acledResult.events.length,
         lastUpdateHours: acledResult.lastUpdateHours,
+        diagnostics: acledResult.diagnostics ?? null,
         publicMode: 'derived-seven-day-regional-counts',
         attribution: 'Armed Conflict Location & Event Data (ACLED), https://acleddata.com/',
         message: acledResult.message ?? null,

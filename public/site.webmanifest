@@ -1,1 +1,1 @@
-{"name":"M3TM.WORLD","short_name":"M3TM.WORLD","icons":[{"src":"/android-chrome-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/android-chrome-512x512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#ffffff","background_color":"#ffffff","display":"standalone"}
+{"name":"M3TM.WORLD","short_name":"M3TM.WORLD","icons":[{"src":"/favicon-m3.svg","sizes":"any","type":"image/svg+xml"},{"src":"/m3tm-mark.png","sizes":"256x256","type":"image/png"}],"theme_color":"#D4AF37","background_color":"#06060C","display":"standalone"}
