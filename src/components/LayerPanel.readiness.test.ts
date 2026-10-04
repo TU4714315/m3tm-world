@@ -23,6 +23,13 @@ describe('public layer readiness messaging', () => {
     expect(panel).toContain("cloudflareState === 'unavailable'");
   });
 
+  it('keeps the network flyout readable with full-width source descriptions', () => {
+    expect(panel).toContain("group.label === 'شبكة وأحداث' ? 'w-[340px]");
+    expect(panel).toContain('flex flex-col items-stretch gap-1.5 p-2');
+    expect(panel).toContain('w-full text-right text-[10px]');
+    expect(panel).not.toContain('disabled={capabilityUnavailable}');
+  });
+
   it('keeps provider availability as status text rather than a disabled control', () => {
     expect(panel).not.toContain('disabled={capabilityUnavailable}');
     expect(panel).toContain("layer.key === 'naval_activity'");
