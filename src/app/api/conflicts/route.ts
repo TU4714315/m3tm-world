@@ -345,6 +345,7 @@ async function fetchAllLiveConflictData(): Promise<{
         events: acledResult.events.length,
         lastUpdateHours: acledResult.lastUpdateHours,
         diagnostics: acledResult.diagnostics ?? null,
+        access: acledResult.access ?? null,
         eventWindowDays: ACLED_EVENT_WINDOW_DAYS,
         publicationWindowDays: ACLED_PUBLICATION_WINDOW_DAYS,
         recentEventDays: ACLED_RECENT_OCCURRENCE_DAYS,

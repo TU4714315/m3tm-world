@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acledEventQuery, classifyAcledEvent,
   ACLED_EVENT_WINDOW_DAYS, ACLED_PUBLICATION_WINDOW_DAYS,
+  acledRecencyEntitlement,
 } from './acled';
 
 describe('classifyAcledEvent', () => {
@@ -28,6 +29,21 @@ describe('classifyAcledEvent', () => {
     expect(q.get('timestamp_where')).toBe('>=');
     expect(ACLED_EVENT_WINDOW_DAYS).toBeGreaterThan(7);
     expect(ACLED_PUBLICATION_WINDOW_DAYS).toBeGreaterThan(7);
+  });
+
+  it('marks a recent-window entitlement mismatch without revealing account scope', () => {
+    const start = new Date('2026-09-01T00:00:00Z');
+    expect(acledRecencyEntitlement({
+      date_recency: {date:'2025-10-05', description:'12 Months old'},
+      countries:['private-account-data']
+    }, start)).toEqual({
+      latestPermittedEventDate:'2025-10-05',
+      recentAccessRestricted:true,
+    });
+    expect(acledRecencyEntitlement({
+      date_recency: {date:'2026-09-14', description:'one-week lag'}
+    }, start).recentAccessRestricted).toBe(false);
+    expect(acledRecencyEntitlement({}, start).latestPermittedEventDate).toBeNull();
   });
 
   it('maps public ACLED sub-event types into stable map categories', () => {
