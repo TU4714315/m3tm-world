@@ -10,7 +10,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
   const preliminary=summary.events.filter(e=>!e.multiplePublishers).length;
   const multiple=summary.events.length-preliminary;
   const air=summary.events.filter(e=>e.category==='aerial_attack').length;
-  const clash=summary.events.filter(e=>['heavy_weapons','armed_clash','bombing','material_conflict'].includes(e.category)).length;
+  const clash=summary.events.filter(e=>['heavy_weapons','armed_clash','bombing','material_conflict','mass_violence','assault'].includes(e.category)).length;
   const unrest=summary.events.filter(e=>e.category==='civil_unrest').length;
   const time=(v:string|null|undefined)=>v&&Number.isFinite(Date.parse(v))
     ?new Date(v).toLocaleString('ar-SA',{timeZone:'UTC',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC':'غير معلوم';

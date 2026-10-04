@@ -1639,6 +1639,7 @@ export default function Dashboard() {
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.90)] p-1.5 shadow-[0_8px_32px_rgba(0,0,0,.4)]" aria-label="عرض الرصد ووضوح القمر الصناعي">
           <button type="button" onClick={() => {
               selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
+              if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
             }}
             className="rounded-md border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20 focus-visible:ring-2 focus-visible:ring-cyan-300"

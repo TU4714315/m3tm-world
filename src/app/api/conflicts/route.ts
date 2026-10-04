@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
+import { fetchGdeltEvents, publisherCoverage, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { fetchAcledPublicEvents } from '@/lib/acled';
 import { gdeltWindowTime } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
@@ -414,6 +414,20 @@ export async function GET() {
     if (previous.value) {
       return NextResponse.json({
         ...previous.value,
+        // Preserve durable last-good data while correcting the old publisher
+        // classification, even when upstream is down.
+        liveEvents: Array.isArray(previous.value.liveEvents)
+          ? previous.value.liveEvents.map((event:any) => ({
+              ...event, corroboration: publisherCoverage(event.sources),
+            })) : [],
+        zones: Array.isArray(previous.value.zones)
+          ? previous.value.zones.map((zone:any) => ({
+              ...zone,
+              events: Array.isArray(zone.events)
+                ? zone.events.map((event:any) => ({
+                    ...event, corroboration: publisherCoverage(event.sources),
+                  })) : [],
+            })) : [],
         dataState: 'cached-stale',
         cacheBackend: previous.backend,
         durableCacheConfigured: durableCacheConfigured(),

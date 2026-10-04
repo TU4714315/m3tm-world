@@ -1068,10 +1068,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         }});
         map.addLayer({ id: l.id, type: 'symbol', source: l.src, layout: {
           'icon-image':l.icon,
-          'icon-size':['interpolate',['linear'],['zoom'],1,0.4,4,0.56,6,0.74,10,1.08],
+          'icon-size':l.id==='fl-military'
+            ? ['interpolate',['linear'],['zoom'],1,0.46,5,0.76,10,1.08]
+            : ['interpolate',['linear'],['zoom'],1,0.4,4,0.56,6,0.74,10,1.08],
           'icon-rotate':['get','heading'],'icon-rotation-alignment':'map',
-          'icon-allow-overlap':false,'icon-ignore-placement':false,'icon-padding':1,
-        },paint:{'icon-opacity':['interpolate',['linear'],['zoom'],1,0.74,4,0.82,10,0.96]}});
+          'icon-allow-overlap':l.id==='fl-military',
+          'icon-ignore-placement':l.id==='fl-military',
+          'icon-padding':1,
+        },paint:{'icon-opacity':l.id==='fl-military'
+          ? 0.94 : ['interpolate',['linear'],['zoom'],1,0.74,4,0.82,10,0.96]}});
       });
 
       map.addLayer({ id: 'selected-flight-track-halo', type: 'line', source: 'selected-flight-track', layout: {
@@ -2945,8 +2950,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     }));
     // The GDELT archive is also read by /api/conflicts. Preserve both
     // sources but render an identical report in only one symbol layer.
-    const publishedGdeltIds = new Set((Array.isArray(data.gdelt_events)?data.gdelt_events:[])
-      .map((entry:any)=>String(entry?.id??'')));
+    const publishedGdeltIds = new Set([
+      ...((activeLayers as any).gdelt_events && Array.isArray(data.gdelt_events) ? data.gdelt_events : []),
+      ...((activeLayers as any).civil_unrest && Array.isArray(data.civil_unrest) ? data.civil_unrest : []),
+    ].map((entry:any)=>String(entry?.id??'')));
     const events = (data.conflict_live_events || [])
       .filter((e: any) => Number.isFinite(Number(e.lat)) && Number.isFinite(Number(e.lng)))
       .map((e: any) => ({
@@ -2960,7 +2967,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           sourceUrl: e.url || '',
           eventCategory: e.type || 'material_conflict',
           corroboration: e.corroboration || 'single-source-report',
-          duplicateGdelt: !!(activeLayers as any).gdelt_events &&
+          duplicateGdelt: (!!(activeLayers as any).gdelt_events || !!(activeLayers as any).civil_unrest) &&
             e.provider === 'GDELT' &&
             publishedGdeltIds.has(String(e.id??'').replace(/^gdelt-/,'')),
           eventCode: e.eventCode || '',
@@ -2979,7 +2986,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         },
       }));
     setGeo('conflict-zones', [...zones, ...events]);
-  }, [mapReady, data.conflict_zones, data.conflict_live_events, data.gdelt_events, (activeLayers as any).gdelt_events, data.conflict_data_state, setGeo]);
+  }, [mapReady, data.conflict_zones, data.conflict_live_events, data.gdelt_events, data.civil_unrest, (activeLayers as any).gdelt_events, (activeLayers as any).civil_unrest, data.conflict_data_state, setGeo]);
 
 
   // Visibility
@@ -3265,7 +3272,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             paint: rasterPaint,
           }, 'day-night-fill');
         } else {
-          map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+          // NOAA's ETOPO mode owns raster visibility at overview zoom;
+          // changing image grading must not reveal imagery beneath relief.
+          if (!(activeLayers.terrain_etopo_2022 && map.getZoom() <= 11)) {
+            map.setLayoutProperty('satellite-layer','visibility','visible');
+          }
           for (const name of Object.keys(rasterPaint) as Array<keyof typeof rasterPaint>) {
             map.setPaintProperty('satellite-layer',name,rasterPaint[name]);
           }
@@ -3278,7 +3289,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     } catch (e) {
       console.warn('Style switch failed:', e);
     }
-  }, [mapReady, mapStyle, satelliteVisual]);
+  }, [mapReady, mapStyle, satelliteVisual, activeLayers.terrain_etopo_2022]);
 
   // Newer NOAA public relief is on-demand; the separate Mapzen DEM stays
   // authoritative for 3D elevation. Satellite and M3TM overlays are preserved.
