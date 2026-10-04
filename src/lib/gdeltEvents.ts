@@ -62,6 +62,9 @@ function httpGetBufferIPv4(url: string, timeoutMs: number): Promise<Buffer> {
 /** Column offsets in the 61-field GDELT 2.0 Events export. */
 const COL = {
   globalEventId: 0,
+  // CAMEO actors are coded names from published news, NOT ActorGeo places.
+  actor1Name: 6,
+  actor2Name: 16,
   sqlDate: 1,
   eventCode: 26,
   eventRootCode: 28,
@@ -166,12 +169,22 @@ export function classifyPublicEvent(
   };
 }
 
+/** CAMEO actor names, not unit locators or real-time identities. */
+function publicCameoName(raw: string | undefined): string | undefined {
+  const name = String(raw || '').replace(/[\x00-\x1f<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!name || /^(?:UNKNOWN|UNSPECIFIED|NONE)$/i.test(name)) return undefined;
+  return name.slice(0, 140);
+}
+
 export interface GdeltEvent {
   id: string;
   lat: number;
   lng: number;
   name: string;
   country: string;
+  /** Names mentioned by GDELT CAMEO coding; not independently verified responsibility. */
+  reported_actor1?: string;
+  reported_actor2?: string;
   actor1_geo_type?: number;
   actor1_name?: string;
   actor1_country?: string;
@@ -427,6 +440,8 @@ export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
       lng,
       name: c[COL.actionGeoFullName] || 'Unknown location',
       country: c[COL.actionGeoCountry] || '',
+      reported_actor1: publicCameoName(c[COL.actor1Name]),
+      reported_actor2: publicCameoName(c[COL.actor2Name]),
       ...(isValidCoordinatePair(actor1Lat, actor1Lng) ? {
         actor1_geo_type: Number(c[COL.actor1GeoType]) || undefined,
         actor1_name: c[COL.actor1GeoFullName] || undefined,

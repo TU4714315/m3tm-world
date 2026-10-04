@@ -30,6 +30,30 @@ describe('fetchGdeltEvents', () => {
       .toEqual(['mena','world1']);
   });
 
+  it('preserves source-coded public parties without exposing actor geo positions', () => {
+    const columns=Array(61).fill('');
+    columns[0]='public-report'; columns[6]='Sudanese Armed Forces'; columns[16]='Rapid Support Forces';
+    columns[26]='190'; columns[28]='19'; columns[29]='4';
+    columns[31]='3'; columns[32]='2'; columns[33]='2';
+    columns[52]='Sudan'; columns[53]='SU'; columns[56]='15.5';
+    columns[57]='32.5'; columns[59]='20261004000000'; columns[60]='https://example.org/news';
+    // ActorGeo is intentionally different from the named news actors.
+    columns[35]='1'; columns[36]='Tactical place'; columns[40]='16.12'; columns[41]='33.1';
+    const parsed=parseGdeltEventsCsv(columns.join('\t'),{limit:10});
+    expect(parsed.events).toHaveLength(1);
+    const projected=toPublicGdeltEvent(parsed.events[0]);
+    expect(projected.reported_actor1).toBe('Sudanese Armed Forces');
+    expect(projected.reported_actor2).toBe('Rapid Support Forces');
+    expect(projected.lat*4).toBe(Math.round(projected.lat*4));
+    expect(projected.lng*4).toBe(Math.round(projected.lng*4));
+    for(const forbidden of ['actor1_lat','actor1_lng','actor1_name','actor1_geo_type','actor1_country']){
+      expect(projected).not.toHaveProperty(forbidden);
+    }
+    const missing=columns.slice();
+    missing[6]='UNKNOWN';missing[16]='';
+    expect(toPublicGdeltEvent(parseGdeltEventsCsv(missing.join('\t')).events[0]).reported_actor1).toBeUndefined();
+  });
+
   it('applies event-code prefixes before the result limit', () => {
     const row = (id: string, eventCode: string) => {
       const cols = Array(61).fill('');

@@ -1572,6 +1572,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
           <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
+          ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
+          ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
           <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
           <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
           <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
@@ -1600,6 +1602,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
           <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
+          ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
+          ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
           <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
           <span style="opacity:0.6;">Goldstein</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
           <span style="opacity:0.6;">متوسط النبرة</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
@@ -1759,6 +1763,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
+        ${isEvent && p.reportedActors ? `<div style="font-size:10px;color:#D5DCE0;margin-bottom:7px;">جهات وردت في ترميز الخبر (دون إثبات المسؤولية): ${htmlEsc(p.reportedActors)}</div>` : ''}
+        ${!isEvent && Number(p.acledReports7d)>0 ? `<div style="font-size:9px;color:#9B978E;margin-bottom:7px;">ACLED: ${htmlEsc(String(p.acledReports7d))} سجلًا إقليميًا خلال ٧ أيام · تحليل مُجمّع، وليس أحداثًا مستقلة عن GDELT بالضرورة · acleddata.com</div>` : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
           <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
           <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
@@ -2438,6 +2444,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         name: e.name, country: e.country, quad: e.quad, quad_label: e.quad_label,
         event_code: e.event_code, root_code: e.root_code, event_category: e.event_category,
         event_label_ar: e.event_label_ar, corroboration: e.corroboration, precision: e.precision,
+        reported_actor1: e.reported_actor1 || '', reported_actor2: e.reported_actor2 || '',
         tone: e.tone, goldstein: e.goldstein, articles: e.articles, sources: e.sources, url: e.url, date: e.date,
       },
     })) : []);
@@ -2453,6 +2460,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         name: e.name, country: e.country, quad: e.quad, quad_label: e.quad_label,
         event_code: e.event_code, root_code: e.root_code, event_category: e.event_category,
         event_label_ar: e.event_label_ar, corroboration: e.corroboration, precision: e.precision,
+        reported_actor1: e.reported_actor1 || '', reported_actor2: e.reported_actor2 || '',
         tone: e.tone, goldstein: e.goldstein, articles: e.articles, sources: e.sources, url: e.url, date: e.date,
       },
     })) : []);
@@ -2865,6 +2873,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         description: `${z.descriptionAr || z.description || ''}${z.eventCount > 0 ? ` · ${z.eventCount} بلاغ حديث` : ''}`,
         sourceUrl: z.sourceUrl || '',
         eventCount: z.eventCount || 0,
+        acledReports7d: z.acledReports7d || 0,
         dominantKind: z.dominantKind || 'other',
         activityBand: z.activityBand || 'quiet',
         dataState: data.conflict_data_state || 'live',
@@ -2887,6 +2896,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           provider: e.provider || 'GDELT',
           providerCount: e.providerCount || 1,
           sourceLabel: e.sourceLabel || '',
+          reportedActors: Array.isArray(e.reportedActors) ? e.reportedActors.slice(0,2).join(' / ') : '',
           fatalities: e.fatalities || 0,
           reportingStrength: e.reportingStrength || 0,
           ageHours: e.ageHours ?? null,
