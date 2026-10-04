@@ -691,7 +691,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, x: -4, filter: 'blur(2px)' }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className="absolute left-[52px] top-1/2 -translate-y-1/2 min-w-[220px] rounded-xl p-3 z-[100] pointer-events-auto"
+                    className={`absolute left-[52px] top-1/2 -translate-y-1/2 rounded-xl p-3 z-[100] pointer-events-auto ${group.label === 'شبكة وأحداث' ? 'w-[340px] max-w-[calc(100vw-72px)]' : 'min-w-[220px]'}`}
                     style={{
                       background: 'rgba(0,0,0,0.6)',
                       backdropFilter: 'blur(40px) saturate(1.5)',
@@ -736,21 +736,45 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
                             title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
-                            className={`relative w-full flex items-center gap-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`relative w-full rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${group.label === 'شبكة وأحداث' ? 'flex flex-col items-stretch gap-1.5 p-2' : 'flex items-center gap-3 py-1.5'} ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
-                            {layer.parent && <SubLayerStem />}
-                            <ToggleSwitch active={!!isLayerActive} />
-                            <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
-                              {layer.label}
-                              {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
-                            </span>
-                            <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                              {getLayerStatus(layer, !!isLayerActive, count)}
-                            </span>
-                            {count !== null && (
-                              <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
-                                {count.toLocaleString()}
-                              </span>
+                            {group.label === 'شبكة وأحداث' ? (
+                              <>
+                                <span className="flex w-full min-w-0 items-center gap-2" dir="rtl">
+                                  <ToggleSwitch active={!!isLayerActive} />
+                                  <span className={`min-w-0 flex-1 text-right text-[11px] font-medium leading-5 ${isLayerActive ? 'text-white/85' : 'text-white/45'}`}>
+                                    {layer.label}
+                                  </span>
+                                </span>
+                                <span className="flex w-full items-center gap-2" dir="rtl">
+                                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] leading-4 ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/85' : 'text-white/30'}`}>
+                                    {getLayerStatus(layer, !!isLayerActive, count)}
+                                  </span>
+                                  {count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
+                                </span>
+                                {layer.description && (
+                                  <span dir="rtl" className="block w-full text-right text-[10px] font-normal normal-case leading-[1.65] tracking-normal text-white/50">
+                                    {layer.description}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {layer.parent && <SubLayerStem />}
+                                <ToggleSwitch active={!!isLayerActive} />
+                                <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
+                                  {layer.label}
+                                  {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                                </span>
+                                <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
+                                  {getLayerStatus(layer, !!isLayerActive, count)}
+                                </span>
+                                {count !== null && (
+                                  <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
+                                    {count.toLocaleString()}
+                                  </span>
+                                )}
+                              </>
                             )}
                           </button>
                         );
