@@ -17,6 +17,15 @@ describe('M3TM regional public evidence',()=>{
     expect(data.seaRegions).toBe(1);
     expect(JSON.stringify(data)).not.toContain('secret');
   });
+  it('surfaces names of published CAMEO parties but not live unit telemetry',()=>{
+    const d=regionalPublicSignals({
+      gdelt_events:[{id:'99',lat:24.7,lng:46.7,
+        reported_actor1:'Government',reported_actor2:'Opposition'}],
+      military_activity:[{lat:24,lng:46,callsign:'hidden-unit'} as {lat:number;lng:number}],
+    });
+    expect(d.events[0].actors).toEqual(['Government','Opposition']);
+    expect(JSON.stringify(d)).not.toContain('hidden-unit');
+  });
   it('uses the GDELT archive timestamp, not HTTP response time',()=>{
     expect(gdeltWindowTime('20261004150000.export.CSV.zip')).toBe('2026-10-04T15:00:00.000Z');
     expect(gdeltWindowTime('20261304150000.export.CSV.zip')).toBeNull();

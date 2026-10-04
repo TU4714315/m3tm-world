@@ -14,13 +14,14 @@ export function gdeltWindowTime(name: string): string | null {
 interface PublicEvent{
   id?:string;lat?:number;lng?:number;date?:string;timestamp?:string;
   title?:string;event_label_ar?:string;provider?:string;sourceLabel?:string;url?:string;
+  reported_actor1?:string;reported_actor2?:string;reportedActors?:string[];
 }
 export function regionalPublicSignals(data:{
   gdelt_events?:PublicEvent[]; civil_unrest?:PublicEvent[];
   conflict_live_events?:PublicEvent[];
   military_activity?:PublicEvent[]; naval_activity?:PublicEvent[];
 }) {
-  const reported:Array<{id:string;title:string;source:string;url:string;time:string|null}>=[];
+  const reported:Array<{id:string;title:string;source:string;url:string;time:string|null;actors:string[]}>=[];
   const seen=new Set<string>();
   const rows=[...(data.conflict_live_events??[]),...(data.gdelt_events??[]),...(data.civil_unrest??[])];
   for(const e of rows){
@@ -30,8 +31,10 @@ export function regionalPublicSignals(data:{
     const key=(provider==='ACLED'?'acled:':'gdelt:')+(id||e.url||e.date||'unspecified');
     if(seen.has(key))continue;
     seen.add(key);
+    const actors=[...(e.reportedActors??[]),e.reported_actor1,e.reported_actor2]
+      .filter((name):name is string=>typeof name==='string'&&Boolean(name.trim())).slice(0,2);
     reported.push({id:key,title:e.event_label_ar||e.title||'حدث مُبلّغ عنه',
-      source:provider,url:e.url||'',time:e.date||e.timestamp||null});
+      source:provider,url:e.url||'',time:e.date||e.timestamp||null,actors});
   }
   reported.sort((a,b)=>(Date.parse(b.time||'')||0)-(Date.parse(a.time||'')||0));
   return {events:reported,reports:reported.length,

@@ -21,8 +21,19 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <div className="rounded bg-white/5 p-2"><strong className="text-lg text-amber-300">{summary.seaRegions}</strong><p className="text-[10px]">مناطق بحرية مجمّعة</p></div>
     </div>
     <p className="mt-2 text-[10px] text-white/60">تاريخ دفعة المصدر: {time(sourceTime)} · {stale?'مخزون سابق':'حسب المصدر المنشور'}</p>
+    <p className="mt-1 text-[10px] leading-relaxed text-white/65">
+      ACLED: {data.conflict_source_status?.acled?.status==='ok'?'متصل — مؤشرات إقليمية':
+        data.conflict_source_status?.acled?.status==='cached-stale'?'آخر بيانات محفوظة، تحديث المصدر غير متاح':
+        data.conflict_source_status?.acled?.status==='not_configured'?'غير مهيأ — حساب myACLED مطلوب':
+        data.conflict_source_status?.acled?.status==='unavailable'?'غير متاح حاليًا':'قيد الفحص'}.
+      {' '}<a href="https://acleddata.com/" target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">المصدر ACLED</a>؛
+      تفاصيل الأحداث أدناه مستمدة من GDELT ولا تتوقف على حساب ACLED.
+    </p>
     <div className="mt-2 divide-y divide-white/10">{summary.events.slice(0,8).map(e=><div key={e.id} className="py-2">
       <div className="text-[11px]">{e.title}</div>
+      {e.actors.length>0 && <div className="mt-1 text-[10px] text-amber-100/80">
+        الجهات المذكورة في ترميز الخبر (دون إثبات المسؤولية): {e.actors.join(' / ')}
+      </div>}
       <div className="mt-1 flex justify-between gap-2 text-[10px] text-white/60">
         <span>{e.source} · {time(e.time)}</span>
         {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-300">المصدر<ExternalLink className="h-3 w-3"/></a>}

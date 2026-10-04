@@ -5,6 +5,7 @@ import { gdeltWindowTime } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
  * OSIRIS — Public Conflict Intelligence API.
@@ -49,6 +50,8 @@ interface ConflictEvent {
   provider: 'GDELT' | 'ACLED' | 'GDELT+ACLED';
   providerCount: number;
   sourceLabel: string;
+  /** Named parties in GDELT's automated CAMEO news coding, not verified responsibility. */
+  reportedActors?: string[];
   fatalities: number;
   reportingStrength: number;
   ageHours: number | null;
@@ -57,7 +60,7 @@ interface ConflictEvent {
   recencyWeight: number;
 }
 
-const CONFLICT_CACHE_KEY = 'm3tm:public:conflicts:v3';
+const CONFLICT_CACHE_KEY = 'm3tm:public:conflicts:v4';
 const CONFLICT_CACHE_TTL_SECONDS = 60 * 60;
 
 function summarizeKinds(events: ConflictEvent[]) {
@@ -221,6 +224,7 @@ async function fetchAllLiveConflictData(): Promise<{
   eventsByRegion: Record<string, number>;
   gdeltWindow: string;
   gdeltScanned: number;
+  acledRegionalCounts: Record<string, number>;
   sourceStatus: Record<string, unknown>;
 }> {
   const acledTimeout = new Promise<Awaited<ReturnType<typeof fetchAcledPublicEvents>>>(resolve => {
@@ -228,8 +232,8 @@ async function fetchAllLiveConflictData(): Promise<{
       status: 'unavailable',
       events: [],
       lastUpdateHours: null,
-      message: 'Optional ACLED source exceeded the 5s response budget.',
-    }), 5000);
+      message: 'Optional ACLED source exceeded the 18s response budget.',
+    }), 18000);
   });
 
   const [gdeltResult, acledResult] = await Promise.all([
@@ -258,6 +262,7 @@ async function fetchAllLiveConflictData(): Promise<{
       provider: 'GDELT',
       providerCount: 1,
       sourceLabel: 'GDELT 2.0',
+      reportedActors: [event.reported_actor1, event.reported_actor2].filter((name): name is string => Boolean(name)),
       fatalities: 0,
       reportingStrength: reportingStrength(1, event.sources, event.articles),
       ageHours: eventAgeHours(event.date),
@@ -292,7 +297,18 @@ async function fetchAllLiveConflictData(): Promise<{
     recencyWeight: acledRecencyWeight(eventAgeDays(event.eventDate), event.timePrecision),
   }));
 
-  const events = combineConflictEvents([...gdeltEvents, ...acledEvents]);
+  // GDELT's source-backed individual reports remain public. ACLED's EULA
+  // permits transformed, attributed analysis but not redistribution of its
+  // reconstructable raw event records through an unrestricted map API.
+  // Compute region/week counts while keeping its IDs/positions server-only.
+  const events = combineConflictEvents(gdeltEvents);
+  const acledRegionalCounts: Record<string, number> = {};
+  for (const zone of KNOWN_CONFLICTS) {
+    acledRegionalCounts[zone.id] = acledEvents.filter(event =>
+      event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
+      event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
+    ).length;
+  }
 
   const eventsByRegion: Record<string, number> = {};
   for (const zone of KNOWN_CONFLICTS) {
@@ -307,12 +323,15 @@ async function fetchAllLiveConflictData(): Promise<{
     eventsByRegion,
     gdeltWindow: gdeltResult.window,
     gdeltScanned: gdeltResult.scanned,
+    acledRegionalCounts,
     sourceStatus: {
       gdelt: { status: 'ok', window: gdeltResult.window, scanned: gdeltResult.scanned },
       acled: {
         status: acledResult.status,
         events: acledResult.events.length,
         lastUpdateHours: acledResult.lastUpdateHours,
+        publicMode: 'derived-seven-day-regional-counts',
+        attribution: 'Armed Conflict Location & Event Data (ACLED), https://acleddata.com/',
         message: acledResult.message ?? null,
       },
     },
@@ -323,7 +342,7 @@ export async function GET() {
   const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
   const servedAt = new Date().toISOString();
   try {
-    const { events: liveEvents, gdeltWindow, gdeltScanned, sourceStatus } = await fetchAllLiveConflictData();
+    const { events: liveEvents, gdeltWindow, gdeltScanned, acledRegionalCounts, sourceStatus } = await fetchAllLiveConflictData();
 
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
       const zoneEvents = liveEvents.filter(event =>
@@ -347,6 +366,7 @@ export async function GET() {
         region: zone.region,
         events: zoneEvents.slice(0, 40),
         eventCount,
+        acledReports7d: acledRegionalCounts[zone.id] || 0,
         eventKinds,
         dominantKind,
         activityBand: eventCount >= 10 ? 'active' : eventCount >= 3 ? 'elevated' : 'quiet',

@@ -31,7 +31,7 @@ export interface AcledPublicEvent {
 }
 
 export interface AcledFetchResult {
-  status: 'ok' | 'not_configured' | 'unavailable';
+  status: 'ok' | 'not_configured' | 'unavailable' | 'cached-stale';
   events: AcledPublicEvent[];
   lastUpdateHours: number | null;
   message?: string;
@@ -123,7 +123,7 @@ function isoDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
+async function fetchFreshAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
   let token: string | null;
   try {
     token = await getAcledToken();
@@ -246,4 +246,37 @@ export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<Ac
       message: error instanceof Error ? error.message : 'ACLED request failed',
     };
   }
+}
+
+// ACLED is curated, not a streaming provider. Coalesce concurrent refreshes
+// within a warm instance, and label fallback data as stale.
+type AcledCache = { key: string; storedAt: number; result: AcledFetchResult };
+let goodSnapshot: AcledCache | null = null;
+let inflightSnapshot: { key: string; value: Promise<AcledFetchResult> } | null = null;
+export async function fetchAcledPublicEvents(days = 7, limit = 1000): Promise<AcledFetchResult> {
+  if (!process.env.ACLED_ACCESS_TOKEN &&
+      !(process.env.ACLED_USERNAME && process.env.ACLED_PASSWORD)) {
+    return { status: 'not_configured', events: [], lastUpdateHours: null,
+      message: 'An authorized myACLED account is required (server-side OAuth).' };
+  }
+  const key = String(days) + '/' + String(limit);
+  if (goodSnapshot?.key === key && Date.now() - goodSnapshot.storedAt < 15 * 60_000) {
+    return goodSnapshot.result;
+  }
+  if (inflightSnapshot?.key === key) return inflightSnapshot.value;
+  const promise = (async (): Promise<AcledFetchResult> => {
+    const result = await fetchFreshAcledPublicEvents(days, limit);
+    if (result.status === 'ok') {
+      goodSnapshot = { key, result, storedAt: Date.now() };
+      return result;
+    }
+    if (goodSnapshot?.key === key && Date.now() - goodSnapshot.storedAt < 24 * 60 * 60_000) {
+      return { ...goodSnapshot.result, status: 'cached-stale',
+        message: 'Serving a previous ACLED snapshot while provider refresh is unavailable.' };
+    }
+    return result;
+  })();
+  inflightSnapshot = { key, value: promise };
+  try { return await promise; }
+  finally { if (inflightSnapshot?.value === promise) inflightSnapshot = null; }
 }
