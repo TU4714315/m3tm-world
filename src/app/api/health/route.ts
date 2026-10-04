@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchAcledPublicEvents } from '@/lib/acled';
+import { durableCacheConfigured } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,15 @@ function acledAuthMode() {
 function hasOpenSkyCredentials() {
   return Boolean(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
 }
+
+function hasAisCredentials() {
+  return Boolean(process.env.AIS_API_KEY);
+}
+
+function hasCloudflareRadarCredentials() {
+  return Boolean(process.env.CLOUDFLARE_API_TOKEN);
+}
+
 
 async function probeGdelt(): Promise<{ status: SourceStatus; detail: string }> {
   try {
@@ -92,6 +102,9 @@ export async function GET(request: Request) {
 
   const acledConfigured = hasAcledCredentials();
   const openskyConfigured = hasOpenSkyCredentials();
+  const aisConfigured = hasAisCredentials();
+  const cloudflareConfigured = hasCloudflareRadarCredentials();
+  const durableConfigured = durableCacheConfigured();
 
   const [gdeltProbe, acledProbe] = deep
     ? await Promise.all([probeGdelt(), probeAcled()])
@@ -132,6 +145,47 @@ export async function GET(request: Request) {
       auth: 'none',
       detail: 'Runtime counts are exposed by /api/flights.providers.',
     },
+    ais: {
+      role: 'public-maritime-observation',
+      configured: aisConfigured,
+      status: aisConfigured ? 'configured' as SourceStatus : 'not_configured' as SourceStatus,
+      authMode: aisConfigured ? 'server-api-key' : 'none',
+      detail: aisConfigured
+        ? 'AISStream.io is configured; runtime vessel counts/freshness are exposed by /api/maritime.source_status.'
+        : 'AIS_API_KEY is absent. Static public ports/chokepoints remain available, but live AIS vessels are not claimed.',
+    },
+    cloudflareRadar: {
+      role: 'optional-internet-observation',
+      configured: cloudflareConfigured,
+      status: cloudflareConfigured ? 'configured' as SourceStatus : 'not_configured' as SourceStatus,
+      authMode: cloudflareConfigured ? 'server-api-token' : 'none',
+      detail: cloudflareConfigured
+        ? 'Cloudflare Radar: Read credential is present.'
+        : 'CLOUDFLARE_API_TOKEN is absent; public controls remain operable but report غير مهيأ and no Cloudflare data is claimed.',
+    },
+    durableCache: {
+      role: 'public-last-good-snapshot-cache',
+      configured: durableConfigured,
+      status: durableConfigured ? 'configured' as SourceStatus : 'anonymous_fallback' as SourceStatus,
+      authMode: durableConfigured ? 'server-rest-token' : 'process-memory',
+      detail: durableConfigured
+        ? 'Redis/KV REST storage is configured for bounded public last-good snapshots.'
+        : 'Redis/KV is not configured; bounded process-memory fallback remains active.',
+    },
+    balloons: {
+      role: 'optional-moving-object-layer',
+      configured: false,
+      status: 'unavailable' as SourceStatus,
+      authMode: 'none',
+      detail: '/api/balloons is not implemented in this deployment; no public control is exposed.',
+    },
+    radiation: {
+      role: 'optional-radiation-monitor-layer',
+      configured: false,
+      status: 'unavailable' as SourceStatus,
+      authMode: 'none',
+      detail: '/api/radiation is not implemented in this deployment; no public control is exposed.',
+    },
   };
 
   const degraded =
@@ -155,6 +209,7 @@ export async function GET(request: Request) {
       spatialCellDegrees: 6,
       temporalBucketMinutes: 30,
       exactMilitaryTracksExposed: false,
+      exactMilitaryTracksPersisted: false,
       unobservedAircraftInferred: false,
       absenceMeaning: 'not-observed-does-not-mean-absent',
       knownPublicFeedLimitations: [
@@ -173,6 +228,10 @@ export async function GET(request: Request) {
       '/api/gdelt',
       '/api/markets',
       '/api/frontlines',
+      '/api/maritime',
+      '/api/cctv',
+      '/api/cloudflare-radar',
+      '/api/geosearch',
       '/api/region-dossier',
     ],
   }, {

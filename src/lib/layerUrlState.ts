@@ -1,8 +1,19 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '2';
+export const LAYER_URL_SCHEMA = '4';
 
-/** These layers did not exist in pre-v2 shared URLs, and are default-on today. */
-const LEGACY_ADDED_LAYERS = new Set(['app_news', 'country_borders']);
+/** Defaults added in earlier schemas must only be migrated for bookmarks that
+ * predate that schema. A v3 bookmark can contain an intentional off-choice for a
+ * v3 layer, so v4 migration must not silently switch those layers back on. */
+const V3_DEFAULT_ON_LAYERS = new Set([
+  'app_news', 'country_borders',
+  'military_activity', 'maritime', 'naval_activity',
+  'conflict_zones', 'conflict_density', 'frontlines', 'reported_routes',
+  'gdelt_events', 'civil_unrest', 'alert_pins', 'global_incidents',
+]);
+
+const V4_DEFAULT_ON_LAYERS = new Set([
+  'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks',
+]);
 
 export function restoreLayerState<T extends Record<string, boolean>>(
   defaults: T,
@@ -11,15 +22,15 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   const raw = params.get('layers');
   if (raw === null) return defaults;
   const active = new Set(raw.split(',').filter(Boolean));
-  // A pre-v2 bookmark has no way to opt a not-yet-existing layer in or out.
-  // Restore new public defaults only if NEITHER newly added key was present.
-  // From v2 onward, missing keys unambiguously mean the user turned them off.
-  const legacyBookmark = !params.has('layers_v')
-    && ![...LEGACY_ADDED_LAYERS].some(key => active.has(key));
+  const schemaRaw = params.get('layers_v');
+  const parsedSchema = Number(schemaRaw);
+  const schema = Number.isFinite(parsedSchema) && parsedSchema >= 0 ? parsedSchema : 0;
   const restored = { ...defaults };
   for (const key of Object.keys(defaults)) {
-    (restored as Record<string, boolean>)[key] = active.has(key)
-      || (legacyBookmark && LEGACY_ADDED_LAYERS.has(key) && defaults[key]);
+    const migratedDefault =
+      (schema < 3 && V3_DEFAULT_ON_LAYERS.has(key) && defaults[key])
+      || (schema < 4 && V4_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
+    (restored as Record<string, boolean>)[key] = active.has(key) || migratedDefault;
   }
   return restored;
 }

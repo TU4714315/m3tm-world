@@ -2,92 +2,115 @@ import { NextResponse } from 'next/server';
 
 export const maxDuration = 60;
 
+type SettledResponse = PromiseSettledResult<Response>;
+
+async function parseJson(result: SettledResponse): Promise<any | null> {
+  if (result.status !== 'fulfilled' || !result.value.ok) return null;
+  try {
+    return await result.value.json();
+  } catch {
+    return null;
+  }
+}
+
+function sourceState(result: SettledResponse, parsed: any | null) {
+  if (result.status === 'rejected') return { ok: false, status: 0 };
+  const applicationStatus = typeof parsed?.status === 'string' ? parsed.status : null;
+  const applicationHealthy = applicationStatus !== 'degraded' && applicationStatus !== 'unavailable';
+  return {
+    ok: result.value.ok && parsed !== null && applicationHealthy,
+    status: result.value.status,
+    ...(applicationStatus ? { application_status: applicationStatus } : {}),
+  };
+}
+
 /**
  * OSIRIS — Global Stats API
  * Lightweight aggregation endpoint.
- * Fetches metrics from all local APIs and returns ONLY the counts.
- * 
- * ARCHITECTURE NOTE (10k+ Concurrent Users):
- * This endpoint ensures the Next.js server serves ~100 bytes instead of 10MB+ 
- * of raw GeoJSON mapping data when 10,000 users boot the dashboard simultaneously.
- * The underlying API routes utilize their own 45-60s TTL caching, meaning the 
- * heavy external APIs (adsb.lol, USGS) are only hit once per minute, while this 
- * lightweight stats route safely serves 10k concurrent users instantly.
+ *
+ * Flight aggregation uses /api/flights?summary=1 so this endpoint never
+ * serializes/parses the multi-megabyte aircraft payload merely to count it.
+ * The 55s flight budget exceeds the route's hard 45s refresh budget.
+ *
+ * A failed or malformed upstream must never make the whole dashboard counter
+ * endpoint fail. Counts are best-effort and the response explicitly reports
+ * degraded state when one or more source APIs could not be read.
  */
-
 export async function GET(req: Request) {
+  const emptyStats = {
+    flights: 0,
+    sats: 0,
+    cctv: 0,
+    weather: 0,
+    nuclear: 0,
+    incidents: 0,
+  };
+
   try {
     const origin = new URL(req.url).origin;
 
-    // Fetch all internal APIs in parallel (they have their own Cache-Control TTLs)
-    const [flightsRes, satsRes, cctvRes, weatherRes, infraRes, gdeltRes] = await Promise.allSettled([
-      fetch(`${origin}/api/flights`, { signal: AbortSignal.timeout(20000), next: { revalidate: 45 } }),
+    const settled = await Promise.allSettled([
+      fetch(`${origin}/api/flights?summary=1`, { signal: AbortSignal.timeout(55000), next: { revalidate: 45 } }),
       fetch(`${origin}/api/satellites`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/cctv`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
       fetch(`${origin}/api/weather`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } }),
       fetch(`${origin}/api/infrastructure`, { signal: AbortSignal.timeout(20000), next: { revalidate: 86400 } }),
-      fetch(`${origin}/api/gdelt`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } })
+      fetch(`${origin}/api/gdelt`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } }),
     ]);
 
-    let flights = 0;
-    let sats = 0;
-    let cctv = 0;
-    let weather = 0;
-    let nuclear = 0;
-    let incidents = 0;
+    const parsed = await Promise.all(settled.map(parseJson));
+    const [flightsData, satsData, cctvData, weatherData, infraData, gdeltData] = parsed;
 
-    // Safely parse counts
-    if (flightsRes.status === 'fulfilled' && flightsRes.value.ok) {
-      const data = await flightsRes.value.json();
-      flights = (data.commercial_flights?.length || 0) + 
-                (data.private_flights?.length || 0) + 
-                (data.private_jets?.length || 0) + 
-                (data.military_flights?.length || 0);
-    }
+    const stats = {
+      flights:
+        Number.isFinite(Number(flightsData?.counts?.public_total))
+          ? Number(flightsData.counts.public_total)
+          : (flightsData?.commercial_flights?.length || 0) +
+            (flightsData?.private_flights?.length || 0) +
+            (flightsData?.private_jets?.length || 0) +
+            (flightsData?.military_flights?.length || 0),
+      sats: satsData?.satellites?.length || 0,
+      cctv: cctvData?.cameras?.length || 0,
+      weather: weatherData?.events?.length || weatherData?.weather_events?.length || 0,
+      nuclear: infraData?.infrastructure?.length || 0,
+      incidents: gdeltData?.events?.length || gdeltData?.gdelt?.length || 0,
+    };
 
-    if (satsRes.status === 'fulfilled' && satsRes.value.ok) {
-      const data = await satsRes.value.json();
-      sats = data.satellites?.length || 0;
-    }
+    const names = ['flights', 'satellites', 'cctv', 'weather', 'infrastructure', 'gdelt'] as const;
+    const sources = Object.fromEntries(
+      names.map((name, index) => [name, sourceState(settled[index], parsed[index])]),
+    );
+    const degraded = Object.values(sources).some((state: any) => !state.ok);
 
-    if (cctvRes.status === 'fulfilled' && cctvRes.value.ok) {
-      const data = await cctvRes.value.json();
-      cctv = data.cameras?.length || 0;
-    }
-
-    if (weatherRes.status === 'fulfilled' && weatherRes.value.ok) {
-      const data = await weatherRes.value.json();
-      weather = data.events?.length || 0;
-    }
-
-    if (infraRes.status === 'fulfilled' && infraRes.value.ok) {
-      const data = await infraRes.value.json();
-      nuclear = data.infrastructure?.length || 0;
-    }
-
-    if (gdeltRes.status === 'fulfilled' && gdeltRes.value.ok) {
-        const data = await gdeltRes.value.json();
-        incidents = data.events?.length || 0;
-    }
-
-    return NextResponse.json({
-      stats: {
-        flights,
-        sats,
-        cctv,
-        weather,
-        nuclear,
-        incidents
+    return NextResponse.json(
+      {
+        status: degraded ? 'degraded' : 'operational',
+        degraded,
+        stats,
+        sources,
+        timestamp: new Date().toISOString(),
       },
-      timestamp: new Date().toISOString()
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-      }
-    });
-
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      },
+    );
   } catch (error) {
-    console.error('Stats aggregation failed:', error);
-    return NextResponse.json({ error: 'Failed to compute stats' }, { status: 500 });
+    console.error('Stats aggregation failed:', error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      {
+        status: 'degraded',
+        degraded: true,
+        stats: emptyStats,
+        sources: {},
+        timestamp: new Date().toISOString(),
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        },
+      },
+    );
   }
 }

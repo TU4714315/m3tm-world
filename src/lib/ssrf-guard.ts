@@ -233,6 +233,43 @@ export function isRateLimited(ip: string, limit: number = 20, windowMs: number =
 }
 
 export function getClientIp(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for');
-  return forwarded?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const h = (name: string) => req.headers.get(name)?.trim() || '';
+
+  const platform = h('cf-connecting-ip') || h('x-vercel-forwarded-for') || h('true-client-ip');
+  if (platform && isIpLike(platform)) return platform;
+
+  const real = h('x-real-ip');
+  if (real && isIpLike(real)) return real;
+
+  const chain = h('x-forwarded-for').split(',').map(s => s.trim()).filter(Boolean);
+  const nearest = chain[chain.length - 1];
+  if (nearest && isIpLike(nearest)) return nearest;
+
+  return 'unknown';
+}
+
+function bareIp(value: string): string {
+  return value.trim().replace(/^\[|\]$/g, '').replace(/^::ffff:(?=\d+\.)/i, '');
+}
+
+export function isPublicIp(value: string): boolean {
+  const ip = bareIp(value);
+  const v4 = parseIPv4(ip);
+  if (v4) return !ipv4InBlocked(v4);
+  return isIP(ip) === 6 && !ipv6InBlocked(ip);
+}
+
+export function visitorIp(req: Request): string | null {
+  const candidates = ['cf-connecting-ip', 'true-client-ip', 'x-vercel-forwarded-for', 'x-real-ip', 'x-forwarded-for']
+    .flatMap(name => (req.headers.get(name) || '').split(','))
+    .map(s => s.trim())
+    .filter(Boolean);
+  const found = candidates.find(isPublicIp);
+  return found ? bareIp(found) : null;
+}
+
+function isIpLike(value: string): boolean {
+  const bare = value.startsWith('[') ? value.slice(1, value.indexOf(']')) : value.split('%')[0];
+  if (parseIPv4(bare)) return true;
+  return /^[0-9a-f:]+$/i.test(bare) && bare.includes(':');
 }

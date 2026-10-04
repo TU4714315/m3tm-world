@@ -88,10 +88,10 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/flights',
         method: 'GET',
-        summary: 'Live ADS-B aircraft, bucketed by class.',
-        returns: ['commercial_flights', 'private_flights', 'private_jets', 'military_flights', 'source'],
+        summary: 'Live ADS-B aircraft, bucketed by class. Add `?summary=1` for the lightweight privacy-safe counter projection.',
+        returns: ['commercial_flights', 'private_flights', 'private_jets', 'military_activity', 'source'],
         notes:
-          'Keyless via adsb.lol. Each bucket is an array; sum them for a total. `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` are reserved for higher rate limits and are not required.',
+          'The default response carries public civilian rows plus coarse military activity cells. `?summary=1` returns `status`, civilian `counts`, coarse `military_activity.cells`, provider readiness, source and timestamp without aircraft identifiers or exact military tracks.',
       },
       {
         path: '/api/satellites',
@@ -299,8 +299,8 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/maritime',
         method: 'GET',
-        summary: 'Ports, chokepoints, and vessel positions.',
-        returns: ['ports', 'chokepoints', 'ships', 'total_ports', 'total_chokepoints', 'total_ships', 'timestamp'],
+        summary: 'Public ports/chokepoints plus live civilian AIS observations and privacy-safe coarse naval activity cells when AISStream.io is configured. Exact military-class AIS tracks remain excluded.',
+        returns: ['ports', 'chokepoints', 'ships', 'naval_activity', 'naval_activity_meta', 'total_ports', 'total_chokepoints', 'total_ships', 'source', 'source_status', 'timestamp'],
         env: ['AIS_API_KEY'],
       },
       {

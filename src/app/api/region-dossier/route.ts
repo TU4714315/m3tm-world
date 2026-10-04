@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { httpJson } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
 
-const ATTRIBUTION = '© OpenStreetMap contributors';
-
 /**
  * M3TM.WORLD — Region Dossier API
  * Provides country intelligence for any coordinate (double right-click on map)
@@ -249,7 +247,7 @@ export async function GET(request: Request) {
       head_of_state: headOfState,
       wikipedia: wikiSummary,
       /** The place this dossier is about was named by OpenStreetMap. */
-      attribution: ATTRIBUTION,
+      attribution: '© OpenStreetMap contributors',
       timestamp: new Date().toISOString(),
     }, {
       headers: {

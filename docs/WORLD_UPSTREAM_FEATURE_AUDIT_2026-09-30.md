@@ -24,9 +24,13 @@ Upstream has a working `alert_pins` concept tied to Live Alerts and location par
 This is intentionally not a unit/equipment tracker. A headline saying a tank or artillery was reported can be categorized as an equipment report at the publisher's generalized location, but the map does not infer the exact equipment position.
 
 ### military / sat_military
-The upstream project can render exact ADS-B military flight rows and military/intelligence satellite categories. M3TM.WORLD still contains renderer support, but the **public contract** currently omits exact military flight rows and filters military satellite categories. The public surface exposes a source-backed coarse military-air activity aggregate instead.
+The upstream project can render exact ADS-B military flight rows and individual military/intelligence satellite objects. M3TM.WORLD now carries the useful source-backed awareness from both domains without turning the public map into an exact operational tracker:
 
-This is a data-precision boundary applied independent of actor/country; it is not a political classification. The public map continues to display source-reported conflict events, generalized air activity, frontlines/context, and published field alerts. Exact operational tracks, if ever used, belong behind an authenticated internal surface with separate access controls, not by silently changing the public contract.
+- `military`: the server still classifies public ADS-B observations, but `military_flights` remains empty in the public API. `military_activity` renders 6° regional cells, requires at least two observations per cell, uses a 30-minute time bucket, exposes no aircraft identifiers or exact tracks, and now publishes provider/readiness metadata for adsb.fi/OpenSky.
+- `sat_military`: now a real public layer rather than a dead toggle. CelesTrak/SatNOGS TLE rows are propagated with SGP4 server-side, military/government rows are grouped into 20° regional cells with a minimum group of three, and the public response exposes only cells, aggregate mission/altitude counts, source state and freshness. Names, NORAD IDs and individual orbit tracks are not included in this layer.
+- Individual non-military satellite categories continue to use the existing 3D renderer. Turning on `sat_military` does **not** insert military rows into that exact-object renderer.
+
+This data-precision boundary is applied independent of actor/country. The repository currently has no authenticated API contract that safely separates an exact military feed from the public deployment, so this branch does not invent a URL flag or weaken access controls to expose exact rows.
 
 ## Other upstream features checked
 
@@ -39,21 +43,8 @@ This is a data-precision boundary applied independent of actor/country; it is no
 | `war_alerts` | Key appears in upstream page state | No working layer in M3TM | Upstream search found no corresponding LayerPanel/render/source implementation. It is not a functioning upstream feature to copy as-is. |
 | camera-source expansion | Yes | Yes | Prior parity work registered the reviewed upstream public camera categories; runtime availability remains source-specific. |
 | camera timeout backoff (#403) | Yes | Added in follow-up | Timed-out regions enter a 5-minute cooldown instead of spending the full 12-second regional budget on every catalogue refresh; successful regions and cached camera indexes are unchanged. |
-
-## Newer upstream runtime fixes discovered in the second pass
-
-The first layer-key audit was not sufficient by itself. A commit-level review of recent upstream work found additional behaviour that is not represented by a LayerPanel key:
-
-| Upstream change | M3TM status before this follow-up | Follow-up action |
-|---|---|---|
-| Satellite layer restores itself after city zoom (#390) | Missing: renderer had no high-zoom guard, so the upstream restoration fix was absent | Ported: above zoom 7 it clears only the projection/pick state and preserves the GPU point count; zoom-out restores without toggling |
-| Search ranks near current map centre and aborts stale type-ahead (#390) | Missing: SearchBar called direct global lookup and did not receive `mapCenter` | Ported: SearchBar uses existing `/api/geosearch?lat=&lng=`, current map centre, AbortController and conditional Nominatim fallback |
-| Region Dossier uses Photon + cache and Wikidata REST (#390) | Old implementation: direct Nominatim reverse + Wikidata SPARQL | Ported: cached Photon reverse, one retry, sparse-land radius, Wikidata REST current-statement selection |
-| Malaysian OpenCCTV images/proxy fixes (#380) | Missing | Ported: HTTPS proxy for Selangor HTTP snapshots, dead `/offcam/` rows dropped, multi-address retry and image-byte MIME detection |
-| Live Alerts media/place/digest rebuild (#376/#380) | M3TM.APP public feed has published coordinates but currently **no media fields**; M3TM does not carry upstream Telegram perspective roster | Not falsely enabled. Generalized `alert_pins` is already live from M3TM.APP. Media playback requires a real M3TM.APP media contract first; source/perspective labels are not inferred by WORLD. |
-| Nearby-biased region dossier/search | Partially present through `mapCenter` state and Directions only | Search parity included here; dossier reverse lookup no longer competes with an unrelated Nominatim queue |
-
-This second pass is why commit-level parity remains necessary even after all layer keys are compared.
+| satellite zoom recovery (#390 / `ed3c8cc5...`) | Yes | Already present | Re-audited: M3TM's current custom satellite layer already keeps the GPU buffer count while zoom-hidden and clears only the projection, so zooming back out does not require a toggle reset. No duplicate port was needed. |
+| Sweden CCTV expansion (#404 / `d972d9af...`) | Yes | Yes | Rechecked 2026-10-01: M3TM carries the same `src/app/api/cctv/sweden.ts` blob as upstream (`a630aacc...`), including Trafikverket road cameras and CamStreamer live streams. |
 
 ## Current public conflict evidence contract
 
@@ -62,7 +53,8 @@ The panel must say explicitly whether a layer is **نشط** or **متوقف**. C
 - optional ACLED when server credentials are configured;
 - published frontlines/context;
 - M3TM.APP published field-alert categories;
-- generalized military-air activity.
+- generalized military-air activity;
+- generalized military/government satellite activity from public TLE propagation.
 
 A toggle may be active while its provider returns zero rows. Conversely, a provider can have data while a toggle is off. UI state and source readiness must remain separate.
 
@@ -73,4 +65,14 @@ A toggle may be active while its provider returns zero rows. Conversely, a provi
 - the map renders distinct source-backed categories and source popups without synthetic unit/equipment positions;
 - TypeScript, Vitest and Next production build pass;
 - browser preview shows nonzero alert-pin counts when matching M3TM.APP items exist and toggling the layer changes the map source;
-- no exact military-flight or military-satellite public contract is introduced by this PR.
+- no exact military-flight or exact individual military-satellite public contract is introduced by this PR;
+- `sat_military` is source-backed and functional through a coarse 20° / minimum-3 / 1-hour aggregate, with source readiness visible in the UI.
+
+
+## Upstream recheck — 2026-10-01
+
+- Live GitHub commit audit of `simplifaisoul/osiris` found `d972d9af5c6f45aebf6d60b8a60f229a8abbe2f1` (2026-09-30T04:25:12Z) as the latest merged commit visible at review time.
+- The latest upstream change is the Sweden CCTV expansion (#404). M3TM.WORLD already carries the exact same Sweden adapter blob (`a630aacc5f07060cd24dfce14b95a0abaa2b9625`), so no duplicate port is required.
+- The earlier timeout backoff (#403) and satellite zoom recovery (#390) remain present from prior parity work.
+- Upstream-only OSINT/recon capabilities such as FINGERPRINT are **not** copied into the public WORLD surface. They belong to the authenticated internal portal/orchestrator roadmap so public map UI and internal operational tooling remain separated.
+- Phase-1 local M3TM changes on `feat/world-phase1-map-clarity-20261001` focus on public map clarity: semantic event badges, improved satellite imagery presentation, and removal of Markets/Bluetooth Remote from public WORLD chrome.
