@@ -15,6 +15,21 @@ import { buildGdeltReportedRoutes, classifyPublicEvent, fetchGdeltEvents, parseG
 const liveIt = process.env.RUN_LIVE_TESTS === '1' ? it : it.skip;
 
 describe('fetchGdeltEvents', () => {
+  it('reserves Middle East reports without losing all worldwide coverage or exceeding limits',()=>{
+    const row=(id:string,lat:number,lng:number)=>{
+      const c=Array(61).fill('');
+      c[0]=id;c[1]='20261004';c[26]='190';c[28]='19';c[29]='4';
+      c[31]='3';c[32]='2';c[33]='2';c[52]=id;c[53]='SA';
+      c[56]=String(lat);c[57]=String(lng);c[59]='20261004150000';
+      c[60]='https://example.com/'+id;
+      return c.join('\t');
+    };
+    const csv=[row('world1',40,-74),row('world2',39,-75),row('mena',24.7,46.7)].join('\n');
+    expect(parseGdeltEventsCsv(csv,{limit:2}).events.map(e=>e.id)).toEqual(['world1','world2']);
+    expect(parseGdeltEventsCsv(csv,{limit:2,regionalPriority:'middle-east'}).events.map(e=>e.id))
+      .toEqual(['mena','world1']);
+  });
+
   it('applies event-code prefixes before the result limit', () => {
     const row = (id: string, eventCode: string) => {
       const cols = Array(61).fill('');
