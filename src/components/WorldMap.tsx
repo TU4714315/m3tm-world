@@ -3266,8 +3266,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           }, 'day-night-fill');
         } else {
           map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
-          for (const [name,value] of Object.entries(rasterPaint)) {
-            map.setPaintProperty('satellite-layer',name,value);
+          for (const name of Object.keys(rasterPaint) as Array<keyof typeof rasterPaint>) {
+            map.setPaintProperty('satellite-layer',name,rasterPaint[name]);
           }
         }
       } else {
