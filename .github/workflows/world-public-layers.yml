@@ -24,6 +24,21 @@ on:
       - 'src/components/SearchBar.tsx'
       - 'src/app/api/region-dossier/**'
       - 'src/lib/satellite-layer*'
+      # ACLED/conflict and handoff/source provenance changes require full checks.
+      - 'src/lib/acled*'
+      - 'src/app/api/conflicts/**'
+      - 'src/app/api/health/**'
+      - 'docs/ACLED_PUBLIC_SOURCE_CONTRACT_2026-10-04.md'
+      - 'docs/M3TM_CONTINUATION_MASTER_2026-10-04.md'
+      - 'docs/M3TM_PROJECTS_INTEGRATION_2026.md'
+      - 'AGENTS.md'
+      # Browser, search-engine and install icons are production assets.
+      - 'src/app/layout.tsx'
+      - 'src/app/favicon.ico'
+      - 'public/favicon*'
+      - 'public/m3tm-mark.png'
+      - 'public/site.webmanifest'
+      - 'public/manifest.json'
       - 'vercel.json'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
