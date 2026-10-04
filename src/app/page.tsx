@@ -1047,7 +1047,7 @@ export default function Dashboard() {
           reported_routes_meta: d.reported_routes_meta ?? null,
           gdelt_source_published_at: d.source_published_at ?? null,
         };
-      }), undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
+      }, undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
     }
     if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
@@ -2055,7 +2055,7 @@ export default function Dashboard() {
                       publishedAt={data.conflict_source_published_at || data.gdelt_source_published_at}
                       onFocus={() => {setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});setMobilePanel(null);}}/>
                     <WorldFeed data={data} onLocate={(lat,lng) => {setFlyToLocation({lat,lng,ts:Date.now()});setMobilePanel(null);}}/>
-                  </div>
+                  </div>}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
