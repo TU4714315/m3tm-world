@@ -15,13 +15,16 @@ interface PublicEvent{
   id?:string;lat?:number;lng?:number;date?:string;timestamp?:string;
   title?:string;event_label_ar?:string;provider?:string;sourceLabel?:string;url?:string;
   reported_actor1?:string;reported_actor2?:string;reportedActors?:string[];
+  corroboration?: 'single-source-report'|'multi-source-report';
+  event_category?:string;type?:string;sources?:number;
 }
 export function regionalPublicSignals(data:{
   gdelt_events?:PublicEvent[]; civil_unrest?:PublicEvent[];
   conflict_live_events?:PublicEvent[];
   military_activity?:PublicEvent[]; naval_activity?:PublicEvent[];
 }) {
-  const reported:Array<{id:string;title:string;source:string;url:string;time:string|null;actors:string[]}>=[];
+  const reported:Array<{id:string;title:string;source:string;url:string;time:string|null;actors:string[];
+    category:string;multiplePublishers:boolean;}>=[];
   const seen=new Set<string>();
   const rows=[...(data.conflict_live_events??[]),...(data.gdelt_events??[]),...(data.civil_unrest??[])];
   for(const e of rows){
@@ -34,7 +37,9 @@ export function regionalPublicSignals(data:{
     const actors=[...(e.reportedActors??[]),e.reported_actor1,e.reported_actor2]
       .filter((name):name is string=>typeof name==='string'&&Boolean(name.trim())).slice(0,2);
     reported.push({id:key,title:e.event_label_ar||e.title||'حدث مُبلّغ عنه',
-      source:provider,url:e.url||'',time:e.date||e.timestamp||null,actors});
+      source:provider,url:e.url||'',time:e.date||e.timestamp||null,actors,
+      category:e.event_category||e.type||'other',
+      multiplePublishers:e.corroboration==='multi-source-report' && (e.sources === undefined || e.sources>=2)});
   }
   reported.sort((a,b)=>(Date.parse(b.time||'')||0)-(Date.parse(a.time||'')||0));
   return {events:reported,reports:reported.length,

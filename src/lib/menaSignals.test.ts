@@ -26,6 +26,14 @@ describe('M3TM regional public evidence',()=>{
     expect(d.events[0].actors).toEqual(['Government','Opposition']);
     expect(JSON.stringify(d)).not.toContain('hidden-unit');
   });
+  it('reports publisher coverage without upgrading syndicated articles',()=>{
+    const d=regionalPublicSignals({gdelt_events:[
+      {id:'11',lat:24.7,lng:46.7,sources:1,corroboration:'single-source-report',event_category:'aerial_attack'},
+      {id:'12',lat:25.3,lng:44,sources:2,corroboration:'multi-source-report',event_category:'armed_clash'}
+    ]});
+    expect(d.events.find(e=>e.id==='gdelt:11')?.multiplePublishers).toBe(false);
+    expect(d.events.find(e=>e.id==='gdelt:12')?.multiplePublishers).toBe(true);
+  });
   it('uses the GDELT archive timestamp, not HTTP response time',()=>{
     expect(gdeltWindowTime('20261004150000.export.CSV.zip')).toBe('2026-10-04T15:00:00.000Z');
     expect(gdeltWindowTime('20261304150000.export.CSV.zip')).toBeNull();
