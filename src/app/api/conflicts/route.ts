@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { fetchGdeltEvents, publisherCoverage, toPublicGdeltEvent } from '@/lib/gdeltEvents';
-import { fetchAcledPublicEvents } from '@/lib/acled';
+import {
+  fetchAcledPublicEvents, ACLED_EVENT_WINDOW_DAYS,
+  ACLED_PUBLICATION_WINDOW_DAYS, ACLED_RECENT_OCCURRENCE_DAYS,
+} from '@/lib/acled';
 import { gdeltWindowTime } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
@@ -225,6 +228,7 @@ async function fetchAllLiveConflictData(): Promise<{
   gdeltWindow: string;
   gdeltScanned: number;
   acledRegionalCounts: Record<string, number>;
+  acledPublishedUpdates: Record<string, number>;
   sourceStatus: Record<string, unknown>;
 }> {
   const acledTimeout = new Promise<Awaited<ReturnType<typeof fetchAcledPublicEvents>>>(resolve => {
@@ -238,7 +242,7 @@ async function fetchAllLiveConflictData(): Promise<{
 
   const [gdeltResult, acledResult] = await Promise.all([
     fetchGdeltEvents({ quads: [4], minArticles: 2, limit: 1400, regionalPriority: 'middle-east' }),
-    Promise.race([fetchAcledPublicEvents(7, 1200), acledTimeout]),
+    Promise.race([fetchAcledPublicEvents(ACLED_EVENT_WINDOW_DAYS, 1200, ACLED_PUBLICATION_WINDOW_DAYS), acledTimeout]),
   ]);
 
   const gdeltEvents: ConflictEvent[] = gdeltResult.events
@@ -303,11 +307,20 @@ async function fetchAllLiveConflictData(): Promise<{
   // Compute region/week counts while keeping its IDs/positions server-only.
   const events = combineConflictEvents(gdeltEvents);
   const acledRegionalCounts: Record<string, number> = {};
+  const acledPublishedUpdates: Record<string, number> = {};
   for (const zone of KNOWN_CONFLICTS) {
-    acledRegionalCounts[zone.id] = acledEvents.filter(event =>
+    const inZone = acledEvents.filter(event =>
       event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
       event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
+    );
+    // Preserve the old seven-day occurrence meaning exactly.
+    acledRegionalCounts[zone.id] = inZone.filter(event =>
+      event.ageDays !== null && event.ageDays >= 0 &&
+      event.ageDays < ACLED_RECENT_OCCURRENCE_DAYS
     ).length;
+    // Separately display ACLED weekly publication/edits, whose event
+    // dates may be older. Only regional counts go to the public response.
+    acledPublishedUpdates[zone.id] = inZone.length;
   }
 
   const eventsByRegion: Record<string, number> = {};
@@ -324,6 +337,7 @@ async function fetchAllLiveConflictData(): Promise<{
     gdeltWindow: gdeltResult.window,
     gdeltScanned: gdeltResult.scanned,
     acledRegionalCounts,
+    acledPublishedUpdates,
     sourceStatus: {
       gdelt: { status: 'ok', window: gdeltResult.window, scanned: gdeltResult.scanned },
       acled: {
@@ -331,7 +345,10 @@ async function fetchAllLiveConflictData(): Promise<{
         events: acledResult.events.length,
         lastUpdateHours: acledResult.lastUpdateHours,
         diagnostics: acledResult.diagnostics ?? null,
-        publicMode: 'derived-seven-day-regional-counts',
+        eventWindowDays: ACLED_EVENT_WINDOW_DAYS,
+        publicationWindowDays: ACLED_PUBLICATION_WINDOW_DAYS,
+        recentEventDays: ACLED_RECENT_OCCURRENCE_DAYS,
+        publicMode: 'derived-regional-weekly-updates-and-seven-day-occurrences',
         attribution: 'Armed Conflict Location & Event Data (ACLED), https://acleddata.com/',
         message: acledResult.message ?? null,
       },
@@ -343,7 +360,7 @@ export async function GET() {
   const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
   const servedAt = new Date().toISOString();
   try {
-    const { events: liveEvents, gdeltWindow, gdeltScanned, acledRegionalCounts, sourceStatus } = await fetchAllLiveConflictData();
+    const { events: liveEvents, gdeltWindow, gdeltScanned, acledRegionalCounts, acledPublishedUpdates, sourceStatus } = await fetchAllLiveConflictData();
 
     const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
       const zoneEvents = liveEvents.filter(event =>
@@ -368,6 +385,7 @@ export async function GET() {
         events: zoneEvents.slice(0, 40),
         eventCount,
         acledReports7d: acledRegionalCounts[zone.id] || 0,
+        acledPublishedUpdates10d: acledPublishedUpdates[zone.id] || 0,
         eventKinds,
         dominantKind,
         activityBand: eventCount >= 10 ? 'active' : eventCount >= 3 ? 'elevated' : 'quiet',

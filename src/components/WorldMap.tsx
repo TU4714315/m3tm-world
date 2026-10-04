@@ -1833,7 +1833,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
         ${isEvent && p.reportedActors ? `<div style="font-size:10px;color:#D5DCE0;margin-bottom:7px;">جهات وردت في ترميز الخبر (دون إثبات المسؤولية): ${htmlEsc(p.reportedActors)}</div>` : ''}
-        ${!isEvent && Number(p.acledReports7d)>0 ? `<div style="font-size:9px;color:#9B978E;margin-bottom:7px;">ACLED: ${htmlEsc(String(p.acledReports7d))} سجلًا إقليميًا خلال ٧ أيام · تحليل مُجمّع، وليس أحداثًا مستقلة عن GDELT بالضرورة · acleddata.com</div>` : ''}
+        ${!isEvent && Number(p.acledPublishedUpdates10d)>0
+            ? `<div style="font-size:10px;color:#B8CFE0;margin-bottom:7px;">ACLED: ${htmlEsc(String(p.acledPublishedUpdates10d))} سجلًا منشورًا أو مُحدّثًا في آخر ١٠ أيام (وقائع آخر ٣٥ يومًا)، منها ${htmlEsc(String(p.acledReports7d||0))} وقائع في آخر ٧ أيام. مؤشرات إقليمية مجمّعة · acleddata.com</div>`
+            : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
           <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
           <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
@@ -2943,6 +2945,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         sourceUrl: z.sourceUrl || '',
         eventCount: z.eventCount || 0,
         acledReports7d: z.acledReports7d || 0,
+        acledPublishedUpdates10d: z.acledPublishedUpdates10d || 0,
         dominantKind: z.dominantKind || 'other',
         activityBand: z.activityBand || 'quiet',
         dataState: data.conflict_data_state || 'live',
