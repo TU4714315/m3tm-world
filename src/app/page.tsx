@@ -26,6 +26,7 @@ import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
+import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
@@ -425,6 +426,7 @@ export default function Dashboard() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number; bounds?: { west: number; south: number; east: number; north: number } } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'layers'|'intel'|'search'|null>(null);
+  const [showMenaPulse, setShowMenaPulse] = useState(false);
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
@@ -957,6 +959,7 @@ export default function Dashboard() {
           civil_unrest: events.filter((event: any) => event?.event_category === 'civil_unrest'),
           reported_routes: d.reported_routes ?? [],
           reported_routes_meta: d.reported_routes_meta ?? null,
+          gdelt_source_published_at: d.source_published_at ?? null,
         };
       });
     }
@@ -968,6 +971,7 @@ export default function Dashboard() {
         conflict_category_counts: d.categoryCounts ?? {},
         conflict_data_state: d.dataState ?? 'live',
         conflict_served_at: d.servedAt ?? d.timestamp ?? null,
+        conflict_source_published_at: d.sourcePublishedAt ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
@@ -1041,8 +1045,9 @@ export default function Dashboard() {
           civil_unrest: events.filter((event: any) => event?.event_category === 'civil_unrest'),
           reported_routes: d.reported_routes ?? [],
           reported_routes_meta: d.reported_routes_meta ?? null,
+          gdelt_source_published_at: d.source_published_at ?? null,
         };
-      }), 300000));
+      }, undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
     }
     if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
@@ -1052,6 +1057,7 @@ export default function Dashboard() {
         conflict_category_counts: d.categoryCounts ?? {},
         conflict_data_state: d.dataState ?? 'live',
         conflict_served_at: d.servedAt ?? d.timestamp ?? null,
+        conflict_source_published_at: d.sourcePublishedAt ?? null,
         conflict_summary: {
           totalZones: d.totalZones ?? 0,
           totalLiveEvents: d.totalLiveEvents ?? 0,
@@ -1059,7 +1065,7 @@ export default function Dashboard() {
           zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
-      })), 300000));
+      }), undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
     }
     if ((activeLayers as any).frontlines) {
       intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
@@ -1095,7 +1101,7 @@ export default function Dashboard() {
       }), undefined, { skipWhenHidden: true }), 180000));
     }
     return () => intervals.forEach(clearInterval);
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, showMenaPulse]);
 
   // Maritime earns a fast cadence only while live vessels are actually arriving.
   // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
@@ -1752,6 +1758,19 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
+          <button type="button" aria-label="موجز الشرق الأوسط والبحر الأحمر" aria-expanded={showMenaPulse}
+            onClick={() => {setShowMenaPulse(p=>!p);setShowAlerts(false);setShowSpaceCam(false);}}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-cyan-300 hover:bg-cyan-300/20 focus-visible:ring-1">
+            <MapPinned className="h-4 w-4"/>
+          </button>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/85 px-2 py-1 text-[11px] text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">الشرق الأوسط والبحر الأحمر</span>
+          {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(88vw,390px)]">
+            <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+              publishedAt={data.conflict_source_published_at || data.gdelt_source_published_at}
+              onFocus={() => setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()})}/>
+          </div>}
+        </div>
+        <div className="relative group">
           <button onClick={() => { setShowAlerts(!showAlerts); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="تنبيهات حية — زلازل ونزاعات وأخبار عاجلة" aria-label="التنبيهات" aria-expanded={showAlerts}>
             <AlertTriangle className={`w-4 h-4 ${showAlerts ? 'text-[#FF3D3D]' : 'text-white/60'}`} />
             {showAlerts && (
@@ -2031,7 +2050,12 @@ export default function Dashboard() {
                       </div>
                     </>
                   )}
-                  {mobilePanel === 'intel' && <WorldFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+                  {mobilePanel === 'intel' && <div className="space-y-3">
+                    <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+                      publishedAt={data.conflict_source_published_at || data.gdelt_source_published_at}
+                      onFocus={() => {setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});setMobilePanel(null);}}/>
+                    <WorldFeed data={data} onLocate={(lat,lng) => {setFlyToLocation({lat,lng,ts:Date.now()});setMobilePanel(null);}}/>
+                  </div>}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />

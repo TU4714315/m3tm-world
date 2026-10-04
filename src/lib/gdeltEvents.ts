@@ -368,6 +368,7 @@ function parseGdeltDate(dateAdded: string, sqlDate: string): string {
 }
 
 export interface FetchOptions {
+  regionalPriority?: 'middle-east';
   /** Keep only these QuadClass values. Empty means keep all. */
   quads?: number[];
   /** Keep only event codes that start with one of these prefixes. Empty means keep all. */
@@ -387,12 +388,14 @@ export interface GdeltEventsResult {
 }
 
 export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
-  const { quads = [], eventCodePrefixes = [], minArticles = 1, limit = 600 } = opts;
+  const { quads = [], eventCodePrefixes = [], minArticles = 1, limit = 600, regionalPriority } = opts;
   const rows = csv.split('\n');
   const events: GdeltEvent[] = [];
+  const prioritized: GdeltEvent[] = [];
+  const reserve = regionalPriority === 'middle-east' ? Math.max(1, Math.floor(limit * .3)) : 0;
 
   for (const row of rows) {
-    if (events.length >= limit) break;
+    if (events.length >= limit && prioritized.length >= reserve) break;
     if (!row) continue;
     const c = row.split('\t');
     if (c.length < 61) continue;
@@ -418,7 +421,7 @@ export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
     const sources = Number(c[COL.numSources]) || 0;
     const semantics = classifyPublicEvent(eventCode, rootCode, quad, sources, articles);
 
-    events.push({
+    const event: GdeltEvent = {
       id: c[COL.globalEventId],
       lat,
       lng,
@@ -442,29 +445,42 @@ export function parseGdeltEventsCsv(csv: string, opts: FetchOptions = {}) {
       sources,
       url: c[COL.sourceUrl]?.trim() || '',
       date: parseGdeltDate(c[COL.dateAdded], c[COL.sqlDate]),
-    });
+    };
+    if (events.length < limit) events.push(event);
+    if (prioritized.length < reserve && event.lat >= 8 && event.lat <= 43 &&
+        event.lng >= 20 && event.lng <= 65) prioritized.push(event);
   }
-
-  return { events, scanned: rows.length };
+  if (!reserve) return { events, scanned: rows.length };
+  const priorityIds=new Set(prioritized.map(e=>e.id));
+  return {events:[...prioritized,...events.filter(e=>!priorityIds.has(e.id))].slice(0,limit),scanned:rows.length};
 }
 
+// A warm instance keeps the latest 15-minute export and shares in-flight
+// downloads. New source windows are checked each minute, not fabricated.
+type ExportSnapshot={url:string;csv:string;checkedAt:number};
+let latest:ExportSnapshot|null=null;
+let inflight:Promise<ExportSnapshot>|null=null;
+async function latestArchive():Promise<ExportSnapshot>{
+  if(latest&&Date.now()-latest.checkedAt<60000)return latest;
+  if(inflight)return inflight;
+  inflight=(async()=>{
+    const manifest=(await httpGetBufferIPv4(LASTUPDATE_URL,12000)).toString('utf8');
+    const announced=manifest.split('\n').map(l=>l.trim())
+      .find(l=>l.includes('.export.CSV.zip'))?.split(/\s+/).pop();
+    if(!announced)throw new Error('No GDELT export announced');
+    // Reprobe an advertised archive when an older fallback was used.
+    if(latest?.url===announced){
+      latest={...latest,checkedAt:Date.now()};
+      return latest;
+    }
+    const response=await fetchExportWithFallback(announced);
+    latest={url:response.url,csv:response.csv,checkedAt:Date.now()};
+    return latest;
+  })();
+  try{return await inflight;}finally{inflight=null;}
+}
 export async function fetchGdeltEvents(opts: FetchOptions = {}): Promise<GdeltEventsResult> {
-  const manifest = (await httpGetBufferIPv4(LASTUPDATE_URL, 12000)).toString('utf8');
-
-  const exportUrl = manifest
-    .split('\n')
-    .map(l => l.trim())
-    .find(l => l.includes('.export.CSV.zip'))
-    ?.split(/\s+/)
-    .pop();
-  if (!exportUrl) throw new Error('No export archive listed in lastupdate.txt');
-
-  const { csv, url: resolvedUrl } = await fetchExportWithFallback(exportUrl);
-  const { events, scanned } = parseGdeltEventsCsv(csv, opts);
-
-  return {
-    events,
-    window: resolvedUrl.split('/').pop() || '',
-    scanned,
-  };
+  const snapshot=await latestArchive();
+  const {events,scanned}=parseGdeltEventsCsv(snapshot.csv,opts);
+  return {events,scanned,window:snapshot.url.split('/').pop()||''};
 }

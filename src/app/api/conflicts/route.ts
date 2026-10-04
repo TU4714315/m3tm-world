@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { fetchAcledPublicEvents } from '@/lib/acled';
+import { gdeltWindowTime } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
@@ -232,7 +233,7 @@ async function fetchAllLiveConflictData(): Promise<{
   });
 
   const [gdeltResult, acledResult] = await Promise.all([
-    fetchGdeltEvents({ quads: [4], minArticles: 2, limit: 1400 }),
+    fetchGdeltEvents({ quads: [4], minArticles: 2, limit: 1400, regionalPriority: 'middle-east' }),
     Promise.race([fetchAcledPublicEvents(7, 1200), acledTimeout]),
   ]);
 
@@ -369,6 +370,7 @@ export async function GET() {
       timestamp: servedAt,
       source: 'GDELT 2.0 + optional ACLED fusion',
       sourceWindow: gdeltWindow,
+      sourcePublishedAt: gdeltWindowTime(gdeltWindow),
       sourceRowsScanned: gdeltScanned,
       sourceStatus,
       sourceMode: 'multi-source-public-conflict-layer',
@@ -383,7 +385,7 @@ export async function GET() {
 
     return NextResponse.json(payload, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { buildGdeltReportedRoutes, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
+import { gdeltWindowTime, isMiddleEastBelt } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const maxDuration = 60;
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
     : { value: null, backend: 'miss' as const };
 
   try {
-    const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit });
+    const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit, regionalPriority: 'middle-east' });
     const reportedRoutes = buildGdeltReportedRoutes(events);
     const publicEvents = events.map(toPublicGdeltEvent);
     const payload = {
@@ -72,6 +73,9 @@ export async function GET(req: Request) {
       reported_routes_total: reportedRoutes.length,
       scanned,
       window,
+      source_published_at: gdeltWindowTime(window),
+      priority_region: 'middle-east-red-sea',
+      priority_region_count: publicEvents.filter(e => isMiddleEastBelt(e.lat,e.lng)).length,
       source: 'GDELT 2.0 Events',
       timestamp: new Date().toISOString(),
       data_state: 'live',
@@ -85,7 +89,7 @@ export async function GET(req: Request) {
       {
         // GDELT publishes a new export every 15 minutes, so anything under that
         // is wasted work. Serve stale while revalidating to absorb bursts.
-        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
       }
     );
   } catch (error) {
