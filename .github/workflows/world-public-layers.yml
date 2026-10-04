@@ -24,6 +24,7 @@ on:
       - 'src/components/SearchBar.tsx'
       - 'src/app/api/region-dossier/**'
       - 'src/lib/satellite-layer*'
+      - 'vercel.json'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
 
