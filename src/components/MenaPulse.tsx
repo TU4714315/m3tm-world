@@ -33,7 +33,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <div className="text-[11px]">{e.title}</div>
       {e.actors.length>0 && <div className="mt-1 text-[10px] text-amber-100/80">
         الجهات المذكورة في ترميز الخبر (دون إثبات المسؤولية): {e.actors.join(' / ')}
-      </div>
+      </div>}
       <div className="mt-1 flex justify-between gap-2 text-[10px] text-white/60">
         <span>{e.source} · {time(e.time)}</span>
         {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-300">المصدر<ExternalLink className="h-3 w-3"/></a>}
