@@ -20,8 +20,16 @@ on:
       - 'src/lib/etopo-relief*'
       - 'src/app/terrain-sources/page.tsx'
       - 'src/app/api/cctv/**'
+      - 'src/app/api/geosearch/route.ts'
+      - 'src/components/SearchBar.tsx'
+      - 'src/app/api/region-dossier/**'
+      - 'src/lib/satellite-layer*'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
+
+concurrency:
+  group: world-public-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
