@@ -165,7 +165,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     <div className="mt-2 rounded-xl border border-cyan-300/25 bg-[#061b24]/85 p-2.5" aria-label="الأرشيف الزمني المنشور للشرق الأوسط">
       <div className="flex items-center justify-between gap-2">
         <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>أرشيف التقارير المنشورة</strong>
-        <span className="rounded border border-cyan-300/20 px-1.5 py-0.5 text-[10px] text-cyan-100/65">GDELT · إسناد تاريخي</span>
+        <a href="/conflict-evolution" className="rounded border border-cyan-300/50 bg-cyan-300/10 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-300/20" aria-label="فتح أطلس تطور تقارير النزاعات الزمني">الأطلس الزمني ↗</a>
       </div>
       {historyStatus==='ready'&&archiveHistory ? <>
         <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
