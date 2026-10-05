@@ -13,6 +13,13 @@ describe('world public visual density',()=>{
       });
     }
   });
+  it('groups only mapped APP news report symbols, not alerts or unlocated feeds',()=>{
+    expect(publicClusterOptions('app-news')).toEqual({
+      cluster:true,clusterRadius:48,clusterMaxZoom:8,
+    });
+    expect(publicClusterOptions('field-alerts')).toEqual({});
+    expect(publicClusterOptions('live-news')).toEqual({});
+  });
   it('does not group live flights, marine tracks, naval or satellite cells',()=>{
     for(const name of ['flights','military','maritime','naval-activity','satellites']){
       expect(publicClusterOptions(name)).toEqual({});
