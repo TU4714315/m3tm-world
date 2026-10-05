@@ -27,6 +27,8 @@ on:
       - 'src/lib/menaSignals*'
       - 'src/lib/gdeltCoverageLedger*'
       - 'src/lib/gdeltPublicHistory*'
+      - 'src/lib/conflictEvolution*'
+      - 'src/app/conflict-evolution/**'
       - 'src/app/api/gdelt-history/**'
       - 'supabase/functions/world-gdelt-archive/**'
       - 'infra/supabase_applied/**'
