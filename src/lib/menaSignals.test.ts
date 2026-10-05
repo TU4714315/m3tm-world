@@ -158,6 +158,10 @@ describe('M3TM independent APP published news witness',()=>{
     precision:'regional-0.5deg' as const,
     provenance:'M3TM.APP public feed' as const,
     status:'source-reported' as const,
+    // The map-pin provenance schema now requires explicit publisher evidence.
+    publisherCount:1,
+    evidenceLabel:'بلاغ ناشر واحد',
+    evidenceLinks:[{publisher:'M3TM.APP',url:'https://example.org/article'}],
   };
   it('keeps published APP news separate from classified GDELT conflicts',async()=>{
     const {buildMenaFusionRadar}=await import('./menaSignals');
