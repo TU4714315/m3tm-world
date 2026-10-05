@@ -26,7 +26,7 @@ on:
       - 'src/lib/satellite-layer*'
       - 'src/lib/menaSignals*'
       - 'src/lib/gdeltCoverageLedger*'
-      - 'src/lib/gdeltHistory*'
+      - 'src/lib/gdeltPublicHistory*'
       - 'src/app/api/gdelt-history/**'
       - 'supabase/functions/world-gdelt-archive/**'
       - 'infra/supabase_applied/**'
@@ -83,6 +83,6 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/world-gdelt-archive/index.ts
+      - run: deno check --config supabase/functions/world-gdelt-archive/deno.json supabase/functions/world-gdelt-archive/index.ts
       # Offline migration privilege contract review; does not contact APP DB.
       - run: node tools/verify-world-archive.mjs

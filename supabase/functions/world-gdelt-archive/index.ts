@@ -1,5 +1,5 @@
 
-import { unzipSync } from 'npm:fflate@0.8.2';
+import { Unzip, UnzipInflate } from 'npm:fflate@0.8.2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -113,13 +113,54 @@ async function boundedZip(name: string): Promise<{reports:unknown[];scanned:numb
   if (!response.ok) throw new Error('GDELT export returned HTTP '+response.status);
   const length = Number(response.headers.get('content-length') || 0);
   if (length > MAX_ZIP) throw new Error('ZIP limit exceeded');
-  const input = new Uint8Array(await response.arrayBuffer());
-  if (input.byteLength > MAX_ZIP) throw new Error('ZIP exceeds maximum size');
-  const files = unzipSync(input);
-  const file = Object.entries(files).find(([filename]) => filename.endsWith('.export.CSV'));
-  if (!file) throw new Error('ZIP did not contain a GDELT events CSV');
-  if (file[1].byteLength > MAX_CSV) throw new Error('GDELT CSV too large');
-  return parseReports(new TextDecoder('utf-8',{fatal:false}).decode(file[1]));
+  // Content-Length may be absent or forged. Bound incoming bytes *while*
+  // reading the stream, and decompress only the matching CSV entry in bounded
+  // chunks. unzipSync would inflate every ZIP member before any size check.
+  if (!response.body) throw new Error('GDELT ZIP stream unavailable');
+  const reader = response.body.getReader();
+  let zipped = 0, expanded = 0, found = false, complete = false;
+  let error: Error | null = null;
+  const pieces: Uint8Array[] = [];
+  const unzip = new Unzip(file => {
+    if (!file.name.endsWith('.export.CSV')) return;
+    if (found) { error = new Error('Multiple GDELT CSV entries'); return; }
+    found = true;
+    if (file.size !== undefined && file.size > MAX_CSV) {
+      error = new Error('GDELT CSV declared size exceeds cap');
+      return;
+    }
+    file.ondata = (failure, data, last) => {
+      if (failure) { error = new Error('GDELT inflate failed'); return; }
+      expanded += data.byteLength;
+      if (expanded > MAX_CSV) { error = new Error('GDELT CSV too large'); return; }
+      pieces.push(data);
+      if (last) complete = true;
+    };
+    file.start();
+  });
+  unzip.register(UnzipInflate);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      zipped += value.byteLength;
+      if (zipped > MAX_ZIP) throw new Error('ZIP exceeds maximum size');
+      unzip.push(value, false);
+      if (error) throw error;
+    }
+    unzip.push(new Uint8Array(0), true);
+    if (error) throw error;
+    if (!found || !complete) throw new Error('ZIP lacks a complete GDELT events CSV');
+  } catch (cause) {
+    await reader.cancel().catch(() => undefined);
+    throw cause;
+  } finally {
+    reader.releaseLock();
+  }
+  const csv = new Uint8Array(expanded);
+  let offset = 0;
+  for (const chunk of pieces) { csv.set(chunk, offset); offset += chunk.byteLength; }
+  return parseReports(new TextDecoder('utf-8', { fatal:false }).decode(csv));
 }
 async function latestName() {
   const r = await fetch('https://' + GDELT_HOST + '/gdeltv2/lastupdate.txt',
@@ -200,8 +241,11 @@ async function publicCoverage() {
   };
   // The 30-minute delayed cutoff anchors BOTH ends of the week; an
   // uninterrupted 7-day archive can reach 672/672 instead of 670/672.
-  const windowStart=Math.max(dueThrough-(672-1)*slot,
-    asMillis(windows[0].window_name)??now);
+  // Start from the independently verified original collector opening
+  // (2026-10-05 11:45 UTC), not the oldest *retained* receipt. Once seven
+  // days elapse, a missing oldest slot must remain a gap in all 672 slots.
+  const archiveBeganAt=Date.parse('2026-10-05T11:45:00Z');
+  const windowStart=Math.max(dueThrough-(672-1)*slot,archiveBeganAt);
   const expected=Math.max(0,Math.min(672,Math.floor((dueThrough-windowStart)/slot)+1));
   const valid=windows.filter(x=>{
     const t=asMillis(x.window_name);
