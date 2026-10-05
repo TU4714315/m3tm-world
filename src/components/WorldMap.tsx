@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
+import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { publicClusterOptions } from '@/lib/map-visual-density';
 import { syncEtopo2022Relief } from '@/lib/etopo-relief';
@@ -319,6 +320,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
     map.on('load', () => {
       mapRef.current = map;
+      // CARTO vector place labels use English by default; render Arabic names
+      // from ISO region display values and source-local names without touching borders.
+      applyArabicBasemapLabels(map);
 
       // Theme colors
       const isGhost = theme === 'ghost';
