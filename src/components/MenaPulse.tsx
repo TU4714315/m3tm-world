@@ -47,7 +47,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       </button>
     </header>
     <p className="mt-2 text-[11px] leading-5 text-white/65">الرصد يقيس <strong>توقيت ترميز/نشر البلاغ</strong> ولا يثبت وقت الواقعة أو المسؤولية؛ الإحداثيات المنشورة معمّمة.</p>
-    <div className="mt-2 grid grid-cols-4 gap-1" aria-label="تصفية البلاغات بحسب الفترة">
+    <div className="mt-2 grid grid-cols-4 gap-1" aria-label="فرز عينة البلاغات المحمّلة بحسب زمن الترميز">
       {PERIODS.map(p=><button key={p.id} type="button" onClick={()=>setPeriod(p.id)}
         aria-pressed={period===p.id}
         className={`rounded-md border p-1.5 text-center transition-colors ${period===p.id?'border-cyan-300/70 bg-cyan-300/20 text-cyan-100':'border-white/15 bg-white/5 text-white/70 hover:bg-white/10'}`}>
@@ -55,6 +55,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
         <span className="text-[10px]">{p.label}</span>
       </button>)}
     </div>
+    <p className="mt-1.5 text-[10px] leading-4 text-amber-100/75">هذه النوافذ تفرز بلاغات أحدث دفعة محمّلة، ولا تمثل أرشيفًا متصلًا لكل ساعة أو ٧ أيام.</p>
     <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-cyan-200">{visible.length}</strong><p className="text-[10px] text-white/70">بلاغات الفترة</p></div>
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-amber-200">{radar.airRegions}</strong><p className="text-[10px] text-white/70">مناطق جوية مجمّعة</p></div>
@@ -69,7 +70,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
         <span className="rounded bg-orange-400/15 px-2 py-1">نزاعات · {clash}</span>
         <span className="rounded bg-yellow-400/15 px-2 py-1">اضطرابات · {unrest}</span>
       </div>
-      <p className="mt-1.5 text-[10px] leading-4 text-white/60">آخر ٦ ساعات: {radar.windows.h6} بلاغًا، مقابل {radar.previous6h} في الساعات الست السابقة. تغيّر وتيرة البلاغات ليس إثباتًا لتصاعد القتال.</p>
+      <p className="mt-1.5 text-[10px] leading-4 text-white/60">مؤشرات هذه العينة فقط؛ المقارنة الفعلية بين فترات الرصد تتطلب سجلًا تاريخيًا متصلًا، ولا يثبت ترميز الخبر تصاعد القتال.</p>
     </div>
     <div className="mt-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.055] p-2">
       <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>سلامة وحداثة المصدر</strong>
