@@ -424,7 +424,7 @@ html:has(.docs-root) body {
 
 /* ── Vignette ── */
 .vignette {
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(4,4,10,0.45) 80%, rgba(4,4,10,0.75) 100%);
+  background: radial-gradient(ellipse at center, transparent 68%, rgba(4,4,10,0.12) 85%, rgba(4,4,10,0.28) 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════════
