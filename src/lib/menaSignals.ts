@@ -70,7 +70,7 @@ type MilitarySummaryCell = PublicEvent & {
   data_state?: string;
   cell_degrees?: number;
 };
-type RadarData = RegionalData & {
+type RadarData = Omit<RegionalData, 'military_activity'> & {
   military_activity?: MilitarySummaryCell[];
   military_activity_meta?: { provider_healthy?: boolean; stale_fallback?: boolean };
   conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
