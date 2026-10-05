@@ -42,7 +42,7 @@ describe('source-preserving public news fusion',()=>{
  });
  it('keeps distinct titles and publication windows as separate reports',()=>{
    const a=item();
-   const b=item({title:'Official diplomatic statement about ceasefire'});
+   const b=item({title:'Official diplomatic statement about ceasefire', link:'https://example.net/independent-article'});
    expect(mergePublicNews([a,b])).toHaveLength(2);
    const sevenHoursAgo=new Date(Date.now()-7*60*60_000).toISOString();
    expect(mergePublicNews([a,item({published:sevenHoursAgo})])).toHaveLength(2);
