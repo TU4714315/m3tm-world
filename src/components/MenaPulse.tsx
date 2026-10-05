@@ -116,6 +116,23 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
     </div>
+    <div className="mt-2 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.04] px-2.5 py-2">
+      <strong className="flex items-center gap-1 text-xs text-emerald-100"><Activity className="h-3.5 w-3.5"/>إشارات أخبار مستقلة · M3TM.APP</strong>
+      <p className="mt-1 text-[10px] leading-4 text-white/65">عناوين ذات إسناد جغرافي منشور؛ ليست تصنيفًا لحوادث قتال ولا تأكيدًا آليًا لبلاغات GDELT. ضمن أحدث عينة: {radar.appNewsLast24h} منشورًا في ٢٤ ساعة.</p>
+      <div className="mt-1 divide-y divide-emerald-200/10">
+        {radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]).slice(0,8).map(n=>
+          <div key={n.id} className="py-1.5">
+            <p className="text-[11px] leading-5 text-white/85">{n.title}</p>
+            <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-white/60">
+              <span>{n.source} · {timestamp(n.time)}</span>
+              <a href={n.url} rel="noopener noreferrer" target="_blank"
+                className="flex items-center gap-1 text-emerald-200 underline">الأصل<ExternalLink className="h-3 w-3"/></a>
+            </div>
+          </div>)}
+        {radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]).length===0&&
+          <p className="py-2 text-[11px] text-white/55">لا توجد عناوين مرتبطة مكانيًا ضمن الفترة المختارة.</p>}
+      </div>
+    </div>
     <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 text-white/60"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0"/>تعدد الناشرين لا يثبت استقلالهم، ولا يدل ترميز الخبر على المسؤولية. تحقق من الرابط الأصلي.</p>
     <div className="mt-1 divide-y divide-white/10">
       {visible.slice(0,16).map(e=><div key={e.id} className="py-2">

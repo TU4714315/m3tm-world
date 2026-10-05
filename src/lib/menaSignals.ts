@@ -1,3 +1,5 @@
+import type { AppNewsPin } from './appNewsPins';
+
 /** Public evidence fusion over an expanded Middle East and Red Sea belt. */
 export const isMiddleEastBelt = (lat: unknown, lng: unknown): boolean =>
   typeof lat === 'number' && typeof lng === 'number' &&
@@ -71,6 +73,7 @@ type MilitarySummaryCell = PublicEvent & {
   cell_degrees?: number;
 };
 type RadarData = Omit<RegionalData, 'military_activity'> & {
+  app_news?: AppNewsPin[];
   military_activity?: MilitarySummaryCell[];
   military_activity_meta?: { mode?: string | null; provider_healthy?: boolean; stale_fallback?: boolean };
   conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
@@ -95,6 +98,29 @@ export function buildMenaFusionRadar(
     ...event,
     ageMs: reportedTimeAge(event.time, nowMs),
   }));
+  // APP public geo-tagged news is a separate published witness, not a GDELT
+  // event and not proof of an attack, actor, or operational position.
+  const appNewsSignals: Array<{
+    id:string;title:string;source:string;url:string;time:string;ageMs:number;
+  }> = [];
+  const seenNewsUrls=new Set<string>();
+  for(const pin of data.app_news??[]){
+    if(pin.provenance!=='M3TM.APP public feed' ||
+       pin.status!=='source-reported' ||
+       pin.precision!=='regional-0.5deg' ||
+       !isMiddleEastBelt(pin.lat,pin.lng) ||
+       !/^https?:\/\//i.test(pin.url))continue;
+    const ageMs=reportedTimeAge(pin.published,nowMs);
+    if(ageMs===null || ageMs>FUSION_WINDOWS.d7)continue;
+    const key=pin.url.split('#')[0];
+    if(!key||seenNewsUrls.has(key))continue;
+    seenNewsUrls.add(key);
+    appNewsSignals.push({
+      id:`app-news-${seenNewsUrls.size}`,title:pin.title,source:pin.source,
+      url:pin.url,time:pin.published,ageMs,
+    });
+  }
+  appNewsSignals.sort((a,b)=>a.ageMs-b.ageMs);
   const windows: Record<FusionWindow,number> = { h1: 0, h6: 0, h24: 0, d7: 0 };
   let previous6h = 0, invalidDates = 0, missingLinks = 0;
   for (const event of events) {
@@ -122,6 +148,9 @@ export function buildMenaFusionRadar(
   return {
     ...summary,
     events,
+    // Do not merge APP news into GDELT publisher corroboration/counters.
+    appNewsSignals: appNewsSignals.slice(0,24),
+    appNewsLast24h: appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS.h24).length,
     windows,
     previous6h,
     coverage: {
