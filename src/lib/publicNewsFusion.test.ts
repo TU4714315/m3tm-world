@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {mergePublicNews,publicUrl,sourceTitleKey,selectPublicHeadlineAlerts,type PublicNewsRow} from './publicNewsFusion';
+import {mergePublicNews,publicUrl,sourceTitleKey,selectPublicHeadlineAlerts,sourcePublishedPoint,type PublicNewsRow} from './publicNewsFusion';
 const published=new Date(Date.now()-10*60_000).toISOString();
 const item=(o:Partial<PublicNewsRow>={}):PublicNewsRow=>({
  id:'1',title:'Reported incident in the Red Sea',description:'Observed in published reporting',
@@ -7,6 +7,18 @@ const item=(o:Partial<PublicNewsRow>={}):PublicNewsRow=>({
  risk_score:3,coords:null,coords_default:true,language:'en',
  feed_origin:'independent-fallback',location_basis:'keyword-context',
  verification_status:'source-reported',machine_assessment:null,...o,
+});
+describe('verified input coordinate boundary',()=>{
+  it('rejects null, undefined, blank, booleans and invalid coordinates',()=>{
+    for(const coordinate of [null,undefined,'',false,true,Infinity,NaN,100,{}]){
+      expect(sourcePublishedPoint(coordinate,53)).toBeNull();
+    }
+    expect(sourcePublishedPoint(23,null)).toBeNull();
+  });
+  it('accepts genuinely supplied coordinates, including geographic zero',()=>{
+    expect(sourcePublishedPoint('24.65','46.71')).toEqual([24.65,46.71]);
+    expect(sourcePublishedPoint(0,0)).toEqual([0,0]);
+  });
 });
 describe('source-preserving public news fusion',()=>{
  it('normalizes duplicate URL tracking params and keeps publisher evidence',()=>{
