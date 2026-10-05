@@ -103,7 +103,28 @@ export function summarizeGdeltCoverage(rows: Observation[], now = Date.now(), ba
       : 'Observed publication windows only; no historical GDELT event rows or client-render latency.',
   };
 }
+/**
+ * Prefer the independently scheduled durable Supabase archive. This endpoint
+ * publishes sanitized public-source metadata only; WORLD needs no APP secrets,
+ * and a storage outage never interrupts the separate live GDELT map feed.
+ */
+async function remoteGdeltCoverage() {
+  const res=await fetch('https://heibzaolhwlzqaweludm.supabase.co/functions/v1/world-gdelt-archive?mode=coverage',{
+    next:{revalidate:60},signal:AbortSignal.timeout(5200),
+  });
+  if(!res.ok)throw new Error('Public archive service is unavailable');
+  const data=await res.json();
+  if(data?.backend!=='supabase'||data?.durable!==true||
+    !['observed-export-checkpoints','not-yet-collected'].includes(data?.sampling)||
+    typeof data?.expectedWindows!=='number'||
+    !Number.isFinite(data.expectedWindows))throw new Error('Invalid coverage provenance');
+  return data;
+}
 export async function getGdeltCoverage(now = Date.now()) {
+  try{return await remoteGdeltCoverage();}catch{
+    // Preserve prior Redis source if Supabase cannot be reached. Never claim
+    // ephemeral Vercel process memory is a shared seven-day archive.
+  }
   // Vercel route functions do not necessarily share the same memory.
   // Never present memory count=0 as observed full-week source failure.
   const local = () => ({

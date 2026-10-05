@@ -45,6 +45,7 @@ on:
       - 'public/m3tm-mark.png'
       - 'public/site.webmanifest'
       - 'public/manifest.json'
+      - 'tsconfig.json'
       - 'vercel.json'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
