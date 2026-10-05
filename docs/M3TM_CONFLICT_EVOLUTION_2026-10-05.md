@@ -8,6 +8,7 @@ Existing many-layer M3TM map shows points, not auditable regional chronology. A 
 - Arabic right-to-left /conflict-evolution interactive MapLibre page linked from M3TM Fusion Radar.
 - Geographic viewing frames for MENA, Yemen/Red Sea, Saudi/Gulf, Iraq/Iran, Levant (bounding boxes are not territorial claims).
 - Histories 1h/6h/24h/7d, replay slider/play/pause, classification of published violent news reports, unrest, and statements/diplomacy.
+- Two explicit animation interpretations: per-source-bin snapshot versus *cumulative available NEWS-sample footprint*; the latter is NEVER territorial advances or expanding control. UI legend explains the cumulative sample bias.
 - Real archived SOURCE publication timeline with 3° grouped report-map cells and original article URLs. Region-wide report totals and selected bounded sample counts are explicitly distinguished.
 - Pure deterministic tests for zero stored-report slots, geo grouping, news type separation, duplicate IDs, invalid geodata and no identifiers/URLs in map GeoJSON; required workflow watches new source paths.
 - No migration, cron, third-party key, new source scraping, private-OSINT/public bridge change or individual military units/tracks.
