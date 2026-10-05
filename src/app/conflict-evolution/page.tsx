@@ -4,7 +4,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {buildConflictEvolutionFrames,conflictGridGeoJson,CONFLICT_FOCUS,
-  type ConflictFocus,type ConflictKind} from '@/lib/conflictEvolution';
+  type ConflictFocus,type ConflictKind,cumulativeSampleCells} from '@/lib/conflictEvolution';
 import type {GdeltHistoryView} from '@/lib/gdeltPublicHistory';
 import {MAP_ATTRIBUTION_OPTIONS} from '@/lib/terrain-source-attribution';
 
@@ -41,11 +41,17 @@ export default function ConflictEvolutionPage(){
   const [coverage,setCoverage]=useState<{durable?:boolean;observedWindows?:number|null;expectedWindows?:number|null}|null>(null);
   const [loading,setLoading]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [cursor,setCursor]=useState(-1),[playing,setPlaying]=useState(false);
+  const [viewMode,setViewMode]=useState<'snapshot'|'cumulative'>('snapshot');
 
   const frames=useMemo(()=>archive?buildConflictEvolutionFrames(archive,focus,kind):[],[archive,focus,kind]);
   const index=cursor<0?frames.length-1:Math.min(cursor,frames.length-1);
   const selected=frames[index]||null;
-  const mapData=useMemo(()=>conflictGridGeoJson(selected?.cells||[]),[selected]);
+  const drawn=useMemo(()=>viewMode==='cumulative'
+    ?cumulativeSampleCells(frames,index):(selected?.cells||[]),[frames,index,selected,viewMode]);
+  const reportRows=useMemo(()=>viewMode==='cumulative'
+    ?frames.slice(0,Math.max(0,index+1)).flatMap(x=>x.sampleRows)
+    :(selected?.sampleRows||[]),[frames,index,selected,viewMode]);
+  const mapData=useMemo(()=>conflictGridGeoJson(drawn),[drawn]);
   const peak=Math.max(1,...frames.map(x=>x.recordedReports));
   const sampled=Boolean(archive &&
     (archive.totalReportRows>archive.events.length || archive.events.length>=archive.reportLimit));
@@ -196,14 +202,24 @@ export default function ConflictEvolutionPage(){
               {k.label}</button>)}
           </div>
         </fieldset>
+        <fieldset><legend className="mb-1.5 text-xs text-white/65">طريقة قراءة الامتداد</legend>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button type="button" aria-pressed={viewMode==='snapshot'} onClick={()=>setViewMode('snapshot')}
+              className={'rounded-md border px-2 py-2 text-xs '+(viewMode==='snapshot'?'border-cyan-300 bg-cyan-300/15':'border-white/15 bg-white/5')}>
+              لقطة زمنية</button>
+            <button type="button" aria-pressed={viewMode==='cumulative'} onClick={()=>setViewMode('cumulative')}
+              className={'rounded-md border px-2 py-2 text-xs '+(viewMode==='cumulative'?'border-cyan-300 bg-cyan-300/15':'border-white/15 bg-white/5')}>
+              تراكم التغطية الإعلامية</button>
+          </div>
+        </fieldset>
         <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
           <div className="rounded-lg bg-cyan-200/10 p-2"><strong className="block text-lg text-cyan-200">{archive?.totalReportRows??'—'}</strong>إجمالي الفترة*</div>
           <div className="rounded-lg bg-white/5 p-2"><strong className="block text-lg">{selected?.recordedReports??'—'}</strong>تقارير الدفعة*</div>
-          <div className="rounded-lg bg-white/5 p-2"><strong className="block text-lg">{selected?.sampledReports??'—'}</strong>العيّنة المعروضة</div>
+          <div className="rounded-lg bg-white/5 p-2"><strong className="block text-lg">{archive?reportRows.length:'—'}</strong>العيّنة المعروضة</div>
         </div>
         <div className="rounded-lg border border-amber-300/25 bg-amber-300/5 p-2.5 text-[11px] leading-5 text-amber-100/90">
           <strong className="block">حدود الدلالة والتحقق</strong>
-          البقع تمثل بلاغات مرمّزة تلقائيًا حسب زمن نشر الملف في خلايا تقريبية ٣ درجات.
+          البقع تمثل بلاغات مرمّزة تلقائيًا حسب زمن نشر الملف في خلايا تقريبية ٣ درجات. وضع التراكم يضيف التقارير الواردة منذ أول نافذة متاحة، ولا يُظهر توسعًا جغرافيًا للصراع.
           ليست خريطة سيطرة أو تقدم جبهات أو تحركات قوات أو إثبات مسؤولية.
           {sampled?' تُعرض عينة محدودة بأحدث ٢٠٠ سجل، ولا تمثل جميع أحداث النافذة.':''}
         </div>
@@ -218,9 +234,9 @@ export default function ConflictEvolutionPage(){
         <section aria-label="الأدلة المصدرية للّقطة">
           <h3 className="text-sm font-bold">الأدلة المرتبطة باللقطة</h3>
           <p className="mt-1 text-[11px] text-white/60">روابط مصدرية لا تعني التحقق المستقل؛ الناشرون المتعددون قد ينقلون خبرًا واحدًا.</p>
-          {selected?.sampleRows.length
+          {reportRows.length
             ?<div className="mt-2 max-h-[225px] space-y-2 overflow-auto">
-              {selected.sampleRows.slice(0,12).map(row=><div key={row.id} className="rounded-md bg-white/5 p-2 text-[11px]">
+              {reportRows.slice(0,12).map(row=><div key={row.id} className="rounded-md bg-white/5 p-2 text-[11px]">
                 <div>{LABELS[row.category]||'ترميز خبري'} · {row.place||row.country||'موقع تقريبي'}</div>
                 <div className="mt-1 flex justify-between gap-2 text-[10px] text-white/60">
                   <span>{row.publisherCoverage==='multi-source-report'?'عدة ناشرين':'ناشر واحد'}</span>
