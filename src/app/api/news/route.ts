@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { mergePublicNews, type PublicNewsRow } from '@/lib/publicNewsFusion';
 
 /**
  * M3TM.WORLD — Public News Aggregation API
@@ -17,7 +18,8 @@ const DEFAULT_TELEGRAM_CHANNELS = [
 const configuredChannels = (process.env.M3TM_WORLD_TELEGRAM_CHANNELS || '')
   .split(',')
   .map(channel => channel.trim().replace(/^@/, ''))
-  .filter(Boolean);
+  .filter(channel => /^[a-zA-Z0-9_]{5,32}$/.test(channel))
+  .slice(0, 8);
 
 const TELEGRAM_CHANNELS = configuredChannels.length > 0
   ? configuredChannels
@@ -26,6 +28,7 @@ const TELEGRAM_CHANNELS = configuredChannels.length > 0
 const FALLBACK_FEEDS = {
   BBC: 'https://feeds.bbci.co.uk/news/world/rss.xml',
   AlJazeera: 'https://www.aljazeera.com/xml/rss/all.xml',
+  BBCArabic: 'https://feeds.bbci.co.uk/arabic/rss.xml',
   GDACS: 'https://www.gdacs.org/xml/rss.xml'
 };
 
@@ -74,7 +77,7 @@ function parseTelegramHTML(html: string, channel: string): any[] {
     const dateRegex = /<a class="tgme_widget_message_date" href="(https:\/\/t\.me\/[^"]+)".*?<time datetime="([^"]+)"/i;
     const dateMatch = blockHtml.match(dateRegex);
     const link = dateMatch ? dateMatch[1] : `https://t.me/${channel}`;
-    const pubDate = dateMatch ? dateMatch[2] : new Date().toISOString();
+    const pubDate = dateMatch ? dateMatch[2] : ''; // Unknown must not become a fresh alert.
 
     const title = text.split('\n')[0].substring(0, 100);
 
@@ -102,7 +105,7 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
       title: title.length > 100 ? title.substring(0, 100) + '...' : title,
       description: desc,
       link: getTag('link'),
-      pubDate: getTag('pubDate') || new Date().toISOString(),
+      pubDate: getTag('pubDate') || '',
       source: sourceName
     });
   }
@@ -111,6 +114,9 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 
 export async function GET() {
   try {
+    const primaryNews: PublicNewsRow[] = [];
+    let primaryTimestamp: string | null = null;
+    let appOk = false;
     // M3TM.APP already publishes a sanitized, source-backed Arabic feed. Reuse
     // that public contract first so the standalone WORLD surface and the APP
     // embed speak the same language and do not independently reinterpret news.
@@ -120,6 +126,7 @@ export async function GET() {
         next: { revalidate: 60 },
       });
       if (published.ok) {
+        appOk = true;
         const payload = await published.json() as { items?: unknown; fetchedAt?: unknown };
         const fetchedAt = typeof payload.fetchedAt === 'string'
           ? payload.fetchedAt
@@ -158,17 +165,8 @@ export async function GET() {
           };
         });
         if (news.length > 0) {
-          return NextResponse.json({
-            news,
-            total: news.length,
-            timestamp: fetchedAt,
-            language: 'ar',
-            source: 'M3TM.APP public feed',
-          }, {
-            headers: {
-              'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-            },
-          });
+          primaryNews.push(...news as PublicNewsRow[]);
+          primaryTimestamp = fetchedAt;
         }
       }
     } catch {
@@ -194,8 +192,9 @@ export async function GET() {
       if (result.status === 'fulfilled') allArticles.push(...result.value);
     }
 
-    // FAILSAFE: If Telegram completely blocks the IP, fall back to traditional RSS
-    if (allArticles.length === 0) {
+    // Independent, bounded RSS desks are sampled alongside Telegram, not only
+    // when all channels fail. Publisher plurality is NOT independent confirmation.
+    { 
       const fallbackPromises = Object.entries(FALLBACK_FEEDS).map(async ([source, url]) => {
         try {
           const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -211,9 +210,10 @@ export async function GET() {
       }
     }
 
-    const newsItems = allArticles.map(article => {
+    const newsItems:PublicNewsRow[] = allArticles.map(article => {
       const riskScore = scoreRisk(article.description || article.title);
-      const coords = findCoords(article.description || article.title);
+      // A mentioned country is not a verifiable incident coordinate.
+      // Keep the inferred match available only as a text-context basis.
 
       return {
         id: crypto.createHash('md5').update((article.link || '') + (article.pubDate || '')).digest('hex'),
@@ -222,24 +222,32 @@ export async function GET() {
         link: article.link,
         published: article.pubDate,
         source: article.source,
-        risk_score: riskScore,
-        coords: coords ? [coords[0], coords[1]] : null,
-        coords_default: !coords,
+        risk_score: Math.min(5, riskScore),
+        risk_basis: 'keyword-only',
+        coords: null,
+        coords_default: true,
         language: 'source',
         feed_origin: 'independent-fallback',
-        location_basis: coords ? 'keyword-context' : 'none',
+        location_basis: findCoords(article.description || article.title) ? 'keyword-context' : 'none',
         verification_status: 'source-reported',
         machine_assessment: null,
       };
     });
 
-    newsItems.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
-
+    const fused=mergePublicNews([...primaryNews,...newsItems],200);
     return NextResponse.json({
-      news: newsItems,
-      total: newsItems.length,
-      timestamp: new Date().toISOString(),
-      source: allArticles.length ? 'Telegram / RSS independent fallback' : 'none',
+      news: fused,
+      total: fused.length,
+      timestamp: primaryTimestamp || new Date().toISOString(),
+      language: primaryNews.length ? 'mixed-arabic-primary' : 'source',
+      source: primaryNews.length ? 'M3TM.APP + public RSS/Telegram evidence' :
+        (allArticles.length ? 'public RSS/Telegram fallback' : 'none'),
+      source_health: {
+        app: appOk ? (primaryNews.length ? 'data' : 'empty') : 'unavailable',
+        rss_telegram: allArticles.length ? 'partial-sampled' : 'empty-or-unavailable',
+        // Empty and unreachable are intentionally not treated as "no events".
+        coverage: 'partial',
+      },
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
