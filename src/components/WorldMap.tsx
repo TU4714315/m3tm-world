@@ -978,17 +978,31 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#EC407A', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
 
+      // Group regionalized news reports visually, NOT field-confirmed incidents.
+      map.addLayer({id:'app-news-clusters',type:'circle',source:'app-news',
+        filter:['has','point_count'],paint:{
+          'circle-color':'#0B6369',
+          'circle-radius':['step',['get','point_count'],15,5,20,20,26],
+          'circle-opacity':0.88,'circle-stroke-color':'#7FF3E9','circle-stroke-width':2,
+        }});
+      map.addLayer({id:'app-news-cluster-count',type:'symbol',source:'app-news',
+        filter:['has','point_count'],
+        layout:{'text-field':['to-string',['get','point_count']],
+          'text-font':['Open Sans Bold'],'text-size':11,'text-allow-overlap':true},
+        paint:{'text-color':'#FFFFFF'},
+      });
+
       // Only published M3TM.APP news with source-provided, generalized location.
-      map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', paint: {
+      map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', filter:['!', ['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,16, 10,22],
         'circle-color': '#5CD9CE', 'circle-opacity': 0.11, 'circle-blur': 1,
       }});
-      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', paint: {
+      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', filter:['!', ['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,7, 10,10],
-        'circle-color': '#5CD9CE', 'circle-opacity': 0.86,
+        'circle-color': ['case',['>=',['coalesce',['get','publisherCount'],1],2],'#F4C36B','#5CD9CE'], 'circle-opacity': 0.86,
         'circle-stroke-width': 1.3, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.45,
       }});
-      map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', minzoom: 4, layout: {
+      map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', minzoom: 4, filter:['!', ['has','point_count']], layout: {
         'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.7], 'text-max-width': 13, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#5CD9CE', 'text-halo-color': '#000', 'text-halo-width': 1 }});
@@ -1474,7 +1488,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
+      'gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','app-news-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -2024,7 +2038,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','app-news-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2269,18 +2283,54 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       });
     });
 
+    map.on('click','app-news-clusters',e=>{
+      const feature=e.features?.[0];
+      if(!feature || feature.geometry.type!=='Point')return;
+      const coords=feature.geometry.coordinates as [number,number];
+      const id=Number(feature.properties?.cluster_id);
+      const source=map.getSource('app-news') as maplibregl.GeoJSONSource|undefined;
+      if(!Number.isSafeInteger(id)||!source||
+        typeof source.getClusterExpansionZoom!=='function')return;
+      void source.getClusterExpansionZoom(id).then(zoom=>{
+        if(map.isStyleLoaded()){
+          map.easeTo({center:coords,
+            zoom:Math.min(11,Math.max(map.getZoom()+1,zoom)),duration:250});
+        }
+      }).catch(()=>{/* Cluster remains visible when zoom resolution fails. */});
+    });
+
     // Source-backed article detail; unlike the broadcast layer, clicking a
     // news pin opens a sourced article, not an invented video feed.
     map.on('click', 'app-news-dots', e => {
       const p = e.features?.[0]?.properties;
       if (!p) return;
       const coords = (e.features![0].geometry as any).coordinates;
-      popup(coords, `<div style="${pStyle}border:1px solid rgba(92,217,206,0.4);">
-        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر منشور من M3TM.APP</div>
+      let evidence:Array<{publisher:string;url:string}>=[];
+      try{
+        const parsed=JSON.parse(String(p.evidenceLinks||'[]'));
+        if(Array.isArray(parsed)){
+          evidence=parsed.filter(item=>item&&typeof item.publisher==='string'&&
+            typeof item.url==='string'&&/^https?:\/\//i.test(item.url)).slice(0,6);
+        }
+      }catch{/* An invalid report must not break the map. */}
+      const evidenceHtml=evidence.map((item,i)=>`<a href="${htmlEsc(urlSafe(item.url))}"
+          target="_blank" rel="noopener noreferrer"
+          style="${linkStyle}display:block;color:#9AE9E3;margin-top:5px;"
+          >${i+1}. ${htmlEsc(item.publisher)} ↗</a>`).join('');
+      const coverage=Number(p.publisherCount)>1
+        ? 'عدة ناشرين؛ لا تثبت استقلالية التأكيد'
+        : 'بلاغ أولي من ناشر واحد';
+      popup(coords, `<div dir="rtl" style="${pStyle}border:1px solid rgba(92,217,206,0.4);">
+        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر مُسنَد من M3TM.APP</div>
         <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'خبر')}</div>
         <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
-        <p style="font-size:8px;color:#A0A0A0;">موقع إقليمي معمّم 0.5°، وليس تحديدًا دقيقًا لمكان الواقعة. المحتوى منسوب لناشره.</p>
-        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">فتح الخبر المنشور ↗</a>` : ''}
+        <p style="font-size:10px;color:#F4C36B;">${coverage}</p>
+        <p style="font-size:8px;color:#A0A0A0;">الموقع مأخوذ من تغذية APP المنشورة
+          ومُعمّم إلى 0.5°، وليس إثباتًا ميدانيًا للواقعة.</p>
+        ${evidenceHtml ||
+          (p.url ? `<a href="${htmlEsc(urlSafe(p.url))}" target="_blank"
+            rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">
+            قراءة المصدر الأصلي ↗</a>` : '')}
       </div>`);
     });
 
@@ -2898,7 +2948,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       ? data.app_news.map((n: any) => ({
           type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
           properties: { id: n.id, title: n.title, source: n.source,
-            url: n.url, published: n.published, precision: n.precision },
+            url: n.url, published: n.published, precision: n.precision,
+            publisherCount: n.publisherCount, evidenceLabel: n.evidenceLabel,
+            evidenceLinks: JSON.stringify(n.evidenceLinks||[]) },
         }))
       : []);
   }, [mapReady, data.app_news, (activeLayers as any).app_news, setGeo]);
