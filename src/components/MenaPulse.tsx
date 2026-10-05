@@ -20,6 +20,10 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
   data:any;stale?:boolean;publishedAt?:string|null;onFocus:()=>void;
 }){
   const [period,setPeriod]=useState<FusionWindow>('h24');
+  const [archiveCoverage,setArchiveCoverage]=useState<{
+    observedWindows:number;expectedWindows:number;coveragePercent:number;
+    durable:boolean;firstSeenLagMinutes:{p50:number|null;p95:number|null};
+  }|null>(null);
   const [nowMs,setNowMs]=useState(()=>Date.now());
   // A failed refresh leaves data object identity unchanged. Keep source age,
   // time-window cohorts and stale warnings moving while the desk is open.
@@ -29,6 +33,16 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     const id=window.setInterval(tick,60_000);
     document.addEventListener('visibilitychange',onVisible);
     return ()=>{window.clearInterval(id);document.removeEventListener('visibilitychange',onVisible);};
+  },[]);
+  useEffect(()=>{
+    let live=true;
+    const load=()=>fetch('/api/source-coverage')
+      .then(r=>r.ok?r.json():null)
+      .then(r=>{if(live&&r?.sampling==='observed-export-checkpoints')setArchiveCoverage(r);})
+      .catch(()=>{if(live)setArchiveCoverage(null);});
+    load();
+    const id=window.setInterval(load,5*60_000);
+    return ()=>{live=false;window.clearInterval(id);};
   },[]);
   const sourceTime=publishedAt??gdeltWindowTime(data.conflict_source_status?.gdelt?.window||'');
   const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime,nowMs),[data,sourceTime,nowMs]);
@@ -100,6 +114,12 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <p className="text-[11px] leading-5 text-white/85">GDELT الأحداث والاضطرابات: {standaloneFreshness} · {timestamp(standaloneTime)}</p>
       <p className="text-[10px] text-white/65">زمن دفعة النزاعات: {src.publishedAgeMinutes===null?'غير معلوم':`${src.publishedAgeMinutes} دقيقة`} · زمن دفعة الأحداث: {standaloneAge===null?'غير معلوم':`${standaloneAge} دقيقة`}</p>
       <p className="text-[10px] text-white/65">بلاغ بلا تاريخ صالح: {radar.coverage.invalidDates} · دون رابط مباشر: {radar.coverage.missingLinks}</p>
+      <div className="mt-1.5 rounded-md border border-white/10 bg-black/25 p-2 text-[10px] leading-5 text-white/80" aria-label="سجل جودة استقبال ملفات GDELT">
+        <strong className="text-cyan-100">تغطية استقبال ملفات GDELT خلال ٧ أيام</strong>
+        <p>نوافذ موثقة: {archiveCoverage?.observedWindows ?? '—'} / {archiveCoverage?.expectedWindows ?? 672} ({archiveCoverage?.coveragePercent ?? 0}%)</p>
+        <p>التخزين: {archiveCoverage?.durable ? 'دائم' : 'مؤقت/غير مهيأ'} · تأخر أول وصول للخادم P95: {archiveCoverage?.firstSeenLagMinutes.p95 ?? '—'} دقيقة</p>
+        <p className="text-amber-100/75">القياس يخص استقبال ملفات النشر، وليس أرشيف حوادث كاملًا أو زمن عرض البلاغ للمستخدم.</p>
+      </div>
       <p className="mt-1 text-[10px] leading-4 text-white/65">
         ACLED: {src.acledStatus==='restricted_recency'
           ? `صلاحية تاريخية فقط (حتى ${acled?.access?.latestPermittedEventDate||'تاريخ غير متاح'})`

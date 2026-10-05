@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { buildGdeltReportedRoutes, publisherCoverage, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { gdeltWindowTime, isMiddleEastBelt } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
+import { observeGdeltWindow } from '@/lib/gdeltCoverageLedger';
 
 export const maxDuration = 60;
 
@@ -58,6 +59,9 @@ export async function GET(req: Request) {
 
   try {
     const { events, window, scanned } = await fetchGdeltEvents({ quads, minArticles, limit, regionalPriority: 'middle-east' });
+    // Preserve exactly which 15-minute source export was *actually* decoded.
+    // This is metadata sampling, not a fake seven-day event history.
+    await observeGdeltWindow(window);
     const reportedRoutes = buildGdeltReportedRoutes(events);
     const publicEvents = events.map(toPublicGdeltEvent);
     const payload = {
