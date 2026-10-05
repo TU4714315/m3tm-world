@@ -37,7 +37,7 @@ describe('flight process-cache fallback',()=>{
     expect(text).not.toContain('trajectory');
   });
   it('keeps a safe degraded fallback when no aggregate is available',()=>{
-    const out=markCachedFlightDataStale({source:'regional',military_activity:[],military_activity_meta:{}});
+    const out=markCachedFlightDataStale({source:'regional',military_activity:[],military_activity_meta:{stale_fallback:false}});
     expect(out.military_activity).toHaveLength(0);
     expect(out.military_activity_meta.stale_fallback).toBe(true);
   });
