@@ -6,6 +6,7 @@ import * as maplibregl from 'maplibre-gl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
+import { publicClusterOptions } from '@/lib/map-visual-density';
 import { syncEtopo2022Relief } from '@/lib/etopo-relief';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
 import { MAP_DEFAULTS, MAP_PALETTE_KEYS, readMapPalette, satColorFor, type MapPalette } from '@/lib/map-palette';
@@ -352,8 +353,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       // Clusters group only the *visual* symbol footprints. Public records
       // and source attribution are retained and expand on zoom.
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
-        ...(s === 'gdelt-events' || s === 'civil-unrest'
-          ? { cluster: true, clusterRadius: 48, clusterMaxZoom: 6 } : {}),
+        ...publicClusterOptions(s),
       }));
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
@@ -540,7 +540,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             'aerial_attack','evt-air','heavy_weapons','evt-heavy',
             'bombing','evt-bomb','armed_clash','evt-clash','mass_violence','evt-mass',
             'assault','evt-assault','material_conflict','evt-conflict','evt-other']],
-        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.72, 5,0.84, 10,0.98],
+        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.82, 5,0.98, 10,1.12],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }, paint: { 'icon-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.45,1] }});
       map.addLayer({ id: 'conflict-icons', type: 'symbol', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], layout: {
@@ -623,7 +623,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
 
       // Day/Night
-      map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': isGhost ? '#0D0030' : '#000022', 'fill-opacity': 0.35 }});
+      map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': isGhost ? '#0D0030' : '#000022', 'fill-opacity': 0.22 }});
 
       // Earthquakes — amber threat spectrum
       map.addLayer({ id: 'eq-circles', type: 'circle', source: 'earthquakes', paint: {
@@ -641,19 +641,35 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-color': '#E65100', 'circle-opacity': 0.45, 'circle-blur': 0.5,
       }});
 
-      // CCTV — outer glow ring (black/white depending on theme)
-      map.addLayer({ id: 'cctv-glow', type: 'circle', source: 'cctv', paint: {
+      // Compact, countable camera locations at continental/country scale.
+      // Every original camera stays in GeoJSON and expands on zoom.
+      map.addLayer({ id: 'cctv-clusters', type: 'circle', source: 'cctv',
+        filter: ['has','point_count'], paint: {
+          'circle-radius': ['step',['get','point_count'],15,10,19,50,24,200,29],
+          'circle-color': cameraColor, 'circle-opacity': 0.83,
+          'circle-stroke-color': '#06201C', 'circle-stroke-width': 2,
+        }});
+      map.addLayer({ id: 'cctv-cluster-count', type: 'symbol', source: 'cctv',
+        filter: ['has','point_count'], layout: {
+          'text-field':['get','point_count_abbreviated'],'text-size':12,
+          'text-font':['Open Sans Bold'],'text-allow-overlap':true,
+        }, paint: {
+          'text-color':'#031812','text-halo-color':'#EAFFF3','text-halo-width':0.8,
+        }});
+      // Original cameras remain individually clickable at street zoom.
+      map.addLayer({ id: 'cctv-glow', type: 'circle', source: 'cctv',
+        filter: ['!', ['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,5, 5,8, 10,14, 14,20],
         'circle-color': '#000000', 'circle-opacity': 0.35, 'circle-blur': 1,
       }});
       // CCTV — main dot
-      map.addLayer({ id: 'cctv-dots', type: 'circle', source: 'cctv', paint: {
+      map.addLayer({ id: 'cctv-dots', type: 'circle', source: 'cctv', filter: ['!', ['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,3, 5,5, 10,8, 14,12],
         'circle-color': cameraColor, 'circle-opacity': 0.9,
         'circle-stroke-width': 2.5, 'circle-stroke-color': '#000000', 'circle-stroke-opacity': 0.9,
       }});
       // CCTV — labels at zoom 10+
-      map.addLayer({ id: 'cctv-label', type: 'symbol', source: 'cctv', minzoom: 10, layout: {
+      map.addLayer({ id: 'cctv-label', type: 'symbol', source: 'cctv', minzoom: 10, filter: ['!', ['has','point_count']], layout: {
         'text-field': ['get','name'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': cameraColor, 'text-halo-color': '#000000', 'text-halo-width': 1.5, 'text-opacity': 0.8 }});
@@ -763,7 +779,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'WF','incident-wf', 'WILDFIRE','incident-wf',
           'DR','incident-dr', 'DROUGHT','incident-dr',
           'incident-other'],
-        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.72, 5,0.84, 10,0.98],
+        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.82, 5,0.98, 10,1.12],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
 
@@ -808,7 +824,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             'bombing','evt-bomb','armed_clash','evt-clash',
             'mass_violence','evt-mass','assault','evt-assault',
             'material_conflict','evt-conflict','evt-other']],
-        'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
+        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.82, 4,0.94, 7,1.08, 12,1.16],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
 
@@ -818,7 +834,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       }});
       map.addLayer({ id: 'civil-unrest-icons', type: 'symbol', source: 'civil-unrest', filter:['!',['has','point_count']], layout: {
         'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],'evt-unrest-prelim','evt-unrest'],
-        'icon-size': ['interpolate',['linear'],['get','articles'], 1,0.72, 10,0.82, 50,0.94, 200,1.06],
+        'icon-size': ['interpolate',['linear'],['zoom'], 1,0.82, 4,0.94, 7,1.08, 12,1.16],
         'icon-allow-overlap': false, 'icon-padding': 2,
       }});
 
@@ -1454,7 +1470,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-event-clusters','civil-unrest-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
+      'gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1642,7 +1658,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     })
 
     // Clusters are publication counts, never verified air-strike locations.
-    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters']) {
+    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters','cctv-clusters']) {
       map.on('click',layer,e=>{
         const geom=e.features?.[0]?.geometry;
         if (geom?.type !== 'Point') return;
@@ -1983,7 +1999,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2421,6 +2437,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       if (!mapReady || !mapRef.current) return;
       const map = mapRef.current;
       if (map.getLayer('cctv-dots')) map.setPaintProperty('cctv-dots', 'circle-color', palette.cctv);
+      if (map.getLayer('cctv-clusters')) map.setPaintProperty('cctv-clusters', 'circle-color', palette.cctv);
       if (map.getLayer('cctv-label')) map.setPaintProperty('cctv-label', 'text-color', palette.cctv);
     }, [mapReady, palette.cctv]);
 
@@ -3027,7 +3044,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['military-activity-halo','military-activity-dots','military-activity-label'], (activeLayers as any).military_activity);
     setVis(['naval-activity-halo','naval-activity-dots','naval-activity-label'], (activeLayers as any).naval_activity);
     setVis(['military-satellite-activity-halo','military-satellite-activity-dots','military-satellite-activity-label'], (activeLayers as any).sat_military);
-    setVis(['cctv-glow','cctv-dots','cctv-label'], activeLayers.cctv);
+    setVis(['cctv-glow','cctv-dots','cctv-label','cctv-clusters','cctv-cluster-count'], activeLayers.cctv);
     setVis(['fires-heat'], activeLayers.fires);
     setVis(['weather-glow','weather-dots','weather-label'], activeLayers.weather);
     setVis(['infra-glow','infra-dots','infra-label'], activeLayers.infrastructure);

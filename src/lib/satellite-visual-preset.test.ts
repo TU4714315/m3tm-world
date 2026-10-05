@@ -5,6 +5,10 @@ describe('satellite visualization presets', () => {
     expect(satelliteRasterPaint('original')['raster-contrast']).toBe(0.08);
     expect(satelliteRasterPaint('clarity')['raster-contrast']).toBeGreaterThan(0.08);
     expect(satelliteRasterPaint('bright')['raster-brightness-min']).toBeGreaterThan(0.03);
+    expect(satelliteRasterPaint('clarity')['raster-brightness-min']).toBeGreaterThanOrEqual(0.09);
+    expect(satelliteRasterPaint('clarity')['raster-brightness-max']).toBe(1);
+    expect(satelliteRasterPaint('bright')['raster-brightness-min'])
+      .toBeGreaterThan(satelliteRasterPaint('clarity')['raster-brightness-min']);
     for (const p of Object.values(SATELLITE_VISUAL_PRESETS)) {
       expect(p.opacity).toBeGreaterThanOrEqual(0);
       expect(p.opacity).toBeLessThanOrEqual(1);
