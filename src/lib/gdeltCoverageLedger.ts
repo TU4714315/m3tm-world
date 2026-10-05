@@ -120,10 +120,15 @@ async function remoteGdeltCoverage() {
     !Number.isFinite(data.expectedWindows))throw new Error('Invalid coverage provenance');
   return data;
 }
-export async function getGdeltCoverage(now = Date.now()) {
-  try{return await remoteGdeltCoverage();}catch{
-    // Preserve prior Redis source if Supabase cannot be reached. Never claim
-    // ephemeral Vercel process memory is a shared seven-day archive.
+export async function getGdeltCoverage(
+  now = Date.now(),
+  options: { allowRemote?: boolean } = {},
+) {
+  // An explicit offline mode makes synthetic-clock tests deterministic;
+  // production always attempts the public durable archive first.
+  if (options.allowRemote !== false) {
+    try { return await remoteGdeltCoverage(); }
+    catch { /* Keep independent GDELT and durable Redis fallback active. */ }
   }
   // Vercel route functions do not necessarily share the same memory.
   // Never present memory count=0 as observed full-week source failure.

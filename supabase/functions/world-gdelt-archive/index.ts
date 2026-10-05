@@ -140,21 +140,31 @@ async function ingest() {
   if (newest < now - 3 * 60 * 60_000)
     throw new Error('GDELT latest usable export is stale');
   const latest = stamp(new Date(newest)) + '.export.CSV.zip';
-  // Recheck all FOUR latest completed windows against persisted receipts:
-  // a later archive may become available before an earlier 404 is resolved.
-  // Never silently skip a missing GDELT release after newer ones succeed.
-  const start = newest - 3*SLOT_MS;
+  // Missing archives older than one hour must not disappear merely because
+  // the live GDELT manifest advanced. Scan bounded seven-day receipts; at
+  // most four downloads per run protect Edge time and source quota.
+  const earliest=Math.ceil((now-7*86400000)/SLOT_MS)*SLOT_MS;
   const stored = await db(
     'world_gdelt_export_windows?select=window_name&window_name=gte.' +
-    encodeURIComponent(stamp(new Date(start)) + '.export.CSV.zip') +
-    '&order=window_name.asc&limit=10'
+    encodeURIComponent(stamp(new Date(earliest))+'.export.CSV.zip') +
+    '&order=window_name.asc&limit=750'
   ) as Array<{window_name:string}>;
   const seen = new Set((stored||[]).map(row=>row.window_name));
+  const missing:number[]=[];
+  for(let t=earliest;t<=newest;t+=SLOT_MS){
+    if(!seen.has(stamp(new Date(t))+'.export.CSV.zip'))missing.push(t);
+  }
+  const recent=missing.filter(t=>t>=newest-2*SLOT_MS).reverse().slice(0,2);
+  const older=missing.filter(t=>t<newest-2*SLOT_MS);
+  // Rotate retries: a permanently unavailable ZIP cannot starve the backlog.
+  const offset=older.length?Math.floor(now/SLOT_MS)%older.length:0;
+  const historical=Array.from({length:Math.min(2,older.length)},
+    (_,i)=>older[(offset+i)%older.length]);
+  const targets=Array.from(new Set([...recent,...historical]));
   const ingested: Array<{window:string,regional:number,scanned:number}> = [];
   const errors: Array<{window:string,code:string}> = [];
-  for (let t=start; t<=newest; t+=SLOT_MS) {
-    const window = stamp(new Date(t)) + '.export.CSV.zip';
-    if(seen.has(window))continue;
+  for (const t of targets) {
+    const window=stamp(new Date(t))+'.export.CSV.zip';
     try {
       const sample=await boundedZip(window);
       await rpc('world_gdelt_commit_export', {
@@ -173,7 +183,10 @@ function percentiles(values: number[],p: number): number|null {
   return Number(v[Math.min(v.length-1,Math.ceil(v.length*p)-1)].toFixed(1));
 }
 async function publicCoverage() {
-  const cutoff = new Date(Date.now() - 7*86400000).toISOString();
+  // Grade the same delayed eligible slots that are actually counted.
+  const now=Date.now(),slot=SLOT_MS;
+  const dueThrough=Math.floor((now-30*60000)/slot)*slot;
+  const cutoff=new Date(dueThrough-(672-1)*slot).toISOString();
   const windows = await db(
     'world_gdelt_export_windows?select=window_name,published_at,first_observed_at,mena_rows,scanned_rows' +
     '&published_at=gte.'+encodeURIComponent(cutoff)+'&order=published_at.asc&limit=750'
@@ -185,12 +198,10 @@ async function publicCoverage() {
     status:'warming-up',
     note:'No source archives have been persisted yet. This is not evidence of a quiet region.',
   };
-  const now=Date.now(),slot=15*60_000;
-  const windowStart=Math.max(Math.floor((now-7*86400000)/slot)*slot+slot,
+  // The 30-minute delayed cutoff anchors BOTH ends of the week; an
+  // uninterrupted 7-day archive can reach 672/672 instead of 670/672.
+  const windowStart=Math.max(dueThrough-(672-1)*slot,
     asMillis(windows[0].window_name)??now);
-  // A source archive can appear 20-30 minutes after its nominal clock.
-  // Delay coverage grading by 30m; still show first persisted time accurately.
-  const dueThrough=Math.floor((now-30*60000)/slot)*slot;
   const expected=Math.max(0,Math.min(672,Math.floor((dueThrough-windowStart)/slot)+1));
   const valid=windows.filter(x=>{
     const t=asMillis(x.window_name);

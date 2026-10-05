@@ -4,7 +4,7 @@ import { summarizeGdeltCoverage, getGdeltCoverage } from './gdeltCoverageLedger'
 describe('GDELT 15-minute publication checkpoint ledger', () => {
   const now = Date.parse('2026-10-05T12:00:00Z');
   it('marks no shared storage as unverified instead of 0/672 source failure', async () => {
-    const r = await getGdeltCoverage(now);
+    const r = await getGdeltCoverage(now, { allowRemote: false });
     expect(r.sampling).toBe('unverifiable-without-persistence');
     expect(r.observedWindows).toBeNull();
     expect(r.coveragePercent).toBeNull();
