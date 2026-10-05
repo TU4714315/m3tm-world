@@ -62,6 +62,10 @@ describe('public WORLD source-backed layer projection', () => {
       military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5, trend: 'up', data_state: 'cached-stale', observed_at: '2026-10-03T04:00:00Z', age_seconds: 120, icao24: 'should-strip', token: 'strip-me' }],
       military_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, stale_fallback: true, cache_backend: 'redis', durable_cache_configured: true, internalEndpoint: 'http://10.0.0.4' },
       flight_source_status: { status: 'active', exact_military_tracks_exposed: false, hostToken: 'strip-me' },
+      gdelt_data_state: 'cached-stale',
+      gdelt_source_published_at: '2026-10-04T15:00:00Z',
+      conflict_data_state: 'live',
+      conflict_source_published_at: '2026-10-04T15:15:00Z',
       military_satellite_activity: [{ lat: 20, lng: 30, approximate_count: '3-5', noradId: '99999', name: 'strip-me' }],
       naval_activity: [{ id: 'naval-cell', lat: 3, lng: 105, level: 1, approximate_count: '2-4', cell_degrees: 6, mmsi: 'should-strip', name: 'strip-me', speed: 22, heading: 180 }],
       naval_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, speed_heading_exposed: false, internalEndpoint: 'http://10.0.0.6' },
@@ -76,6 +80,10 @@ describe('public WORLD source-backed layer projection', () => {
     expect(result.military_activity[0]).toMatchObject({ id: 'aggregate-cell', lat: 24, lng: 48, trend: 'up', data_state: 'cached-stale', age_seconds: 120 });
     expect(result.military_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, stale_fallback: true, cache_backend: 'redis', durable_cache_configured: true });
     expect(result.flight_source_status).toMatchObject({ status: 'active', exact_military_tracks_exposed: false });
+    expect(result.gdelt_data_state).toBe('cached-stale');
+    expect(result.conflict_data_state).toBe('live');
+    expect(result.gdelt_source_published_at).toBe('2026-10-04T15:00:00Z');
+    expect(result.conflict_source_published_at).toBe('2026-10-04T15:15:00Z');
     expect(result.military_satellite_activity[0]).toMatchObject({ lat: 20, lng: 30, approximate_count: '3-5' });
     expect(result.naval_activity[0]).toMatchObject({ id: 'naval-cell', lat: 3, lng: 105, approximate_count: '2-4', cell_degrees: 6 });
     expect(result.naval_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, speed_heading_exposed: false });

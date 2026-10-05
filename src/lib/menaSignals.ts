@@ -138,7 +138,11 @@ export function buildMenaFusionRadar(
     },
     airObservation: {
       regionalCells: airCells.length,
-      upwardOrNew: airCells.filter(cell=>cell.trend==='up'||cell.trend==='new').length,
+      upwardOrNew: airCells.filter(cell=>
+        cell.data_state!=='cached-stale' &&
+        data.military_activity_meta?.stale_fallback !== true &&
+        (cell.trend==='up'||cell.trend==='new')
+      ).length,
       staleCells,
       providerHealthy: providerHealthy === true ? true : providerHealthy === false ? false : null,
       staleFallback: data.military_activity_meta?.stale_fallback === true,

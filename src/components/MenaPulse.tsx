@@ -40,10 +40,22 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
   const unrest=visible.filter(e=>e.category==='civil_unrest').length;
   const acled=data.conflict_source_status?.acled;
   const src=radar.source;
-  const freshness=stale?'مخزون سابق'
+  const conflictCached=stale||data.conflict_data_state==='cached-stale';
+  const conflictFreshness=conflictCached?'آخر دفعة محفوظة'
     :src.publicationState==='fresh'?'دفعة حديثة'
     :src.publicationState==='delayed'?'تأخر دفعة المصدر'
-    :src.publicationState==='stale'?'دفعة قديمة':'لا يمكن تحديد زمن الدفعة';
+    :src.publicationState==='stale'?'دفعة قديمة':'وقت المصدر غير معلوم';
+  // /api/gdelt-events and /api/conflicts are independent requests/caches.
+  // A cached snapshot in one must not downgrade or freshen the other.
+  const standaloneTime=typeof data.gdelt_source_published_at==='string'
+    ?data.gdelt_source_published_at:null;
+  const rawStandaloneAge=Date.parse(standaloneTime||'');
+  const standaloneAge=Number.isFinite(rawStandaloneAge)&&rawStandaloneAge<=nowMs
+    ?Math.floor((nowMs-rawStandaloneAge)/60_000):null;
+  const standaloneFreshness=data.gdelt_data_state==='cached-stale'?'آخر دفعة محفوظة'
+    :standaloneAge===null?'وقت المصدر غير معلوم'
+    :standaloneAge<=30?'دفعة حديثة'
+    :standaloneAge<=120?'تأخر دفعة المصدر':'دفعة قديمة';
   return <section dir="rtl" aria-label="M3TM Fusion Radar للشرق الأوسط"
     className="glass-panel pointer-events-auto max-h-[min(76dvh,720px)] w-full overflow-y-auto styled-scrollbar rounded-xl border border-cyan-300/25 bg-black/80 p-3 text-white shadow-2xl">
     <header className="flex items-center justify-between gap-2 border-b border-cyan-300/20 pb-2">
@@ -84,8 +96,10 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     </div>
     <div className="mt-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.055] p-2">
       <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>سلامة وحداثة المصدر</strong>
-      <p className="mt-1 text-[11px] text-white/85">GDELT: {freshness} · تاريخ الدفعة: {timestamp(sourceTime)}</p>
-      <p className="text-[10px] text-white/65">زمن الدفعة: {src.publishedAgeMinutes===null?'غير معلوم':`${src.publishedAgeMinutes} دقيقة`} · سجل بلا تاريخ صالح: {radar.coverage.invalidDates} · دون رابط مباشر: {radar.coverage.missingLinks}</p>
+      <p className="mt-1 text-[11px] leading-5 text-white/85">GDELT النزاعات: {conflictFreshness} · {timestamp(sourceTime)}</p>
+      <p className="text-[11px] leading-5 text-white/85">GDELT الأحداث والاضطرابات: {standaloneFreshness} · {timestamp(standaloneTime)}</p>
+      <p className="text-[10px] text-white/65">زمن دفعة النزاعات: {src.publishedAgeMinutes===null?'غير معلوم':`${src.publishedAgeMinutes} دقيقة`} · زمن دفعة الأحداث: {standaloneAge===null?'غير معلوم':`${standaloneAge} دقيقة`}</p>
+      <p className="text-[10px] text-white/65">بلاغ بلا تاريخ صالح: {radar.coverage.invalidDates} · دون رابط مباشر: {radar.coverage.missingLinks}</p>
       <p className="mt-1 text-[10px] leading-4 text-white/65">
         ACLED: {src.acledStatus==='restricted_recency'
           ? `صلاحية تاريخية فقط (حتى ${acled?.access?.latestPermittedEventDate||'تاريخ غير متاح'})`
@@ -98,7 +112,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     </div>
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-2">
       <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري: وعي إقليمي مجمّع فقط</strong>
-      <p className="mt-1 text-[11px] text-white/80">مناطق منشورة مجمّعة: {radar.airObservation.regionalCells} · ارتفاع/ظهور تجميعي: {radar.airObservation.upwardOrNew} · بيانات قديمة: {radar.airObservation.staleCells}</p>
+      <p className="mt-1 text-[11px] text-white/80">مناطق منشورة مجمّعة: {radar.airObservation.regionalCells} · ارتفاع/ظهور بتجميع حي: {radar.airObservation.upwardOrNew} · بيانات قديمة: {radar.airObservation.staleCells}</p>
       <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
     </div>

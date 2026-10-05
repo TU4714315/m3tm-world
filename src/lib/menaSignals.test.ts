@@ -87,10 +87,11 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
       conflict_source_status:{acled:{status:'restricted_recency'},gdelt:{status:'ok'}},
     },null,now);
     expect(r.airObservation).toEqual({
-      regionalCells:2,upwardOrNew:1,staleCells:1,
+      regionalCells:2,upwardOrNew:0,staleCells:1,
       providerHealthy:false,staleFallback:true,mode:'aggregate-only',
     });
     expect(r.source.acledStatus).toBe('restricted_recency');
+    expect(r.airObservation.upwardOrNew).toBe(0); // stale trend must not become a fresh alert
     expect(buildMenaFusionRadar({
       military_activity_meta:{provider_healthy:false,stale_fallback:false},
     },null,now).airObservation.providerHealthy).toBeNull();
