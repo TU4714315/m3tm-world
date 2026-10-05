@@ -32,6 +32,7 @@ function timeAgo(dateStr: string): string {
   try {
     const date = new Date(dateStr);
     const diff = Date.now() - date.getTime();
+    if (!Number.isFinite(diff) || diff < -300000) return 'الزمن غير متاح';
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `منذ ${mins} د`;
     const hrs = Math.floor(mins / 60);
@@ -96,13 +97,13 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                     role="button"
                     tabIndex={0}
                     className="px-4 py-2.5 hover:bg-[var(--hover-accent)] transition-colors cursor-pointer"
-                    onClick={() => { if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); else setSelectedIdx(selectedIdx === i ? null : i); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); }}
+                    onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedIdx(selectedIdx === i ? null : i); } }}
                   >
                     {/* Top row: risk badge + source + time */}
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-mono font-bold tracking-widest ${getRiskClass(item.risk_score)}`}>
-                        {getRiskLabel(item.risk_score)}
+                        {item.risk_basis === 'keyword-only' ? 'مؤشر كلمات' : getRiskLabel(item.risk_score)}
                       </span>
                       <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
                         {item.source}
@@ -118,6 +119,7 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                           <MapPin className="w-2.5 h-2.5" />
                         </button>
                       )}
+                      {item.publication_count > 1 && <span title="تعدد قنوات نشر لا يعني تحققًا مستقلًا" className="text-[9px] text-amber-200">{item.publication_count} ناشرين ≠ تحقق</span>}
                       <span className="text-[9px] font-mono text-[var(--text-muted)] ml-auto">
                         {timeAgo(item.published)}
                       </span>
@@ -147,6 +149,14 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                           exit={{ height: 0, opacity: 0 }}
                           className="mt-2 overflow-hidden"
                         >
+                          <p className="mb-1 text-[10px] text-amber-100/75">{item.evidence_label || 'بلاغ منشور غير مؤكد مستقلًا'}</p>
+                          {Array.isArray(item.evidence_links) && item.evidence_links.slice(0,5).map((source: any, si: number) => (
+                            <a key={si} href={source.url} target="_blank" rel="noopener noreferrer"
+                               onClick={(e) => e.stopPropagation()}
+                               className="mb-1 block text-[10px] text-cyan-200 hover:underline">
+                              {source.publisher} · قراءة الأصل ↗
+                            </a>
+                          ))}
                           <a
                             href={item.link}
                             target="_blank"
