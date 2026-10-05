@@ -83,7 +83,7 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
         {lat:25,lng:47,trend:'steady',data_state:'live',trajectory:[1,2]} as never,
         {lat:40,lng:-75,trend:'new'} as never
       ],
-      military_activity_meta:{provider_healthy:false,stale_fallback:true},
+      military_activity_meta:{mode:'coarse-regional-aggregate',provider_healthy:false,stale_fallback:true},
       conflict_source_status:{acled:{status:'restricted_recency'},gdelt:{status:'ok'}},
     },null,now);
     expect(r.airObservation).toEqual({
@@ -91,6 +91,9 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
       providerHealthy:false,staleFallback:true,mode:'aggregate-only',
     });
     expect(r.source.acledStatus).toBe('restricted_recency');
+    expect(buildMenaFusionRadar({
+      military_activity_meta:{provider_healthy:false,stale_fallback:false},
+    },null,now).airObservation.providerHealthy).toBeNull();
     const output=JSON.stringify(r);
     expect(output).not.toContain('SECRET-CALLSIGN');
     expect(output).not.toContain('trajectory');

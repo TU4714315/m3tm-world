@@ -1,6 +1,6 @@
 'use client';
 
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {MapPinned, Radio, ExternalLink, Clock3, Plane, Waves, Activity, ShieldAlert} from 'lucide-react';
 import {
   buildMenaFusionRadar, gdeltWindowTime, FUSION_WINDOWS,
@@ -20,8 +20,18 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
   data:any;stale?:boolean;publishedAt?:string|null;onFocus:()=>void;
 }){
   const [period,setPeriod]=useState<FusionWindow>('h24');
+  const [nowMs,setNowMs]=useState(()=>Date.now());
+  // A failed refresh leaves data object identity unchanged. Keep source age,
+  // time-window cohorts and stale warnings moving while the desk is open.
+  useEffect(()=>{
+    const tick=()=>setNowMs(Date.now());
+    const onVisible=()=>{if(!document.hidden)tick();};
+    const id=window.setInterval(tick,60_000);
+    document.addEventListener('visibilitychange',onVisible);
+    return ()=>{window.clearInterval(id);document.removeEventListener('visibilitychange',onVisible);};
+  },[]);
   const sourceTime=publishedAt??gdeltWindowTime(data.conflict_source_status?.gdelt?.window||'');
-  const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime),[data,sourceTime]);
+  const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime,nowMs),[data,sourceTime,nowMs]);
   const visible=radar.events.filter(e=>e.ageMs!==null && e.ageMs<=FUSION_WINDOWS[period]);
   const preliminary=visible.filter(e=>!e.multiplePublishers).length;
   const multiple=visible.length-preliminary;
@@ -80,6 +90,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
         ACLED: {src.acledStatus==='restricted_recency'
           ? `صلاحية تاريخية فقط (حتى ${acled?.access?.latestPermittedEventDate||'تاريخ غير متاح'})`
           :src.acledStatus==='ok'?'مؤشرات تاريخية مرجعية حسب أحدث نافذة متاحة'
+          :src.acledStatus==='cached-stale'?'البيانات السابقة محفوظة؛ تعذّر تحديث ACLED'
           :src.acledStatus==='not_configured'?'حساب المصدر غير مهيأ'
           :src.acledStatus==='unavailable'?'المصدر غير متاح الآن':'حالة المصدر قيد التحقق'}
         {' '}<a href="https://acleddata.com/" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline">ACLED</a>

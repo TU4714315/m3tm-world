@@ -72,7 +72,7 @@ type MilitarySummaryCell = PublicEvent & {
 };
 type RadarData = Omit<RegionalData, 'military_activity'> & {
   military_activity?: MilitarySummaryCell[];
-  military_activity_meta?: { provider_healthy?: boolean; stale_fallback?: boolean };
+  military_activity_meta?: { mode?: string | null; provider_healthy?: boolean; stale_fallback?: boolean };
   conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
 };
 
@@ -114,7 +114,10 @@ export function buildMenaFusionRadar(
   const airCells = (data.military_activity || []).filter(
     cell => isMiddleEastBelt(cell.lat,cell.lng),
   );
-  const providerHealthy = data.military_activity_meta?.provider_healthy;
+  // publicLayerData sanitizes absent metadata to {provider_healthy:false},
+  // so false is meaningful only with an actual provider observation mode.
+  const providerHealthy = data.military_activity_meta?.mode === 'coarse-regional-aggregate'
+    ? data.military_activity_meta.provider_healthy : null;
   const staleCells = airCells.filter(cell=>cell.data_state==='cached-stale').length;
   return {
     ...summary,
