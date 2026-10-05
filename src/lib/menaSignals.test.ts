@@ -102,3 +102,38 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
     expect(output).not.toContain('secret');
   });
 });
+
+describe('M3TM independent APP published news witness',()=>{
+  const now=Date.parse('2026-10-05T04:00:00Z');
+  const pin={
+    id:'app-1',title:'منشور إخباري موثق الإسناد',
+    source:'M3TM.APP',url:'https://example.org/article',
+    published:'2026-10-05T03:30:00Z',
+    lat:24.5,lng:45.5,
+    precision:'regional-0.5deg' as const,
+    provenance:'M3TM.APP public feed' as const,
+    status:'source-reported' as const,
+  };
+  it('keeps published APP news separate from classified GDELT conflicts',async()=>{
+    const {buildMenaFusionRadar}=await import('./menaSignals');
+    const r=buildMenaFusionRadar({
+      app_news:[pin,{...pin,id:'second'},{
+        ...pin,id:'bad-source',provenance:'independent-fallback' as never
+      },{
+        ...pin,id:'old',published:'2025-10-04T03:30:00Z',url:'https://example.org/old'
+      },{
+        ...pin,id:'keyword',precision:'keyword-centroid' as never,url:'https://example.org/untrusted'
+      }],
+    },null,now);
+    expect(r.appNewsSignals).toHaveLength(1);
+    expect(r.appNewsLast24h).toBe(1);
+    expect(r.appNewsSignals[0]).toMatchObject({
+      title:pin.title,source:pin.source,url:pin.url,ageMs:30*60_000,
+    });
+    expect(r.events).toHaveLength(0);
+    expect(r.windows.h1).toBe(0);
+    expect(JSON.stringify(r.appNewsSignals)).not.toContain('lat');
+    expect(JSON.stringify(r.appNewsSignals)).not.toContain('lng');
+    expect(JSON.stringify(r.appNewsSignals)).not.toContain('keyword-centroid');
+  });
+});
