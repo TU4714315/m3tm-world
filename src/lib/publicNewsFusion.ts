@@ -83,3 +83,18 @@ export function mergePublicNews(raw:readonly PublicNewsRow[],limit=200):PublicNe
   })).sort((a,b)=>Date.parse(b.published)-Date.parse(a.published))
     .slice(0,Math.min(250,Math.max(1,Math.trunc(limit))));
 }
+
+
+/** Alerts are NOT all news: only timely, explicitly prioritized APP reporting.
+ * Keyword-based fallback/social posts never create breaking-alert severity.
+ */
+export function selectPublicHeadlineAlerts(
+  rows:readonly PublicNewsRow[],nowMs=Date.now(),limit=30,
+):PublicNewsRow[]{
+  return rows.filter(row=>{
+    const when=Date.parse(row.published);
+    return row.feed_origin==='m3tm-app'&&row.risk_basis!=='keyword-only'&&
+      row.risk_score>=6&&Boolean(publicUrl(row.link))&&
+      Number.isFinite(when)&&when<=nowMs+5*60_000&&nowMs-when<=3*60*60_000;
+  }).sort((a,b)=>Date.parse(b.published)-Date.parse(a.published)).slice(0,limit);
+}
