@@ -34,3 +34,7 @@ Sources: https://www.worldmonitor.app/ ; https://www.worldmonitor.app/sources/mi
 
 ## Restrictions
 Do not copy AGPL code into M3TM without license-compliant adoption decision. No military exact tracks/flight identifiers, near-real-time force positions, dynamic target filtering, or unlicensed raw ACLED. OSINT tools remain private and gated. Maintain existing layer catalogue and no-op/deployment quota policy.
+
+
+## Production parity correction (2026-10-05)
+Vercel deploy of PR #66 returned /api/source-coverage backend=memory 0/672 while /api/gdelt-events returned 235 actual rows. The reader and writer are distinct serverless function instances: memory counters cannot provide a consistent joint timeline. A following correction returns an explicit `unverifiable-without-persistence` status and NULL coverage counts until a working shared KV/Redis storage is configured. Never present 0 as a source outage or as a seven-day observation baseline.

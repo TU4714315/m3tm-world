@@ -21,7 +21,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
 }){
   const [period,setPeriod]=useState<FusionWindow>('h24');
   const [archiveCoverage,setArchiveCoverage]=useState<{
-    observedWindows:number;expectedWindows:number;coveragePercent:number;
+    observedWindows:number|null;expectedWindows:number;coveragePercent:number|null;
     durable:boolean;firstSeenLagMinutes:{p50:number|null;p95:number|null};
   }|null>(null);
   const [nowMs,setNowMs]=useState(()=>Date.now());
@@ -38,7 +38,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
     let live=true;
     const load=()=>fetch('/api/source-coverage')
       .then(r=>r.ok?r.json():null)
-      .then(r=>{if(live&&r?.sampling==='observed-export-checkpoints')setArchiveCoverage(r);})
+      .then(r=>{if(live&&r?.expectedWindows===672)setArchiveCoverage(r);})
       .catch(()=>{if(live)setArchiveCoverage(null);});
     load();
     const id=window.setInterval(load,5*60_000);
@@ -116,8 +116,10 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <p className="text-[10px] text-white/65">بلاغ بلا تاريخ صالح: {radar.coverage.invalidDates} · دون رابط مباشر: {radar.coverage.missingLinks}</p>
       <div className="mt-1.5 rounded-md border border-white/10 bg-black/25 p-2 text-[10px] leading-5 text-white/80" aria-label="سجل جودة استقبال ملفات GDELT">
         <strong className="text-cyan-100">تغطية استقبال ملفات GDELT خلال ٧ أيام</strong>
-        <p>نوافذ موثقة: {archiveCoverage?.observedWindows ?? '—'} / {archiveCoverage?.expectedWindows ?? 672} ({archiveCoverage?.coveragePercent ?? 0}%)</p>
-        <p>التخزين: {archiveCoverage?.durable ? 'دائم' : 'مؤقت/غير مهيأ'} · تأخر أول وصول للخادم P95: {archiveCoverage?.firstSeenLagMinutes.p95 ?? '—'} دقيقة</p>
+        {archiveCoverage?.durable
+          ? <><p>نوافذ موثقة: {archiveCoverage.observedWindows} / {archiveCoverage.expectedWindows} ({archiveCoverage.coveragePercent}%)</p>
+             <p>تأخر أول وصول للخادم P95: {archiveCoverage.firstSeenLagMinutes.p95 ?? '—'} دقيقة</p></>
+          : <p className="text-amber-100/80">تعذّر قياس تغطية الأسبوع: التخزين المشترك Redis/KV غير مهيأ أو متعثر؛ لا يعني ذلك انقطاع الأخبار.</p>}
         <p className="text-amber-100/75">القياس يخص استقبال ملفات النشر، وليس أرشيف حوادث كاملًا أو زمن عرض البلاغ للمستخدم.</p>
       </div>
       <p className="mt-1 text-[10px] leading-4 text-white/65">

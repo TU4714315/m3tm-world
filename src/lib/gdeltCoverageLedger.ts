@@ -104,8 +104,17 @@ export function summarizeGdeltCoverage(rows: Observation[], now = Date.now(), ba
   };
 }
 export async function getGdeltCoverage(now = Date.now()) {
-  const local = () => summarizeGdeltCoverage(
-    [...seen].map(([window, firstObservedAt]) => ({ window, firstObservedAt })), now);
+  // Vercel route functions do not necessarily share the same memory.
+  // Never present memory count=0 as observed full-week source failure.
+  const local = () => ({
+    ...summarizeGdeltCoverage([], now),
+    observedWindows: null,
+    missingWindows: null,
+    coveragePercent: null,
+    firstSeenLagMinutes: { p50: null, p95: null },
+    sampling: 'unverifiable-without-persistence' as const,
+    limitations: 'Shared Redis/KV storage is required to measure archive coverage across serverless functions.',
+  });
   if (!redisConfig()) return local();
   try {
     const result = await redis('', ['ZRANGE', KEY, 0, -1, 'WITHSCORES']) as { result?: unknown; error?: string };
