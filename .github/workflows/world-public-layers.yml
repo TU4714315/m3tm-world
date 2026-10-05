@@ -24,6 +24,9 @@ on:
       - 'src/components/SearchBar.tsx'
       - 'src/app/api/region-dossier/**'
       - 'src/lib/satellite-layer*'
+      - 'src/lib/menaSignals*'
+      - 'src/components/MenaPulse.tsx'
+      - 'docs/M3TM_FUSION_RADAR_2026.md'
       # ACLED/conflict and handoff/source provenance changes require full checks.
       - 'src/lib/acled*'
       - 'src/app/api/conflicts/**'

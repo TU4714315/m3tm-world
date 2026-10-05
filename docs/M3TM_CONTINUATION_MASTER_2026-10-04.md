@@ -22,6 +22,30 @@
 - #59 repaired ACLED same-column filter and aggregate diagnostics, introduced WORLD `AGENTS.md` and this continuation entry, and aligned active WORLD favicon/PWA/browser imagery with canonical APP M3TM mark; merged `c72839eff4ac5f9ca91ebae8a42ae9c1e94d1d9b`.
 - #60 uses official ACLED `timestamp` for weekly releases (last 10 days) separated from `event_date` (last 35 days), preserving 7-day occurrence counts; merged `ac718030ea4e79aeacc8a22b0292811d79527b18`. **Crucial confirmed blocker**: the account's own myACLED `data_query_restrictions.date_recency` reports last permitted occurrence `2025-10-05`, `12 Months old`. An unrestricted tiny query returns data but Sept–Oct 2026 occurrence returns zero: this is an upstream **account entitlement**, not an auth or frontend error. Current patch marks this historical-only state explicitly; never bypass licensing. For recent ACLED disaggregated events owner must request Access Team upgrade; GDELT continues live. Read `docs/ACLED_PUBLIC_SOURCE_CONTRACT_2026-10-04.md` for source semantics and limitations. The source may remain empty owing to upstream recency/license; do not fake records.
 
+## 2026-10-05 — M3TM Fusion Radar benchmark and deliverable
+- **New original M3TM-owned code**, not WorldMonitor AGPL sources, adds source-publication freshness thresholds, 1h/6h/24h/7d source-coded report windows, preceding-6h comparison, coverage gaps and coarse regional aviation status. See `docs/M3TM_FUSION_RADAR_2026.md`. All military identities and per-cell details stay excluded from the summary.
+- Baseline WORLD main verified before this new work: `325a626e2f5b9c8801580c2240890505e50e8b91`; benchmark against the current source rather than previous handoff counts. **Do not claim superiority** absent same-region/same-period timed samples and provider reachability evidence.
+
+## CHECKPOINT — M3TM Fusion Radar v1 (2026-10-05)
+
+**TASK:** Independent M3TM-branded event evidence/time-quality radar benchmarked against WorldMonitor public claims, with regional rather than operational military aviation.
+
+**DONE:**
+- Branch `feat/m3tm-fusion-radar-evidence-20261005`, PR #62. Added `buildMenaFusionRadar` in `src/lib/menaSignals.ts`, deterministic tests, refreshed Arabic `MenaPulse`, original `docs/M3TM_FUSION_RADAR_2026.md`, and CI watched paths.
+- Cohorts filter **only loaded GDELT reports**; real historical coverage requires archival ingestion. Displays source archive age, gaps and aggregate military-provider health without exact tracks.
+- Reviewer follow-up implemented explicit ACLED `cached-stale` status, unknown provider vs failure, UI 60s/visibility freshness clock, and this strict handoff.
+
+**VERIFY:**
+- Initial clean patch SHA `8e9ebd2fcd0e3aaee0b7cf13531f785c92de8c8e` passed TypeScript, Vitest, Next build and Vercel Preview on GitHub; subsequent sample-coverage documentation SHA `6273c1580b3100311881808aae07344429e73476` also passed all checks.
+- The follow-up reviewer patch must **re-run all required checks** against its own final PR HEAD; latest test/build status and actual production `/api/health` SHA are source of truth. No benchmark superiority assertion is verified yet.
+
+**BLOCKERS:**
+- A fresh PR head's green required checks, resolved PR #62 review threads, and protected merge/production smoke are release gates—not implied by previous green commits.
+- Current WORLD `fetchGdeltEvents()` reads only the latest 15-minute archive; durable historical backfill/coverage-watermark is not implemented; source coverage is incomplete for a full 6h/24h/7d benchmark.
+- myACLED recent event entitlement is historical-only (2025-10-05); no unauthorized bypass. Exact public military tracks are not permitted.
+
+**NEXT:** Verify final PR #62 checks and review threads → protected merge only if all checks green → confirm deployed SHA, `/api/health`, `/api/conflicts`, `/api/gdelt-events`, military-activity health, map desk desktop/mobile → independently benchmark source publication-to-display delay, citation quality, recall/false positives, UI FPS, and rolling archive completeness for ≥7 days.
+
 ## Open ordered work and objective acceptance
 1. **P0 ACLED access:** confirmed entitlement is historical-only (`date_recency.date=2025-10-05` as of 2026-10-04); the source adapter should report `restricted_recency` instead of `ok` and skip futile recent-content retries. The missing current disaggregated data requires ACLED authorization; never simulate or bypass current data. Preserve full GDELT/news independent pipeline and keep historical ACLED out of live tactical event pins. ACLED is not a live flight feed and must comply with its EULA; GDELT independently remains operational.
 2. **P0 reporting relevance/freshness:** compare GDELT batch timestamp to displayed item dates, country-specific false positives, CAMEO ActorGeo/ActionGeo, duplicates and independent corroboration. Add tests for known Makkah CAMEO-195 ambiguity. No invented event coordinates.

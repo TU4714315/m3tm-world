@@ -962,6 +962,7 @@ export default function Dashboard() {
           reported_routes: d.reported_routes ?? [],
           reported_routes_meta: d.reported_routes_meta ?? null,
           gdelt_source_published_at: d.source_published_at ?? null,
+          gdelt_data_state: d.data_state ?? 'unknown',
         };
       });
     }
@@ -1048,6 +1049,7 @@ export default function Dashboard() {
           reported_routes: d.reported_routes ?? [],
           reported_routes_meta: d.reported_routes_meta ?? null,
           gdelt_source_published_at: d.source_published_at ?? null,
+          gdelt_data_state: d.data_state ?? 'unknown',
         };
       }, undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
     }
@@ -1801,7 +1803,7 @@ export default function Dashboard() {
           <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/85 px-2 py-1 text-[11px] text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">الشرق الأوسط والبحر الأحمر</span>
           {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(88vw,390px)]">
             <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
-              publishedAt={data.conflict_source_published_at || data.gdelt_source_published_at}
+              publishedAt={data.conflict_source_published_at}
               onFocus={() => setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()})}/>
           </div>}
         </div>
@@ -2087,7 +2089,7 @@ export default function Dashboard() {
                   )}
                   {mobilePanel === 'intel' && <div className="space-y-3">
                     <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
-                      publishedAt={data.conflict_source_published_at || data.gdelt_source_published_at}
+                      publishedAt={data.conflict_source_published_at}
                       onFocus={() => {setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});setMobilePanel(null);}}/>
                     <WorldFeed data={data} onLocate={(lat,lng) => {setFlyToLocation({lat,lng,ts:Date.now()});setMobilePanel(null);}}/>
                   </div>}
