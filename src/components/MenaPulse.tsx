@@ -46,7 +46,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
         <MapPinned className="h-3.5 w-3.5"/>الخريطة
       </button>
     </header>
-    <p className="mt-2 text-[11px] leading-5 text-white/65">الرصد يقيس **توقيت ترميز/نشر البلاغ** لا يثبت وقت الواقعة أو المسؤولية؛ الإحداثيات المنشورة معمّمة.</p>
+    <p className="mt-2 text-[11px] leading-5 text-white/65">الرصد يقيس <strong>توقيت ترميز/نشر البلاغ</strong> ولا يثبت وقت الواقعة أو المسؤولية؛ الإحداثيات المنشورة معمّمة.</p>
     <div className="mt-2 grid grid-cols-4 gap-1" aria-label="تصفية البلاغات بحسب الفترة">
       {PERIODS.map(p=><button key={p.id} type="button" onClick={()=>setPeriod(p.id)}
         aria-pressed={period===p.id}
