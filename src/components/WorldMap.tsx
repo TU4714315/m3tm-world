@@ -1657,8 +1657,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     })
 
-    // Clusters are publication counts, never verified air-strike locations.
-    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters','cctv-clusters']) {
+    // Cluster counts are observations, never verified attacks. Cameras have
+    // a source-defined expansion zoom: a constant +2 can leave the same
+    // cluster intact (especially when opening country-level clusters).
+    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters']) {
       map.on('click',layer,e=>{
         const geom=e.features?.[0]?.geometry;
         if (geom?.type !== 'Point') return;
@@ -1666,6 +1668,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           zoom:Math.min(map.getZoom()+2.1,9),duration:600});
       });
     }
+    map.on('click','cctv-clusters',e=>{
+      const feature=e.features?.[0];
+      if (feature?.geometry?.type!=='Point') return;
+      const clusterId=Number(feature.properties?.cluster_id);
+      if (!Number.isFinite(clusterId)) return;
+      const source=map.getSource('cctv') as maplibregl.GeoJSONSource|undefined;
+      if (!source || typeof source.getClusterExpansionZoom!=='function') return;
+      const center=feature.geometry.coordinates as [number,number];
+      void source.getClusterExpansionZoom(clusterId)
+        .then(zoom=>{
+          if (mapRef.current!==map) return; // Unmounted or restyled.
+          map.easeTo({center,zoom:Math.max(zoom,map.getZoom()+0.2),duration:600});
+        })
+        .catch(()=>{
+          // At source failure, open individual cameras rather than requiring
+          // repeated clicks on the same cluster.
+          if (mapRef.current===map)map.easeTo({center,zoom:9,duration:600});
+        });
+    });
     map.on('click', 'civil-unrest-icons', e => {
       if (!e.features?.length) return;
       const p = e.features[0].properties as any;

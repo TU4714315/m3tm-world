@@ -79,3 +79,10 @@
 
 ## Coverage ledger follow-up (2026-10-05)
 Verified after PR #66 that /api/gdelt-events returned 235 valid current archive events but /api/source-coverage, in a separate Vercel function and with no configured Redis, could only return an unrelated memory counter. A follow-up ensures cross-function absence of durable storage yields *unverifiable* rather than zero completeness. Backend persistence and seven-day event history remain separate uncompleted milestones.
+
+## 2026-10-05 — PR #69 visual clarity and camera click expansion (review checkpoint)
+- Source: PR #69 `feat` from the protected WORLD main baseline `e0681b304ae01075c0937af1c5d984e70b4817a5`. No original imagery, cameras, layer APIs or event records removed.
+- **DONE in PR:** Raster-only satellite `clarity` grade/shadow brightening and reduced terrain vignette; countable country-level CCTV clusters with all individual cameras retained at city zoom; larger GDELT/civil report icons and late cluster expansion; related regression tests. Source aggregation does not alter civilian flight or public military aggregates.
+- **Review fix:** CCTV cluster click now uses MapLibre `GeoJSONSource.getClusterExpansionZoom(cluster_id)`, not constant `zoom+2.1`; one click opens the expected individual camera level. An async callback ignores a replaced/unmounted map and falls back to zoom 9 if the cluster API fails. Other event clusters retain previous handler.
+- **VERIFY before claiming complete:** Required TypeScript/Vitest/Next, Vercel Preview, resolved reviewer threads, desktop & 390x844 image comparison, test camera viewer on city zoom, all existing military/data/satellite/camera layers present, APP `hello/ready/sync/select` preserved. Production main/deployed SHA must match the resulting merge commit.
+- **Separate blocker:** PR #68 durable GDELT history is a different concurrent feature; APP-owned Supabase persistence and CI/Deno review issues must be closed independently. Do not merge unresolved upstream governance or bypass deployment quotas.
