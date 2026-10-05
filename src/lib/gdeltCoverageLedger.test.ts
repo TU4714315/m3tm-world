@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeGdeltCoverage } from './gdeltCoverageLedger';
+import { summarizeGdeltCoverage, getGdeltCoverage } from './gdeltCoverageLedger';
 
 describe('GDELT 15-minute publication checkpoint ledger', () => {
   const now = Date.parse('2026-10-05T12:00:00Z');
+  it('marks no shared storage as unverified instead of 0/672 source failure', async () => {
+    const r = await getGdeltCoverage(now);
+    expect(r.sampling).toBe('unverifiable-without-persistence');
+    expect(r.observedWindows).toBeNull();
+    expect(r.coveragePercent).toBeNull();
+  });
   it('de-duplicates real windows, drops future/archive errors and reports gaps', () => {
     const data = [
       { window: '20261005120000.export.CSV.zip', firstObservedAt: now },

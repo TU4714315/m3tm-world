@@ -75,3 +75,7 @@
 ## Safety & quota
 - No cloud/browser to localhost; no credential printing, fake targets or made-up live telemetry. Never expose ACLED credentials, OAuth tokens, raw licensed event rows or exact operational military tracks.
 - Do not force push, remove features, bypass required reviewers or create Vercel no-op preview/deploy loops. `qa/**` remains quota-friendly.
+
+
+## Coverage ledger follow-up (2026-10-05)
+Verified after PR #66 that /api/gdelt-events returned 235 valid current archive events but /api/source-coverage, in a separate Vercel function and with no configured Redis, could only return an unrelated memory counter. A follow-up ensures cross-function absence of durable storage yields *unverifiable* rather than zero completeness. Backend persistence and seven-day event history remain separate uncompleted milestones.
