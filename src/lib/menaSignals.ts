@@ -71,6 +71,15 @@ type MilitarySummaryCell = PublicEvent & {
   trend?: string;
   data_state?: string;
   cell_degrees?: number;
+  level?: number;
+  activity?: string;
+  approximate_count?: string;
+  precision?: string;
+  time_precision?: string;
+  observed_at_bucket?: string;
+  reporting_mode?: string;
+  observed_at?: string;
+  age_seconds?: number | null;
 };
 type RadarData = Omit<RegionalData, 'military_activity'> & {
   app_news?: AppNewsPin[];
@@ -79,6 +88,50 @@ type RadarData = Omit<RegionalData, 'military_activity'> & {
   flight_source_status?: { status?: string | null; timestamp?: string | null };
   conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
 };
+
+/**
+ * Source clock used by both the MENA radar and MapLibre markers.
+ * Process-cache fallback or an expiring last-good browser snapshot
+ * cannot count as a newly observed military activity change.
+ */
+export function coarseFlightSourceStale(
+  data: Pick<RadarData, 'flight_source_status'|'military_activity_meta'>,
+  nowMs = Date.now(),
+): boolean {
+  const last = Date.parse(data.flight_source_status?.timestamp || '');
+  const age = Number.isFinite(last) && last <= nowMs ? nowMs-last : null;
+  return data.military_activity_meta?.stale_fallback === true ||
+    data.flight_source_status?.status === 'degraded' ||
+    (age !== null && age > 5 * 60_000);
+}
+
+/** Minimal authorized public map attributes; no ICAO, callsign, flight track,
+ * heading, individual velocity or military aircraft model ever copied.
+ */
+export function coarseFlightMapFeatures(
+  cells: MilitarySummaryCell[] = [],
+  stale = false,
+) {
+  return cells.flatMap(cell => {
+    if (!Number.isFinite(cell.lat) || !Number.isFinite(cell.lng)) return [];
+    return [{
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const,
+        coordinates: [cell.lng as number, cell.lat as number] as [number,number] },
+      properties: {
+        level: cell.level, activity: cell.activity,
+        approximate_count: cell.approximate_count,
+        cell_degrees: cell.cell_degrees,
+        precision: cell.precision, time_precision: cell.time_precision,
+        observed_at_bucket: cell.observed_at_bucket,
+        reporting_mode: cell.reporting_mode,
+        trend: stale ? undefined : cell.trend,
+        data_state: stale ? 'cached-stale' : cell.data_state,
+        observed_at: cell.observed_at, age_seconds: cell.age_seconds,
+      },
+    }];
+  });
+}
 
 function reportedTimeAge(time: string | null, now: number): number | null {
   if (!time) return null;
@@ -145,13 +198,7 @@ export function buildMenaFusionRadar(
   // The radar's 60s local tick invalidates summaries after five minutes
   // without a successful /api/flights refresh, rather than declaring
   // yesterday's up/new cell a current military activity change.
-  const lastRefresh = Date.parse(data.flight_source_status?.timestamp || '');
-  const refreshAgeMs = Number.isFinite(lastRefresh) && lastRefresh <= nowMs
-    ? nowMs-lastRefresh : null;
-  const expired = refreshAgeMs !== null && refreshAgeMs > 5 * 60_000;
-  const staleFallback =
-    data.military_activity_meta?.stale_fallback === true ||
-    data.flight_source_status?.status === 'degraded' || expired;
+  const staleFallback = coarseFlightSourceStale(data, nowMs);
   // publicLayerData sanitizes missing metadata to provider_healthy:false.
   // Unknown and stale are *not* evidence of a current provider outage.
   const providerHealthy = !staleFallback && data.military_activity_meta?.mode === 'coarse-regional-aggregate'
