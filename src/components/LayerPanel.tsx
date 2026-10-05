@@ -101,7 +101,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'cctv', label: 'كاميرات المراقبة', dataKey: 'cameras' },
       { key: 'cctv_previews', label: 'معاينات حية', dataKey: '', parent: 'cctv' },
       { key: 'live_news', label: 'بث مباشر وأخبار الخريطة المدمجة', dataKey: 'live_feeds', description: 'القنوات العامة والأخبار المتزامنة من M3TM.APP عند التضمين' },
-      { key: 'app_news', label: 'أخبار M3TM.APP على الخريطة', dataKey: 'app_news', description: 'عناصر منشورة ذات إحداثيات متاحة، في خلايا إقليمية 0.5°؛ لا يُستنتج موقع حادثة من عنوان الخبر' },
+      { key: 'app_news', label: 'الأخبار المدمجة وإسناد الناشرين', dataKey: 'app_news', description: 'أخبار APP المسندة مكانيًا ضمن خلايا إقليمية 0.5°، مع روابط الناشرين. RSS/Telegram بلا موضع مسند يظهر في الموجز فقط؛ كثرة الناشرين ليست تحققًا مستقلاً' },
     ],
   },
   {
