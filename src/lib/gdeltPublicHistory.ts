@@ -75,13 +75,32 @@ export function normalizeGdeltHistory(raw: unknown, requestedHours: number, limi
   const categories = (Array.isArray(analytics.categories) ? analytics.categories : [])
     .filter((r): r is Record<string,unknown> => !!r && typeof r === 'object')
     .filter(r => typeof r.category === 'string' && CATEGORIES.has(r.category))
-    .slice(0, 9)
-    .map(r => ({category: String(r.category), reports: safeCount(r.reports)}));
-  const timeline = (Array.isArray(analytics.timeline) ? analytics.timeline : [])
+    .map(r => ({category: String(r.category), reports: safeCount(r.reports)}))
+    .sort((a,b) => b.reports - a.reports || a.category.localeCompare(b.category))
+    .slice(0, 9);
+  // The SQL source aggregates only nonempty buckets. Build a complete
+  // evenly spaced display timeline so hours/days with zero *stored* coded
+  // reports do not visually collapse into adjacent high-volume bars.
+  // Zero means no recorded reports in the archive, not no real events.
+  const minuteStep = ({1:15,6:30,24:60,168:180} as Record<number,number>)[requestedHours];
+  const step = minuteStep * 60000;
+  const anchor = Date.parse(String(analytics.asOf || ''));
+  const sourceBins = (Array.isArray(analytics.timeline) ? analytics.timeline : [])
     .filter((r): r is Record<string,unknown> => !!r && typeof r === 'object')
-    .filter(r => typeof r.publishedAt === 'string' && Number.isFinite(Date.parse(r.publishedAt)))
-    .slice(-70)
-    .map(r => ({publishedAt: String(r.publishedAt), reports: safeCount(r.reports)}));
+    .filter(r => typeof r.publishedAt === 'string' && Number.isFinite(Date.parse(r.publishedAt)));
+  const anchoredAt = Number.isFinite(anchor) ? anchor :
+    Math.max(...sourceBins.map(r => Date.parse(String(r.publishedAt))), 0);
+  const latest = Math.floor(anchoredAt / step) * step;
+  const values = new Map<number,number>();
+  for (const r of sourceBins) {
+    const time = Math.floor(Date.parse(String(r.publishedAt)) / step) * step;
+    values.set(time,(values.get(time)||0)+safeCount(r.reports));
+  }
+  const slots = Math.min(70, Math.ceil(requestedHours * 60 / minuteStep));
+  const timeline = Array.from({length:slots},(_,i)=>{
+    const time = latest - (slots - i - 1) * step;
+    return {publishedAt:new Date(time).toISOString(),reports:values.get(time)||0};
+  });
   const countries = (Array.isArray(analytics.countries) ? analytics.countries : [])
     .filter((r): r is Record<string,unknown> => !!r && typeof r === 'object')
     .slice(0,12)

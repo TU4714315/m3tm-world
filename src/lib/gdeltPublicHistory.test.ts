@@ -7,7 +7,8 @@ const base = {
     singlePublisher:24,multiplePublishers:1,
     categories:[{category:'armed_clash',reports:25}],
     countries:[{country:'YM',reports:10}],
-    timeline:[{publishedAt:'2026-10-05T12:15:00Z',reports:25}]},
+    timeline:[{publishedAt:'2026-10-05T12:15:00Z',reports:25}],
+    asOf:'2026-10-05T13:05:00Z',bucketMinutes:60},
 };
 describe('GDELT MENA public historical evidence sanitization',()=>{
   it('separates codes from independent verification, scrubs unrelated fields',()=>{
@@ -24,6 +25,22 @@ describe('GDELT MENA public historical evidence sanitization',()=>{
     expect(JSON.stringify(result)).not.toMatch(/SECRET|callsign|trajectory|icao24/);
     expect(result.guidance).toContain('does not prove');
     expect(result.totalReportRows).toBe(25);
+  });
+  it('fills actual display intervals and sorts major categories before truncating',()=>{
+    const result=normalizeGdeltHistory({...base, analytics:{
+      ...base.analytics,categories:[
+        {category:'verbal_report',reports:1},
+        {category:'armed_clash',reports:25},
+        {category:'bombing',reports:9},
+      ],
+    },events:[]},24,50);
+    expect(result.timeline).toHaveLength(24);
+    const noon=result.timeline.find(t=>t.publishedAt==='2026-10-05T12:00:00.000Z');
+    expect(noon?.reports).toBe(25);
+    expect(result.timeline.some(t=>t.reports===0)).toBe(true);
+    expect(result.categories.map(c=>c.category)).toEqual([
+      'armed_clash','bombing','verbal_report',
+    ]);
   });
   it('drops invalid location, URL schemes, dates and duplicate IDs',()=>{
     const event={

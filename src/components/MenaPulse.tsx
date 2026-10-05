@@ -250,13 +250,13 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
           {archiveHistory.timeline.map((slot,i)=>{
             const max=Math.max(1,...archiveHistory.timeline.map(t=>t.reports));
             return <div key={slot.publishedAt+'-'+i}
-              title={slot.publishedAt+' · '+slot.reports+' بلاغًا'}
+              title={slot.publishedAt+' · '+slot.reports+' بلاغًا مخزّنًا في الأرشيف (صفر لا يعني عدم وقوع أحداث)'}
               className="min-w-[2px] flex-1 rounded-t-[2px] bg-cyan-300/70"
               style={{height:Math.max(3,Math.round(slot.reports/max*100))+'%'}}/>;
           })}
         </div>
         <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
-          {archiveHistory.categories.slice(0,6).map(item=><span key={item.category}
+          {[...archiveHistory.categories].sort((a,b)=>b.reports-a.reports).slice(0,6).map(item=><span key={item.category}
             className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/75">{CODE_LABELS[item.category]??item.category} · {item.reports}</span>)}
         </div>
         <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-white/65">
