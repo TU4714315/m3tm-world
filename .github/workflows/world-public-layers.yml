@@ -25,6 +25,9 @@ on:
       - 'src/app/api/region-dossier/**'
       - 'src/lib/satellite-layer*'
       - 'src/lib/menaSignals*'
+      - 'src/lib/gdeltCoverageLedger*'
+      - 'src/app/api/gdelt-events/**'
+      - 'src/app/api/source-coverage/**'
       - 'src/components/MenaPulse.tsx'
       - 'docs/M3TM_FUSION_RADAR_2026.md'
       # ACLED/conflict and handoff/source provenance changes require full checks.
