@@ -10,6 +10,15 @@ export type PublicNewsRow = {
   evidence_links?:Array<{publisher:string;url:string;origin:string}>;
   evidence_label?:string;
 };
+/** Coordinates are data, not inferred default 0,0. Reject missing/null/booleans. */
+export function sourcePublishedPoint(lat:unknown,lng:unknown):[number,number]|null {
+  if([lat,lng].some(v=>v===null||v===undefined||typeof v==='boolean'
+    ||(typeof v==='string'&&v.trim()==='')))return null;
+  if([lat,lng].some(v=>typeof v!=='number'&&typeof v!=='string'))return null;
+  const a=Number(lat),b=Number(lng);
+  return Number.isFinite(a)&&Math.abs(a)<=90&&Number.isFinite(b)&&Math.abs(b)<=180
+    ? [a,b] : null;
+}
 const normalize = (s:string) => s.toLocaleLowerCase().normalize('NFKC')
   .replace(/[\u064B-\u065F\u0670\u0640]/g,'')
   .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
