@@ -75,6 +75,29 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
     expect(r.source.publicationState).toBe('stale');
     expect(buildMenaFusionRadar({},null,now).source.publicationState).toBe('unknown');
   });
+
+  it('ages out a disconnected public aviation feed and suppresses old rising trends',async()=>{
+    const {buildMenaFusionRadar}=await import('./menaSignals');
+    const input={
+      military_activity:[{lat:24,lng:46,trend:'up',data_state:'live'}],
+      military_activity_meta:{
+        mode:'coarse-regional-aggregate',provider_healthy:true,stale_fallback:false,
+      },
+      flight_source_status:{status:'active',timestamp:'2026-10-05T03:53:00Z'},
+    };
+    const old=buildMenaFusionRadar(input,null,now);
+    expect(old.airObservation).toEqual({
+      regionalCells:1,upwardOrNew:0,staleCells:1,
+      providerHealthy:null,staleFallback:true,mode:'aggregate-only',
+    });
+    const fresh=buildMenaFusionRadar({
+      ...input,flight_source_status:{status:'active',timestamp:'2026-10-05T03:57:00Z'},
+    },null,now);
+    expect(fresh.airObservation).toEqual({
+      regionalCells:1,upwardOrNew:1,staleCells:0,
+      providerHealthy:true,staleFallback:false,mode:'aggregate-only',
+    });
+  });
   it('uses only coarse MENA aggregate counts, never military identities or positions',async()=>{
     const {buildMenaFusionRadar}=await import('./menaSignals');
     const r=buildMenaFusionRadar({
@@ -87,8 +110,8 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
       conflict_source_status:{acled:{status:'restricted_recency'},gdelt:{status:'ok'}},
     },null,now);
     expect(r.airObservation).toEqual({
-      regionalCells:2,upwardOrNew:0,staleCells:1,
-      providerHealthy:false,staleFallback:true,mode:'aggregate-only',
+      regionalCells:2,upwardOrNew:0,staleCells:2,
+      providerHealthy:null,staleFallback:true,mode:'aggregate-only',
     });
     expect(r.source.acledStatus).toBe('restricted_recency');
     expect(r.airObservation.upwardOrNew).toBe(0); // stale trend must not become a fresh alert

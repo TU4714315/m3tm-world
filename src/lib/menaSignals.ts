@@ -76,6 +76,7 @@ type RadarData = Omit<RegionalData, 'military_activity'> & {
   app_news?: AppNewsPin[];
   military_activity?: MilitarySummaryCell[];
   military_activity_meta?: { mode?: string | null; provider_healthy?: boolean; stale_fallback?: boolean };
+  flight_source_status?: { status?: string | null; timestamp?: string | null };
   conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
 };
 
@@ -140,11 +141,24 @@ export function buildMenaFusionRadar(
   const airCells = (data.military_activity || []).filter(
     cell => isMiddleEastBelt(cell.lat,cell.lng),
   );
-  // publicLayerData sanitizes absent metadata to {provider_healthy:false},
-  // so false is meaningful only with an actual provider observation mode.
-  const providerHealthy = data.military_activity_meta?.mode === 'coarse-regional-aggregate'
+  // A disconnected client may keep the same previous payload indefinitely.
+  // The radar's 60s local tick invalidates summaries after five minutes
+  // without a successful /api/flights refresh, rather than declaring
+  // yesterday's up/new cell a current military activity change.
+  const lastRefresh = Date.parse(data.flight_source_status?.timestamp || '');
+  const refreshAgeMs = Number.isFinite(lastRefresh) && lastRefresh <= nowMs
+    ? nowMs-lastRefresh : null;
+  const expired = refreshAgeMs !== null && refreshAgeMs > 5 * 60_000;
+  const staleFallback =
+    data.military_activity_meta?.stale_fallback === true ||
+    data.flight_source_status?.status === 'degraded' || expired;
+  // publicLayerData sanitizes missing metadata to provider_healthy:false.
+  // Unknown and stale are *not* evidence of a current provider outage.
+  const providerHealthy = !staleFallback && data.military_activity_meta?.mode === 'coarse-regional-aggregate'
     ? data.military_activity_meta.provider_healthy : null;
-  const staleCells = airCells.filter(cell=>cell.data_state==='cached-stale').length;
+  const staleCells = airCells.filter(cell =>
+    cell.data_state==='cached-stale' || staleFallback
+  ).length;
   return {
     ...summary,
     events,
@@ -169,12 +183,12 @@ export function buildMenaFusionRadar(
       regionalCells: airCells.length,
       upwardOrNew: airCells.filter(cell=>
         cell.data_state!=='cached-stale' &&
-        data.military_activity_meta?.stale_fallback !== true &&
+        !staleFallback &&
         (cell.trend==='up'||cell.trend==='new')
       ).length,
       staleCells,
       providerHealthy: providerHealthy === true ? true : providerHealthy === false ? false : null,
-      staleFallback: data.military_activity_meta?.stale_fallback === true,
+      staleFallback,
       mode: 'aggregate-only' as const,
     },
   };

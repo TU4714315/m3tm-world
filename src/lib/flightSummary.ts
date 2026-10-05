@@ -53,3 +53,37 @@ export function buildFlightSummary(data: any): FlightSummary {
     timestamp: typeof data?.timestamp === 'string' ? data.timestamp : null,
   };
 }
+
+
+/** A failed refresh must not keep process-cached regional ADS-B cells marked
+ * live or re-issue a previous aggregate trend as a fresh observation. */
+export function markCachedFlightDataStale<T extends Record<string, any>>(
+  data: T, now = Date.now(),
+): T {
+  const origin = String(data.source || 'unknown');
+  const source = origin.endsWith('+stale') ? origin : origin + '+stale';
+  const cells = Array.isArray(data.military_activity) ? data.military_activity : [];
+  return {
+    ...data,
+    source,
+    // Preserve the original source timestamp and cell date; age the cells
+    // rather than manufacturing a new sample timestamp.
+    military_activity: cells.map((cell: Record<string, unknown>) => {
+      const observed = typeof cell.observed_at === 'string' ? Date.parse(cell.observed_at) : NaN;
+      const age_seconds = Number.isFinite(observed) && observed <= now
+        ? Math.floor((now - observed) / 1000)
+        : null;
+      return { ...cell, data_state: 'cached-stale', trend: undefined, age_seconds };
+    }),
+    military_activity_meta: {
+      ...(data.military_activity_meta || {}),
+      stale_fallback: true,
+      // This is a cache, not evidence that the provider is healthy now.
+      provider_healthy: false,
+    },
+    flight_source_status: {
+      ...(data.flight_source_status || {}),
+      status: 'degraded',
+    },
+  } as T;
+}

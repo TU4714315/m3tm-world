@@ -1861,6 +1861,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط جوي عسكري عام</div>
         <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي واسع من بيانات عامة. لا تُعرض هوية الطائرات أو إحداثياتها الدقيقة أو مساراتها التشغيلية.</div>
+        ${p.data_state === 'cached-stale' ? '<div style="font-size:10px;color:#FFCC80;margin-bottom:7px;font-weight:700;">مشاهدة محفوظة — تعذر تحديث المصدر؛ لا تعني نشاطًا جارياً.</div>' : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
           <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
