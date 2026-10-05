@@ -47,3 +47,99 @@ export function regionalPublicSignals(data:{
     seaRegions:(data.naval_activity??[]).filter(e=>isMiddleEastBelt(e.lat,e.lng)).length,
     precision:'regional-aggregate-only' as const};
 }
+
+
+/**
+ * M3TM Fusion Radar — authored independently for M3TM.WORLD.
+ *
+ * Time windows describe a source report's coded/published timestamp, NOT
+ * independently established incident time. No risk-probabilities are inferred.
+ * Public military/sea cells are counted only at MENA belt scope: never fuse
+ * their positions with conflict locations or expose unit-level identifiers.
+ */
+export type FusionWindow = 'h1' | 'h6' | 'h24' | 'd7';
+export const FUSION_WINDOWS: Readonly<Record<FusionWindow,number>> = {
+  h1: 60 * 60_000,
+  h6: 6 * 60 * 60_000,
+  h24: 24 * 60 * 60_000,
+  d7: 7 * 24 * 60 * 60_000,
+};
+type RegionalData = Parameters<typeof regionalPublicSignals>[0];
+type MilitarySummaryCell = PublicEvent & {
+  trend?: string;
+  data_state?: string;
+  cell_degrees?: number;
+};
+type RadarData = RegionalData & {
+  military_activity?: MilitarySummaryCell[];
+  military_activity_meta?: { provider_healthy?: boolean; stale_fallback?: boolean };
+  conflict_source_status?: { gdelt?: { status?: string }; acled?: { status?: string } };
+};
+
+function reportedTimeAge(time: string | null, now: number): number | null {
+  if (!time) return null;
+  const epoch = Date.parse(time);
+  // Reject synthetic/new dates, missing and future records; never count
+  // undated evidence as a fresh incident.
+  return Number.isFinite(epoch) && epoch <= now && now - epoch <= 365 * 24 * 60 * 60_000
+    ? now - epoch : null;
+}
+
+export function buildMenaFusionRadar(
+  data: RadarData,
+  sourcePublishedAt: string | null = null,
+  nowMs = Date.now(),
+) {
+  const summary = regionalPublicSignals(data);
+  const events = summary.events.map(event => ({
+    ...event,
+    ageMs: reportedTimeAge(event.time, nowMs),
+  }));
+  const windows: Record<FusionWindow,number> = { h1: 0, h6: 0, h24: 0, d7: 0 };
+  let previous6h = 0, invalidDates = 0, missingLinks = 0;
+  for (const event of events) {
+    if (event.ageMs === null) invalidDates++;
+    else {
+      for (const name of Object.keys(FUSION_WINDOWS) as FusionWindow[]) {
+        if (event.ageMs <= FUSION_WINDOWS[name]) windows[name]++;
+      }
+      if (event.ageMs > FUSION_WINDOWS.h6 && event.ageMs <= FUSION_WINDOWS.h6 * 2) previous6h++;
+    }
+    if (!/^https?:\/\//i.test(event.url)) missingLinks++;
+  }
+  const publishedAge = reportedTimeAge(sourcePublishedAt, nowMs);
+  const publicationState = publishedAge === null ? 'unknown'
+    : publishedAge <= 30 * 60_000 ? 'fresh'
+    : publishedAge <= 120 * 60_000 ? 'delayed' : 'stale';
+  const airCells = (data.military_activity || []).filter(
+    cell => isMiddleEastBelt(cell.lat,cell.lng),
+  );
+  const providerHealthy = data.military_activity_meta?.provider_healthy;
+  const staleCells = airCells.filter(cell=>cell.data_state==='cached-stale').length;
+  return {
+    ...summary,
+    events,
+    windows,
+    previous6h,
+    coverage: {
+      multiplePublishers: events.filter(e=>e.multiplePublishers).length,
+      singlePublisher: events.filter(e=>!e.multiplePublishers).length,
+      invalidDates,
+      missingLinks,
+    },
+    source: {
+      publicationState,
+      publishedAgeMinutes: publishedAge === null ? null : Math.floor(publishedAge / 60_000),
+      gdeltStatus: data.conflict_source_status?.gdelt?.status ?? 'unknown',
+      acledStatus: data.conflict_source_status?.acled?.status ?? 'unknown',
+    },
+    airObservation: {
+      regionalCells: airCells.length,
+      upwardOrNew: airCells.filter(cell=>cell.trend==='up'||cell.trend==='new').length,
+      staleCells,
+      providerHealthy: providerHealthy === true ? true : providerHealthy === false ? false : null,
+      staleFallback: data.military_activity_meta?.stale_fallback === true,
+      mode: 'aggregate-only' as const,
+    },
+  };
+}

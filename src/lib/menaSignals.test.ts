@@ -39,3 +39,62 @@ describe('M3TM regional public evidence',()=>{
     expect(gdeltWindowTime('20261304150000.export.CSV.zip')).toBeNull();
   });
 });
+
+describe('M3TM Fusion Radar — source timing and coverage',()=>{
+  const now=Date.parse('2026-10-05T04:00:00Z');
+  it('separates 1h/6h/24h/7d, previous 6h and undated evidence',async()=>{
+    const {buildMenaFusionRadar}=await import('./menaSignals');
+    const timestamps=[
+      '2026-10-05T03:45:00Z', '2026-10-04T23:00:00Z',
+      '2026-10-04T20:00:00Z', '2026-10-02T12:00:00Z',
+      '2026-10-05T05:00:00Z',
+    ];
+    const r=buildMenaFusionRadar({gdelt_events:timestamps.map((date,i)=>({
+      id:String(i+1),lat:24.7,lng:46.7,date,
+      url:i===0?'https://publisher.example/story':'',
+      event_category:'material_conflict',
+      corroboration:i===0?'multi-source-report':'single-source-report',
+      sources:i===0?2:1,
+    }))},'2026-10-05T03:45:00Z',now);
+    expect(r.windows).toEqual({h1:1,h6:2,h24:3,d7:4});
+    expect(r.previous6h).toBe(1);
+    expect(r.coverage.invalidDates).toBe(1);
+    expect(r.coverage.missingLinks).toBe(4);
+    expect(r.coverage.multiplePublishers).toBe(1);
+    expect(r.source.publicationState).toBe('fresh');
+    expect(r.source.publishedAgeMinutes).toBe(15);
+  });
+  it('does not treat fetch time or future timestamps as source freshness',async()=>{
+    const {buildMenaFusionRadar}=await import('./menaSignals');
+    const r=buildMenaFusionRadar({gdelt_events:[
+      {id:'a',lat:25,lng:45,date:'2026-10-05T04:10:00Z'},
+      {id:'b',lat:25,lng:45},
+    ]},'2026-10-04T21:00:00Z',now);
+    expect(r.windows.h24).toBe(0);
+    expect(r.coverage.invalidDates).toBe(2);
+    expect(r.source.publicationState).toBe('stale');
+    expect(buildMenaFusionRadar({},null,now).source.publicationState).toBe('unknown');
+  });
+  it('uses only coarse MENA aggregate counts, never military identities or positions',async()=>{
+    const {buildMenaFusionRadar}=await import('./menaSignals');
+    const r=buildMenaFusionRadar({
+      military_activity:[
+        {lat:24,lng:45,trend:'up',data_state:'cached-stale',callsign:'SECRET-CALLSIGN',icao24:'secret'} as never,
+        {lat:25,lng:47,trend:'steady',data_state:'live',trajectory:[1,2]} as never,
+        {lat:40,lng:-75,trend:'new'} as never
+      ],
+      military_activity_meta:{provider_healthy:false,stale_fallback:true},
+      conflict_source_status:{acled:{status:'restricted_recency'},gdelt:{status:'ok'}},
+    },null,now);
+    expect(r.airObservation).toEqual({
+      regionalCells:2,upwardOrNew:1,staleCells:1,
+      providerHealthy:false,staleFallback:true,mode:'aggregate-only',
+    });
+    expect(r.source.acledStatus).toBe('restricted_recency');
+    const output=JSON.stringify(r);
+    expect(output).not.toContain('SECRET-CALLSIGN');
+    expect(output).not.toContain('trajectory');
+    expect(output).not.toContain('icao24');
+    expect(output).not.toContain('secret');
+  });
+});
