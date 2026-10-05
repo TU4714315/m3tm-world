@@ -8,6 +8,7 @@ import {
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
 import AiOverview from './AiOverview';
+import { selectPublicHeadlineAlerts } from '@/lib/publicNewsFusion';
 
 interface LiveAlertsProps {
   data: any;
@@ -66,8 +67,10 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   const alerts: any[] = [];
 
   // OSINT Telegram News Feed (from /api/news)
-  if (data.news) {
-    data.news.forEach((a: any) => {
+  if (Array.isArray(data.news)) {
+    // The full news digest stays in WorldFeed. The alert drawer is a
+    // narrow, source-timed subset, not every social or RSS message.
+    selectPublicHeadlineAlerts(data.news).forEach((a: any) => {
       alerts.push({
         type: 'news', title: a.title, description: a.description, source: a.source,
         lat: a.coords?.[0], lng: a.coords?.[1], time: a.published,
@@ -201,7 +204,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                         <div className="flex items-start gap-1.5 mb-2">
                           <Icon className="w-3.5 h-3.5 flex-shrink-0 mt-[2px]" style={{ color: sevColor }} />
                           <span className={`text-[11px] font-mono text-[#E8E6E0] leading-relaxed ${alert.type === 'news' ? 'line-clamp-3' : 'truncate'}`}>
-                            {(alert.description || alert.title || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')}
+                            {(alert.title || alert.description || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')}
                           </span>
                         </div>
                         <div className="flex items-center justify-between border-t border-[#2A2A28]/50 pt-1.5 mt-1.5">
