@@ -112,11 +112,38 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
   return items;
 }
 
+
+/** APP and independently attributed public feeds start simultaneously.
+ * End-to-end cold path is bounded by slowest group, not added timeouts.
+ */
+async function sampleIndependentPublicFeeds():Promise<any[]>{
+  const requests=[
+    ...TELEGRAM_CHANNELS.map(async(channel)=>{
+      try {
+        const r=await fetch('https://t.me/s/'+channel,{
+          signal:AbortSignal.timeout(8000),
+          headers:{'User-Agent':'M3TM.WORLD Public Source Review/1.0'},
+        });
+        return r.ok?parseTelegramHTML(await r.text(),channel).slice(-8):[];
+      }catch{return [];}
+    }),
+    ...Object.entries(FALLBACK_FEEDS).map(async([name,url])=>{
+      try {
+        const r=await fetch(url,{signal:AbortSignal.timeout(5000)});
+        return r.ok?parseRSSItems(await r.text(),name).slice(0,5):[];
+      }catch{return [];}
+    }),
+  ];
+  const results=await Promise.allSettled(requests);
+  return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+}
+
 export async function GET() {
   try {
     const primaryNews: PublicNewsRow[] = [];
     let primaryTimestamp: string | null = null;
     let appOk = false;
+    const independentPublicFeeds=sampleIndependentPublicFeeds();
     // M3TM.APP already publishes a sanitized, source-backed Arabic feed. Reuse
     // that public contract first so the standalone WORLD surface and the APP
     // embed speak the same language and do not independently reinterpret news.
@@ -173,42 +200,7 @@ export async function GET() {
       // WORLD keeps its independent public-source fallback below.
     }
 
-    const feedPromises = TELEGRAM_CHANNELS.map(async (channel) => {
-      try {
-        const res = await fetch(`https://t.me/s/${channel}`, {
-          signal: AbortSignal.timeout(8000),
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-        });
-        if (!res.ok) return [];
-        const html = await res.text();
-        return parseTelegramHTML(html, channel).slice(-8);
-      } catch { return []; }
-    });
-
-    const feedResults = await Promise.allSettled(feedPromises);
-    const allArticles: any[] = [];
-
-    for (const result of feedResults) {
-      if (result.status === 'fulfilled') allArticles.push(...result.value);
-    }
-
-    // Independent, bounded RSS desks are sampled alongside Telegram, not only
-    // when all channels fail. Publisher plurality is NOT independent confirmation.
-    { 
-      const fallbackPromises = Object.entries(FALLBACK_FEEDS).map(async ([source, url]) => {
-        try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (!res.ok) return [];
-          const xml = await res.text();
-          return parseRSSItems(xml, source).slice(0, 5);
-        } catch { return []; }
-      });
-
-      const fallbackResults = await Promise.allSettled(fallbackPromises);
-      for (const result of fallbackResults) {
-        if (result.status === 'fulfilled') allArticles.push(...result.value);
-      }
-    }
+    const allArticles = await independentPublicFeeds;
 
     const newsItems:PublicNewsRow[] = allArticles.map(article => {
       const riskScore = scoreRisk(article.description || article.title);
