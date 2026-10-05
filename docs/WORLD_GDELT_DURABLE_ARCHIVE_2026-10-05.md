@@ -25,3 +25,5 @@ Production caution: main `e0681b304ae01075c0937af1c5d984e70b4817a5` was not conf
 - Each scheduled ingest tries two newest missing exports and two rotating historical gaps from the retained seven-day window. 404s remain missing, and per-invocation source traffic is bounded.
 - The WORLD history/Edge function and migration files are included in the required CI watched paths.
 - **Unresolved ownership gate:** WORLD currently persists under APP-owned Supabase `heibzaolhwlzqaweludm`; its prefixed RLS data separation is not separate project ownership. Do not merge or run any replacement migrations until APP/WORLD governance is coordinated or the archive has a dedicated WORLD storage project; existing active jobs were left untouched.
+
+- GitHub required validation now additionally runs Deno 2 `deno check` for the actual Supabase Edge worker (Next TypeScript excludes Deno) and an offline static audit of migration RLS/revoked privileges, tickets and bounded collector. This static audit **does not prove migration execution**; the applied schema already exists and must not be rerun blindly in APP. APP/WORLD ownership P1 remains unresolved.
