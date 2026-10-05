@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
-import { buildFlightSummary } from '@/lib/flightSummary';
+import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
 
 export const maxDuration = 60;
 
@@ -682,7 +682,7 @@ export async function GET(req: Request) {
       console.warn('[OSIRIS] Returning stale flight cache as fallback');
       return respond(
         req,
-        { ...cachedData, source: (cachedData.source || 'unknown') + '+stale' },
+        markCachedFlightDataStale(cachedData),
         'no-store, max-age=0',
       );
     }

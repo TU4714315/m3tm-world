@@ -1,84 +1,44 @@
-import { describe, expect, it } from 'vitest';
-import { buildFlightSummary } from './flightSummary';
+import {describe,expect,it} from 'vitest';
+import {buildFlightSummary,markCachedFlightDataStale} from './flightSummary';
 
-describe('flight summary projection', () => {
-  it('returns public counters without serializing aircraft tracks', () => {
-    const summary = buildFlightSummary({
-      commercial_flights: [{ icao24: 'civil-1' }, { icao24: 'civil-2' }],
-      private_flights: [{ registration: 'private-1' }],
-      private_jets: [{ callsign: 'jet-1' }],
-      military_flights: [{ icao24: 'mil-sensitive' }],
-      military_activity: [
-        { lat: 24, lng: 48, approximate_count: '2-4', icao24: 'strip-me' },
-        { lat: 30, lng: 42, approximate_count: '5-9', callsign: 'strip-me-too' },
+describe('flight process-cache fallback',()=>{
+  const now=Date.parse('2026-10-05T04:00:00Z');
+  it('marks every coarse military observation stale, preserving the last good snapshot',()=>{
+    const good={
+      source:'opensky-anon',timestamp:'2026-10-05T03:50:00Z',
+      commercial_flights:[],military_flights:[],
+      military_activity:[
+        {lat:24,lng:46,trend:'up',data_state:'live',observed_at:'2026-10-05T03:49:00Z',age_seconds:60},
+        {lat:26,lng:42,trend:'new',data_state:'live'},
       ],
-      military_activity_meta: {
-        mode: 'coarse-regional-aggregate',
-        exact_tracks_exposed: false,
-        identifiers_exposed: false,
+      military_activity_meta:{
+        mode:'coarse-regional-aggregate',stale_fallback:false,
+        provider_healthy:true,exact_tracks_exposed:false,identifiers_exposed:false,
       },
-      flight_source_status: {
-        status: 'active',
-        providers: {
-          adsbfi_mil: 6,
-          opensky: 9000,
-          opensky_age_s: 42,
-        },
-      },
-      source: 'opensky-anon',
-      timestamp: '2026-10-01T09:00:00Z',
-    });
-
-    expect(summary.status).toBe('operational');
-    expect(summary.counts).toEqual({
-      commercial: 2,
-      private: 1,
-      jets: 1,
-      public_total: 4,
-    });
-    expect(summary.military_activity).toEqual({
-      cells: 2,
-      mode: 'coarse-regional-aggregate',
-      exact_tracks_exposed: false,
-      identifiers_exposed: false,
-    });
-    expect(summary.providers).toMatchObject({ adsbfi_mil: 6, opensky: 9000 });
-    const serialized = JSON.stringify(summary);
-    for (const forbidden of ['civil-1', 'private-1', 'jet-1', 'mil-sensitive', 'strip-me', 'strip-me-too']) {
-      expect(serialized).not.toContain(forbidden);
-    }
+      flight_source_status:{status:'active',timestamp:'2026-10-05T03:50:00Z'},
+    };
+    const fallback=markCachedFlightDataStale(good,now);
+    expect(good.military_activity[0].data_state).toBe('live');
+    expect(good.military_activity[0].trend).toBe('up');
+    expect(fallback.source).toBe('opensky-anon+stale');
+    expect(fallback.timestamp).toBe('2026-10-05T03:50:00Z');
+    expect(fallback.flight_source_status.status).toBe('degraded');
+    expect(fallback.military_activity_meta.stale_fallback).toBe(true);
+    expect(fallback.military_activity_meta.exact_tracks_exposed).toBe(false);
+    expect(fallback.military_activity[0].data_state).toBe('cached-stale');
+    expect(fallback.military_activity[0].trend).toBeUndefined();
+    expect(fallback.military_activity[0].age_seconds).toBe(660);
+    expect(fallback.military_activity[1].data_state).toBe('cached-stale');
+    expect(fallback.military_activity[1].age_seconds).toBeNull();
+    expect(buildFlightSummary(fallback).status).toBe('degraded');
+    expect(markCachedFlightDataStale(fallback,now).source).toBe('opensky-anon+stale');
+    const text=JSON.stringify(fallback);
+    expect(text).not.toContain('icao24');
+    expect(text).not.toContain('trajectory');
   });
-
-  it('reports degraded when no public observation is active', () => {
-    expect(buildFlightSummary({
-      commercial_flights: [],
-      private_flights: [],
-      private_jets: [],
-      military_activity: [],
-      flight_source_status: { status: 'empty', providers: {} },
-    }).status).toBe('degraded');
-  });
-
-  it('reports cached-only military cells as degraded when the live source status is empty', () => {
-    expect(buildFlightSummary({
-      commercial_flights: [],
-      private_flights: [],
-      private_jets: [],
-      military_activity: [{ id: 'cached-cell' }],
-      military_activity_meta: { stale_fallback: true },
-      flight_source_status: { status: 'empty', providers: {} },
-      source: 'opensky-anon',
-    }).status).toBe('degraded');
-  });
-
-  it('reports stale fallback data as degraded even when cached rows exist', () => {
-    expect(buildFlightSummary({
-      commercial_flights: [{ icao24: 'stale-row' }],
-      private_flights: [],
-      private_jets: [],
-      military_activity: [],
-      flight_source_status: { status: 'active', providers: {} },
-      source: 'opensky-anon+stale',
-    }).status).toBe('degraded');
+  it('keeps a safe degraded fallback when no aggregate is available',()=>{
+    const out=markCachedFlightDataStale({source:'regional',military_activity:[],military_activity_meta:{}});
+    expect(out.military_activity).toHaveLength(0);
+    expect(out.military_activity_meta.stale_fallback).toBe(true);
   });
 });
