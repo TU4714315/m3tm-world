@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import type {GdeltHistoryView} from './gdeltPublicHistory';
-import {buildConflictEvolutionFrames,conflictGridGeoJson,evidenceBand,CONFLICT_FOCUS} from './conflictEvolution';
+import {buildConflictEvolutionFrames,conflictGridGeoJson,evidenceBand,CONFLICT_FOCUS,cumulativeSampleCells} from './conflictEvolution';
 
 const t0=Date.parse('2026-10-05T12:00:00.000Z');
 const stamp=(i:number)=>new Date(t0+i*15*60_000).toISOString();
@@ -52,6 +52,16 @@ describe('source-coded conflict report evolution',()=>{
       {...example.events[0],id:10,lat:Infinity},
     ]});
     expect(f[1].sampledReports).toBe(1);
+  });
+  it('animates expanding NEWS coverage only from observed sampled rows, never borders',()=>{
+    const frames=buildConflictEvolutionFrames(example);
+    expect(cumulativeSampleCells(frames,0)).toEqual([]);
+    expect(cumulativeSampleCells(frames,1)).toEqual([
+      {lat:15.5,lng:45.5,count:2,band:'violence'},
+    ]);
+    const later=cumulativeSampleCells(frames,3);
+    expect(later.reduce((sum,x)=>sum+x.count,0)).toBe(4);
+    expect(later.some(x=>x.band==='diplomatic')).toBe(true);
   });
   it('public map contract excludes source urls, actors and unit identities',()=>{
     const view=conflictGridGeoJson(buildConflictEvolutionFrames(example,'yemen')[1].cells);
