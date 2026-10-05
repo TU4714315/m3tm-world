@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {mergePublicNews,publicUrl,sourceTitleKey,type PublicNewsRow} from './publicNewsFusion';
+import {mergePublicNews,publicUrl,sourceTitleKey,selectPublicHeadlineAlerts,type PublicNewsRow} from './publicNewsFusion';
 const published=new Date(Date.now()-10*60_000).toISOString();
 const item=(o:Partial<PublicNewsRow>={}):PublicNewsRow=>({
  id:'1',title:'Reported incident in the Red Sea',description:'Observed in published reporting',
@@ -47,4 +47,13 @@ describe('source-preserving public news fusion',()=>{
    const sevenHoursAgo=new Date(Date.now()-7*60*60_000).toISOString();
    expect(mergePublicNews([a,item({published:sevenHoursAgo})])).toHaveLength(2);
  });
+
+  it('never emits social/keyword stories or stale items as breaking alerts',()=>{
+    const fresh=item({risk_score:9,feed_origin:'m3tm-app'});
+    const keyword=item({risk_score:9,feed_origin:'m3tm-app',risk_basis:'keyword-only'});
+    const telegram=item({risk_score:10,feed_origin:'independent-fallback'});
+    const old=item({risk_score:9,feed_origin:'m3tm-app',
+      published:new Date(Date.now()-4*60*60_000).toISOString()});
+    expect(selectPublicHeadlineAlerts([fresh,keyword,telegram,old])).toEqual([fresh]);
+  });
 });
