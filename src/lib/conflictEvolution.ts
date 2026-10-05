@@ -86,3 +86,27 @@ export function conflictGridGeoJson(cells:readonly GeoCell[]) {
     })),
   };
 }
+
+
+/** Historical media-footprint expansion, not territorial expansion.
+ * Only accumulates real bounded sample reports in the selected source bins.
+ */
+export function cumulativeSampleCells(frames:readonly ConflictFrame[],through:number):GeoCell[]{
+  const grouped=new Map<string,{lat:number;lng:number;count:number;bands:Record<ConflictBand,number>}>();
+  for(const frame of frames.slice(0,Math.max(0,through+1))){
+    for(const row of frame.sampleRows){
+      const band=evidenceBand(row.category);
+      if(!band)continue;
+      const lat=8+Math.floor((row.lat-8)/CELL)*CELL+CELL/2;
+      const lng=20+Math.floor((row.lng-20)/CELL)*CELL+CELL/2;
+      const key=lat+':'+lng;
+      const cell=grouped.get(key)||{lat,lng,count:0,bands:{violence:0,unrest:0,diplomatic:0}};
+      cell.count++;cell.bands[band]++;grouped.set(key,cell);
+    }
+  }
+  return [...grouped.values()].map(x=>({
+    lat:x.lat,lng:x.lng,count:x.count,
+    band:(Object.entries(x.bands) as Array<[ConflictBand,number]>)
+      .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0][0],
+  })).sort((a,b)=>b.count-a.count);
+}
