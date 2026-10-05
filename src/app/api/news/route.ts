@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { mergePublicNews, type PublicNewsRow } from '@/lib/publicNewsFusion';
+import { mergePublicNews, sourcePublishedPoint, type PublicNewsRow } from '@/lib/publicNewsFusion';
 
 /**
  * M3TM.WORLD — Public News Aggregation API
@@ -183,10 +183,7 @@ export async function GET() {
           : [];
         const arabicRows = rows.filter((item) => /[\u0600-\u06FF]/.test(String(item.title || '')));
         const news = arabicRows.slice(0, 160).map((item) => {
-          const lat = Number(item.latitude);
-          const lng = Number(item.longitude);
-          const hasCoords = Number.isFinite(lat) && Math.abs(lat) <= 90
-            && Number.isFinite(lng) && Math.abs(lng) <= 180;
+          const point = sourcePublishedPoint(item.latitude,item.longitude);
           const severityScore: Record<string, number> = {
             critical: 9,
             high: 7,
@@ -199,14 +196,14 @@ export async function GET() {
             title: String(item.title || 'خبر منشور'),
             description: String(item.summary || ''),
             link: String(item.sourceUrl || ''),
-            published: String(item.publishedAt || fetchedAt),
+            published: typeof item.publishedAt==='string' ? item.publishedAt : '',
             source: String(item.source || 'M3TM.APP'),
             risk_score: severityScore[String(item.severity || '').toLowerCase()] ?? 1,
-            coords: hasCoords ? [lat, lng] : null,
-            coords_default: !hasCoords,
+            coords: point,
+            coords_default: !point,
             language: 'ar',
             feed_origin: 'm3tm-app',
-            location_basis: hasCoords ? 'published-feed-coordinate' : 'none',
+            location_basis: point ? 'published-feed-coordinate' : 'none',
             verification_status: 'source-reported',
             machine_assessment: null,
           };
