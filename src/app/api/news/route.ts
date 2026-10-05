@@ -113,29 +113,49 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 }
 
 
-/** APP and independently attributed public feeds start simultaneously.
- * End-to-end cold path is bounded by slowest group, not added timeouts.
+/** APP and independent feeds start concurrently. Feed health never converts
+ * upstream errors or unparsed feeds to an asserted absence of events.
  */
-async function sampleIndependentPublicFeeds():Promise<any[]>{
-  const requests=[
-    ...TELEGRAM_CHANNELS.map(async(channel)=>{
-      try {
-        const r=await fetch('https://t.me/s/'+channel,{
-          signal:AbortSignal.timeout(8000),
-          headers:{'User-Agent':'M3TM.WORLD Public Source Review/1.0'},
-        });
-        return r.ok?parseTelegramHTML(await r.text(),channel).slice(-8):[];
-      }catch{return [];}
-    }),
-    ...Object.entries(FALLBACK_FEEDS).map(async([name,url])=>{
-      try {
-        const r=await fetch(url,{signal:AbortSignal.timeout(5000)});
-        return r.ok?parseRSSItems(await r.text(),name).slice(0,5):[];
-      }catch{return [];}
-    }),
+type SourceObservation={source:string;kind:'telegram'|'rss';state:'ready'|'empty'|'unavailable';observed:number};
+async function sampleIndependentPublicFeeds():Promise<{articles:any[];providers:SourceObservation[]}>{
+  const sources=[
+    ...TELEGRAM_CHANNELS.map(channel=>({
+      source:'t.me/'+channel,kind:'telegram' as const,
+      url:'https://t.me/s/'+channel,
+      parse:(text:string)=>parseTelegramHTML(text,channel).slice(-8),
+    })),
+    ...Object.entries(FALLBACK_FEEDS).map(([source,url])=>({
+      source,kind:'rss' as const,url,
+      parse:(text:string)=>parseRSSItems(text,source).slice(0,5),
+    })),
   ];
-  const results=await Promise.allSettled(requests);
-  return results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
+  const tasks=sources.map(async s=>{
+    try{
+      const r=await fetch(s.url,{
+        signal:AbortSignal.timeout(s.kind==='telegram'?8000:5000),
+        headers:s.kind==='telegram'
+          ?{'User-Agent':'Mozilla/5.0 (compatible; M3TM.World News Source)'}
+          :{'User-Agent':'M3TM-WORLD-NewsReview/1.0'},
+      });
+      if(!r.ok)return {source:s.source,kind:s.kind,
+        state:'unavailable' as const,observed:0,rows:[]};
+      const rows=s.parse(await r.text());
+      return {source:s.source,kind:s.kind,
+        state:rows.length?'ready' as const:'empty' as const,
+        observed:rows.length,rows};
+    }catch{
+      return {source:s.source,kind:s.kind,
+        state:'unavailable' as const,observed:0,rows:[]};
+    }
+  });
+  const answers=await Promise.allSettled(tasks);
+  const values=answers.map((r,i)=>r.status==='fulfilled'?r.value:
+    {source:sources[i].source,kind:sources[i].kind,
+      state:'unavailable' as const,observed:0,rows:[] as any[]});
+  return {
+    articles:values.flatMap(v=>v.rows),
+    providers:values.map(({source,kind,state,observed})=>({source,kind,state,observed})),
+  };
 }
 
 export async function GET() {
@@ -200,7 +220,7 @@ export async function GET() {
       // WORLD keeps its independent public-source fallback below.
     }
 
-    const allArticles = await independentPublicFeeds;
+    const {articles:allArticles,providers} = await independentPublicFeeds;
 
     const newsItems:PublicNewsRow[] = allArticles.map(article => {
       const riskScore = scoreRisk(article.description || article.title);
@@ -239,6 +259,7 @@ export async function GET() {
         rss_telegram: allArticles.length ? 'partial-sampled' : 'empty-or-unavailable',
         // Empty and unreachable are intentionally not treated as "no events".
         coverage: 'partial',
+        providers,
       },
     }, {
       headers: {
