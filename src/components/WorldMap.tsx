@@ -19,6 +19,7 @@ import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 
 import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
+import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -2302,27 +2303,32 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights, 2) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets, 2) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
-    setGeo('military-activity', (activeLayers as any).military_activity && data.military_activity
-      ? data.military_activity.map((cell: any) => ({
-          type: 'Feature' as const,
-          geometry: { type: 'Point' as const, coordinates: [cell.lng, cell.lat] },
-          properties: {
-            level: cell.level,
-            activity: cell.activity,
-            approximate_count: cell.approximate_count,
-            cell_degrees: cell.cell_degrees,
-            precision: cell.precision,
-            time_precision: cell.time_precision,
-            observed_at_bucket: cell.observed_at_bucket,
-            reporting_mode: cell.reporting_mode,
-            trend: cell.trend,
-            data_state: cell.data_state,
-            observed_at: cell.observed_at,
-            age_seconds: cell.age_seconds,
-          },
-        }))
-      : []);
-  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, data.military_activity, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
+    setGeo('military-activity',
+      (activeLayers as any).military_activity
+        ? coarseFlightMapFeatures(data.military_activity ?? [], coarseFlightSourceStale(data))
+        : []);
+  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, data.military_activity, data.military_activity_meta, data.flight_source_status, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
+
+  // When a browser loses successful flight refreshes, the immutable data
+  // payload never changes. Age *only* the small coarse military layer every
+  // 60 seconds, using exactly the same source clock as M3TM Fusion Radar.
+  // This prevents full-opacity "live" map markers from disagreeing with the
+  // panel's historical/stale status. No individual aircraft fields pass here.
+  useEffect(() => {
+    if (!mapReady || !(activeLayers as any).military_activity ||
+        !Array.isArray(data.military_activity)) return;
+    let marked = false;
+    const checkAge = () => {
+      const stale = coarseFlightSourceStale(data);
+      if (!stale || marked) return;
+      setGeo('military-activity', coarseFlightMapFeatures(data.military_activity, true));
+      marked = true;
+    };
+    checkAge();
+    const id = window.setInterval(checkAge, 60_000);
+    return () => window.clearInterval(id);
+  }, [mapReady, data.military_activity, data.military_activity_meta,
+    data.flight_source_status, (activeLayers as any).military_activity, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;

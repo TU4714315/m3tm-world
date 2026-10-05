@@ -98,6 +98,28 @@ describe('M3TM Fusion Radar — source timing and coverage',()=>{
       providerHealthy:true,staleFallback:false,mode:'aggregate-only',
     });
   });
+  it('shares the exact stale clock and strips military identifying fields from map markers',async()=>{
+    const {coarseFlightSourceStale, coarseFlightMapFeatures}=await import('./menaSignals');
+    const data={
+      flight_source_status:{status:'active',timestamp:'2026-10-05T03:55:00Z'},
+      military_activity_meta:{mode:'coarse-regional-aggregate',stale_fallback:false},
+    };
+    expect(coarseFlightSourceStale(data, Date.parse('2026-10-05T04:00:00Z'))).toBe(false);
+    expect(coarseFlightSourceStale(data, Date.parse('2026-10-05T04:00:00.001Z'))).toBe(true);
+    expect(coarseFlightSourceStale({...data,military_activity_meta:{...data.military_activity_meta,stale_fallback:true}},Date.parse('2026-10-05T03:55:01Z'))).toBe(true);
+    expect(coarseFlightSourceStale({
+      flight_source_status:{status:'degraded',timestamp:'2026-10-05T03:59:59Z'},
+    },Date.parse('2026-10-05T04:00:00Z'))).toBe(true);
+    const rows=[
+      {lat:24,lng:45,trend:'up',data_state:'live',level:2,activity:'متوسط',callsign:'PRIVATE',icao24:'HIDDEN',heading:89},
+    ] as never;
+    const features=coarseFlightMapFeatures(rows,coarseFlightSourceStale({...data,military_activity_meta:{stale_fallback:true}}));
+    expect(features).toHaveLength(1);
+    expect(features[0].properties).toMatchObject({trend:undefined,data_state:'cached-stale'});
+    expect(JSON.stringify(features)).not.toMatch(/PRIVATE|HIDDEN|icao24|heading|callsign/);
+    expect(coarseFlightMapFeatures(rows,false)[0].properties.trend).toBe('up');
+    expect(coarseFlightMapFeatures([{lat:NaN,lng:45}])).toHaveLength(0);
+  });
   it('uses only coarse MENA aggregate counts, never military identities or positions',async()=>{
     const {buildMenaFusionRadar}=await import('./menaSignals');
     const r=buildMenaFusionRadar({
