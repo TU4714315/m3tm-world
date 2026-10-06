@@ -1,7 +1,8 @@
 'use client';
 
 import {useEffect, useMemo, useState} from 'react';
-import {MapPinned, Radio, ExternalLink, Clock3, Plane, Waves, Activity, ShieldAlert} from 'lucide-react';
+import {MapPinned, Radio, ExternalLink, Clock3, Plane, Waves, Activity, ShieldAlert, Newspaper} from 'lucide-react';
+import { locatePublishedMenaNews, locatePublishedMenaReport } from '@/lib/menaNewsLocation';
 import {
   buildMenaFusionRadar, gdeltWindowTime, FUSION_WINDOWS,
   type FusionWindow,
@@ -16,10 +17,13 @@ const timestamp=(v:string|null|undefined)=>v&&Number.isFinite(Date.parse(v))
   ?new Date(v).toLocaleString('ar-SA',{timeZone:'UTC',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC'
   :'غير معلوم';
 
-export default function MenaPulse({data,stale,publishedAt,onFocus}:{
+export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
   data:any;stale?:boolean;publishedAt?:string|null;onFocus:()=>void;
+  /** Fly to a *published and already generalized* article/report map position. */
+  onLocate?:(lat:number,lng:number)=>void;
 }){
   const [period,setPeriod]=useState<FusionWindow>('h24');
+  const [newsLanguage,setNewsLanguage]=useState<'ar'|'all'>('ar');
   const [archiveCoverage,setArchiveCoverage]=useState<{
     observedWindows:number|null;expectedWindows:number;coveragePercent:number|null;
     durable:boolean;firstSeenLagMinutes:{p50:number|null;p95:number|null};
@@ -47,6 +51,9 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
   const sourceTime=publishedAt??gdeltWindowTime(data.conflict_source_status?.gdelt?.window||'');
   const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime,nowMs),[data,sourceTime,nowMs]);
   const visible=radar.events.filter(e=>e.ageMs!==null && e.ageMs<=FUSION_WINDOWS[period]);
+  const publishedNews=radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]);
+  const arabicNews=publishedNews.filter(n=>/[\u0600-\u06FF]/.test(n.title));
+  const visibleNews=newsLanguage==='ar' ? arabicNews : publishedNews;
   const preliminary=visible.filter(e=>!e.multiplePublishers).length;
   const multiple=visible.length-preliminary;
   const air=visible.filter(e=>e.category==='aerial_attack').length;
@@ -97,6 +104,65 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-amber-200">{radar.airRegions}</strong><p className="text-[10px] text-white/70">مناطق جوية مجمّعة</p></div>
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-amber-200">{radar.seaRegions}</strong><p className="text-[10px] text-white/70">مناطق بحرية مجمّعة</p></div>
     </div>
+    <section aria-label="أخبار الشرق الأوسط المرتبطة بموقع منشور"
+      className="mt-3 rounded-lg border border-emerald-300/30 bg-emerald-300/[0.06] p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <strong className="flex items-center gap-1.5 text-[12px] text-emerald-100">
+          <Newspaper className="h-4 w-4" /> أخبار مرتبطة بالخريطة
+        </strong>
+        <div className="flex gap-1" role="group" aria-label="لغة الأخبار">
+          <button type="button" onClick={()=>setNewsLanguage('ar')} aria-pressed={newsLanguage==='ar'}
+            className={`rounded border px-2 py-1 text-[11px] ${newsLanguage==='ar'?'border-emerald-200 bg-emerald-300/20 text-emerald-100':'border-white/20 text-white/60'}`}>العربية</button>
+          <button type="button" onClick={()=>setNewsLanguage('all')} aria-pressed={newsLanguage==='all'}
+            className={`rounded border px-2 py-1 text-[11px] ${newsLanguage==='all'?'border-emerald-200 bg-emerald-300/20 text-emerald-100':'border-white/20 text-white/60'}`}>كل اللغات</button>
+        </div>
+      </div>
+      <p className="mt-1 text-[11px] text-white/55">تحديد الموقع ينقلك إلى إحداثية سبق أن نشرها M3TM.APP بعد تعميمها؛ الأخبار دون موقع منشور لا تُنشأ لها نقاط تخمينية.</p>
+      <div className="mt-1.5 max-h-[195px] divide-y divide-white/10 overflow-y-auto styled-scrollbar">
+        {visibleNews.slice(0,8).map(n=>{
+          const location=locatePublishedMenaNews(data,n.url);
+          return <div key={n.id} className="py-2">
+            <p dir="auto" className="text-[12px] leading-5 font-semibold text-white/90">{n.title}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-white/60">
+              <span>{n.source} · {timestamp(n.time)}</span>
+              {location&&<button type="button" onClick={()=>onLocate?.(location.lat,location.lng)}
+                className="inline-flex items-center gap-1 rounded border border-cyan-300/35 bg-cyan-300/10 px-2 py-1 text-cyan-100 hover:bg-cyan-300/20">
+                <MapPinned className="h-3 w-3" /> تحديد على الخريطة
+              </button>}
+              <a href={n.url} rel="noopener noreferrer" target="_blank"
+                className="inline-flex items-center gap-1 text-emerald-200 underline">المصدر الأصلي<ExternalLink className="h-3 w-3"/></a>
+            </div>
+          </div>;
+        })}
+        {visibleNews.length===0&&<div className="py-3 text-[11px] text-white/60">
+          {newsLanguage==='ar' ? 'لا توجد أخبار عربية مسندة جغرافيًا ضمن هذه الفترة. اختر «كل اللغات» لعرض المتاح.' :
+          'لا توجد أخبار مرتبطة بإحداثية منشورة ضمن هذه الفترة؛ الأخبار غير المحددة الموقع تبقى في موجز الأخبار العام.'}
+        </div>}
+      </div>
+      <div className="mt-1.5 text-[10px] text-emerald-100/70">
+        عناوين عربية: {arabicNews.length} · إجمالي منشورات الموقع: {publishedNews.length}
+      </div>
+    </section>
+    <section aria-label="البلاغات المؤرخة ومواقعها على الخريطة"
+      className="mt-2 rounded-lg border border-white/15 bg-white/[0.035] p-2.5">
+      <strong className="text-[12px] text-white/90">أحدث البلاغات المرتبطة بالخريطة</strong>
+      <div className="mt-1 max-h-[130px] divide-y divide-white/10 overflow-y-auto styled-scrollbar">
+        {visible.slice(0,5).map(e=>{
+          const location=locatePublishedMenaReport(data,e.id);
+          return <div key={e.id} className="flex items-start justify-between gap-2 py-1.5">
+            <div className="min-w-0">
+              <p dir="auto" className="text-[11px] leading-5 text-white/85">{e.title}</p>
+              <p className="text-[10px] text-white/50">{e.source} · {timestamp(e.time)}</p>
+            </div>
+            {location&&<button type="button" onClick={()=>onLocate?.(location.lat,location.lng)}
+              className="shrink-0 rounded border border-cyan-300/40 px-2 py-1.5 text-[10px] text-cyan-100 hover:bg-cyan-300/15">
+              الموقع <MapPinned className="inline h-3 w-3"/>
+            </button>}
+          </div>;
+        })}
+        {visible.length===0&&<p className="py-2 text-[11px] text-white/55">لا توجد بلاغات مؤرخة في العينة والفترة المختارتين.</p>}
+      </div>
+    </section>
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.035] px-2.5 py-2">
       <strong className="flex items-center gap-1 text-xs text-white/90"><Activity className="h-3.5 w-3.5 text-cyan-300"/>مؤشرات الأدلة — ليست احتمالات مؤكدة</strong>
       <div className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
@@ -138,23 +204,6 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
       <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
     </div>
-    <div className="mt-2 rounded-lg border border-emerald-300/20 bg-emerald-300/[0.04] px-2.5 py-2">
-      <strong className="flex items-center gap-1 text-xs text-emerald-100"><Activity className="h-3.5 w-3.5"/>إشارات أخبار مستقلة · M3TM.APP</strong>
-      <p className="mt-1 text-[10px] leading-4 text-white/65">عناوين ذات إسناد جغرافي منشور؛ ليست تصنيفًا لحوادث قتال ولا تأكيدًا آليًا لبلاغات GDELT. ضمن أحدث عينة: {radar.appNewsLast24h} منشورًا في ٢٤ ساعة.</p>
-      <div className="mt-1 divide-y divide-emerald-200/10">
-        {radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]).slice(0,8).map(n=>
-          <div key={n.id} className="py-1.5">
-            <p className="text-[11px] leading-5 text-white/85">{n.title}</p>
-            <div className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-white/60">
-              <span>{n.source} · {timestamp(n.time)}</span>
-              <a href={n.url} rel="noopener noreferrer" target="_blank"
-                className="flex items-center gap-1 text-emerald-200 underline">الأصل<ExternalLink className="h-3 w-3"/></a>
-            </div>
-          </div>)}
-        {radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]).length===0&&
-          <p className="py-2 text-[11px] text-white/55">لا توجد عناوين مرتبطة مكانيًا ضمن الفترة المختارة.</p>}
-      </div>
-    </div>
     <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 text-white/60"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0"/>تعدد الناشرين لا يثبت استقلالهم، ولا يدل ترميز الخبر على المسؤولية. تحقق من الرابط الأصلي.</p>
     <div className="mt-1 divide-y divide-white/10">
       {visible.slice(0,16).map(e=><div key={e.id} className="py-2">
@@ -165,7 +214,13 @@ export default function MenaPulse({data,stale,publishedAt,onFocus}:{
         {e.actors.length>0&&<p className="mt-1 text-[10px] text-amber-100/75">الجهات المذكورة في الخبر (دون إثبات المسؤولية): {e.actors.join(' / ')}</p>}
         <div className="mt-1 flex justify-between gap-2 text-[10px] text-white/65">
           <span>{e.source} · {timestamp(e.time)}</span>
-          {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-300 underline">المصدر<ExternalLink className="h-3 w-3"/></a>}
+          <span className="flex items-center gap-2">
+            {locatePublishedMenaReport(data,e.id)&&<button type="button" className="text-cyan-200 underline"
+              onClick={()=>{const point=locatePublishedMenaReport(data,e.id);if(point)onLocate?.(point.lat,point.lng);}}>
+              الموقع
+            </button>}
+            {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-300 underline">المصدر<ExternalLink className="h-3 w-3"/></a>}
+          </span>
         </div>
       </div>)}
       {visible.length===0&&<p className="py-3 text-center text-xs text-white/65">لا توجد بلاغات مؤرخة ضمن الفترة المختارة؛ لا يعني ذلك عدم وقوع أحداث.</p>}

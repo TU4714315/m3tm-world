@@ -45,7 +45,10 @@ function timeAgo(dateStr: string): string {
 export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
   const [expanded, setExpanded] = useState(true);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const news = data.news || [];
+  const [language,setLanguage] = useState<'ar'|'all'>('ar');
+  const news: any[] = Array.isArray(data?.news) ? data.news : [];
+  const arabicNews = news.filter((item: any) => /[\u0600-\u06FF]/.test(String(item.title || '')));
+  const visibleNews = language === 'ar' ? arabicNews : news;
 
   return (
     <motion.div
@@ -73,6 +76,15 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
         </div>
       </button>
 
+      <div dir="rtl" className="flex items-center justify-between gap-2 px-3 pb-2 text-[11px]">
+        <span className="text-[var(--text-muted)]">عربية {arabicNews.length} / كل المصادر {news.length}</span>
+        <div role="group" aria-label="لغة عناوين الأخبار" className="flex gap-1">
+          <button type="button" onClick={() => {setLanguage('ar');setSelectedIdx(null);}} aria-pressed={language==='ar'}
+            className={`rounded border px-2 py-1 ${language==='ar'?'border-emerald-300/50 bg-emerald-400/15 text-emerald-100':'border-white/15 text-white/65'}`}>العربية</button>
+          <button type="button" onClick={() => {setLanguage('all');setSelectedIdx(null);}} aria-pressed={language==='all'}
+            className={`rounded border px-2 py-1 ${language==='all'?'border-emerald-300/50 bg-emerald-400/15 text-emerald-100':'border-white/15 text-white/65'}`}>جميع اللغات</button>
+        </div>
+      </div>
       {/* News Items */}
       <AnimatePresence>
         {expanded && (
@@ -83,21 +95,21 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
             className="overflow-hidden"
           >
             <div className="max-h-[400px] overflow-y-auto styled-scrollbar divide-y divide-[var(--border-secondary)]">
-              {news.length === 0 ? (
+              {visibleNews.length === 0 ? (
                 <div className="px-4 py-6 text-center">
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">
-                    في انتظار الأخبار...
+                    {language==='ar' ? 'لا توجد أخبار بالعربية في العينة الحالية؛ اختر «جميع اللغات».' : 'في انتظار أخبار جديدة...'}
                   </span>
                 </div>
               ) : (
-                news.slice(0, 25).map((item: any, i: number) => (
+                visibleNews.slice(0, 25).map((item: any, i: number) => (
                   <div
                     key={i}
                     role="button"
                     tabIndex={0}
                     className="px-4 py-2.5 hover:bg-[var(--hover-accent)] transition-colors cursor-pointer"
-                    onClick={() => { if (item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); else setSelectedIdx(selectedIdx === i ? null : i); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && item.link) window.open(item.link, '_blank', 'noopener,noreferrer'); }}
+                    onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') {e.preventDefault();setSelectedIdx(selectedIdx === i ? null : i);} }}
                   >
                     {/* Top row: risk badge + source + time */}
                     <div className="flex items-center gap-2 mb-1">
@@ -107,7 +119,11 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                       <span className="text-[9px] font-mono text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
                         {item.source}
                       </span>
-                      {item.coords && (
+                      {item.location_basis === 'published-feed-coordinate' &&
+                        Array.isArray(item.coords) &&
+                        item.coords.length === 2 &&
+                        Number.isFinite(item.coords[0]) &&
+                        Number.isFinite(item.coords[1]) && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -147,16 +163,20 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                           exit={{ height: 0, opacity: 0 }}
                           className="mt-2 overflow-hidden"
                         >
-                          <a
-                            href={item.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-[11px] font-mono text-[var(--cyan-primary)] hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="w-2.5 h-2.5" />
-                            فتح المصدر
-                          </a>
+                          <>
+                            <p className="mb-1 text-[10px] text-white/55">
+                              {item.location_basis==='published-feed-coordinate' ? 'الموقع منشور ومُعمّم؛ استخدم علامة الموقع لتحديده.' : 'المصدر لم ينشر إحداثية موثقة؛ لا تُنشأ نقطة تخمينية.'}
+                            </p>
+                            {typeof item.link === 'string' && /^https?:\/\//i.test(item.link) && <a
+                              href={item.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[11px] font-mono text-[var(--cyan-primary)] hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" /> قراءة المصدر الأصلي
+                            </a>}
+                          </>
                         </motion.div>
                       )}
                     </AnimatePresence>

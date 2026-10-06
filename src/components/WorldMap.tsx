@@ -3,6 +3,7 @@
 import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
@@ -319,6 +320,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
     map.on('load', () => {
       mapRef.current = map;
+      // CARTO's hard-coded name_en text fields must be changed on the actual
+      // loaded style, not just in UI labels. Preserve all border geometries.
+      applyArabicBasemapLabels(map);
 
       // Theme colors
       const isGhost = theme === 'ghost';
@@ -1143,10 +1147,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
       // ── SEA domain (Distinct Solid Lines) ──
       // Removed glow to match the clean, diagrammatic look of submarinecablemap.com
+      // Regional overview must prioritize published incidents and readable
+      // geography, not a bright wall of overlapping subsea cable segments.
+      // The same records remain available and become detailed when zoomed in.
       map.addLayer({ id: 'sdk-sea', type: 'line', source: 'sdk-links', filter: ['==',['get','domain'],'SEA'], paint: {
-        'line-color': ['coalesce', ['get', 'color'], '#1976D2'], // Single solid color from properties
-        'line-width': ['interpolate',['linear'],['zoom'], 1, 0.8, 5, 1.5, 10, 2.5],
-        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.3, 5, 0.5, 10, 0.7],
+        'line-color': ['coalesce', ['get', 'color'], '#1976D2'],
+        'line-width': ['interpolate',['linear'],['zoom'], 1, 0.3, 4.5, 0.45, 7, 1.0, 10, 1.6],
+        'line-opacity': ['interpolate',['linear'],['zoom'], 1, 0.05, 4.5, 0.12, 7, 0.28, 10, 0.48],
       }});
 
       // ── AIR domain (Steel Gray / Cyan) ──

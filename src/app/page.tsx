@@ -1801,10 +1801,11 @@ export default function Dashboard() {
             <MapPinned className="h-4 w-4"/>
           </button>
           <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/85 px-2 py-1 text-[11px] text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">الشرق الأوسط والبحر الأحمر</span>
-          {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(88vw,390px)]">
+          {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(89vw,440px)]">
             <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
               publishedAt={data.conflict_source_published_at}
-              onFocus={() => setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()})}/>
+              onFocus={() => setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()})}
+              onLocate={(lat,lng) => setFlyToLocation({lat,lng,zoom:6,ts:Date.now()})}/>
           </div>}
         </div>
         <div className="relative group">
