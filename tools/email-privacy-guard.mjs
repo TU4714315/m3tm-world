@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 // Prevent newly added personal email addresses in this public repository.
 // Do not print matching addresses to CI logs.
-const EMAIL_PATTERN = /[A-Z0-9_][A-Z0-9.!#$%&'*+/=?^`{|}~-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi;
+const EMAIL_PATTERN = /[A-Z0-9_][A-Z0-9.!#$%&'*+/=?^`{|}~-]*@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi;
 const PLACEHOLDER_DOMAINS = new Set(['example.com', 'example.net', 'example.org', 'example.invalid']);
 const SAFE_GIT_ADDRESSES = new Set(['noreply@github.com', 'git@github.com']);
 
