@@ -1,0 +1,25 @@
+name: Prevent personal email disclosure
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  public-email-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test privacy guard
+        run: node --test tools/email-privacy-guard.test.mjs
+      - name: Scan newly added public content (no sensitive values in logs)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node tools/email-privacy-guard.mjs
