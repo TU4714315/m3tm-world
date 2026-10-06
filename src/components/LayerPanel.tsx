@@ -295,27 +295,41 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   const meta = data?.military_activity_meta;
   const source = data?.flight_source_status;
   if (!meta && !source && !cells) return null;
-  const adsbMil = Number(source?.providers?.adsbfi_mil || 0);
+  const adsbFiCount = source?.providers?.adsbfi_mil;
+  const adsbFiHealthy = source?.providers?.adsbfi_mil_healthy;
+  const adsbLolCount = source?.providers?.adsblol_mil;
+  const adsbLolHealthy = source?.providers?.adsblol_mil_healthy;
+  const taggedSource = meta?.tagged_feed_provider || source?.providers?.tagged_feed_provider;
+  const backupState = meta?.backup_feed_state;
   const openSky = Number(source?.providers?.opensky || 0);
-  const openSkyAge = Number(source?.providers?.opensky_age_s);
+  const openSkyAge = source?.providers?.opensky_age_s;
   const stale = meta?.stale_fallback === true;
+  const taggedUnhealthy = meta?.provider_healthy === false;
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
       <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
-      <div className={stale ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
-        البيانات: {stale ? 'آخر لقطة عامة مخزنة · المصدر الحي متعذر مؤقتًا' : 'رصد حي/مجمّع'}
+      <div className={stale || taggedUnhealthy ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
+        البيانات: {stale ? 'آخر لقطة مخزنة · ليست رصدًا حيًا'
+          : taggedUnhealthy ? 'المصدر الموسوم عسكريًا متعذر؛ التصنيف الإقليمي العام ليس تأكيدًا عسكريًا'
+            : taggedSource === 'adsb.fi' ? 'مجمّع من مزوّد احتياطي مرخّص للاستخدام الحالي'
+              : 'مجمّع من ADSB.lol العام، ليس دليلًا على عملية عسكرية'}
         {meta?.cache_backend ? ' · التخزين ' + String(meta.cache_backend) : ''}
       </div>
       {source && (
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
           <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>
-          <span>ADS-B عسكري مرصود: <b className="text-white/55">{adsbMil.toLocaleString('ar-SA')}</b></span>
+          <span>ADSB.lol: <b className="text-white/55">{adsbLolHealthy === true ? Number(adsbLolCount).toLocaleString('ar-SA') : 'متعذر / لا رصد'}</b></span>
+          <span>ADSB.fi الاحتياطي: <b className="text-white/55">{backupState === 'not_requested' ? 'لم يُستخدم' : adsbFiHealthy === true ? Number(adsbFiCount).toLocaleString('ar-SA') : 'متعذر / لا رصد'}</b></span>
           <span>OpenSky: <b className="text-white/55">{openSky.toLocaleString('ar-SA')}</b></span>
-          {Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
+          {typeof openSkyAge === 'number' && Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
         </div>
       )}
       {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
-      <div className="mt-1 text-white/30">التصنيف: رصد ADS-B عسكري/حكومي عام مجمّع فقط؛ غياب الرصد لا يعني غياب طائرة، ولا توجد مسارات عسكرية دقيقة في السطح العام.</div>
+      <div className="mt-1 text-white/30">
+        التصنيف عام وآلي وغير مؤكد عسكريًا؛ غياب الرصد لا يعني غياب طائرة، ولا تُعرض مسارات عسكرية دقيقة.
+        {' '}المصدر: <a className="underline" href="https://www.adsb.lol/" target="_blank" rel="noopener noreferrer">ADSB.lol</a>
+        {' '}· <a className="underline" href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL 1.0</a>.
+      </div>
     </div>
   );
 }
