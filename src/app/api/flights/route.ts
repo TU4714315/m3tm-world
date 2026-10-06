@@ -131,8 +131,9 @@ const FLIGHT_REFRESH_STOP_MARGIN_MS = 2_500;
 // adsb.fi serves /mil but returns 400 for /ladd, /pia and /squawk/{code},
 // so the global type feeds collapse to the military one.
 async function fetchAdsbFiRegion(lat: number, lon: number, timeoutMs = REGIONAL_REQUEST_TIMEOUT_MS): Promise<any[]> {
-  // adsb.fi's public endpoint is personal/non-commercial; require opt-in.
-  if (process.env.ADSBFI_PERSONAL_USE_CONFIRMED !== 'true') return [];
+  // Preserve the existing civilian regional fallback. Operators can turn it
+  // off if their use does not qualify for ADSB.fi's non-commercial API terms.
+  if (process.env.ADSBFI_REGIONAL_DISABLED === 'true') return [];
   try {
     const boundedTimeout = Math.max(500, Math.min(REGIONAL_REQUEST_TIMEOUT_MS, timeoutMs));
     const res = await fetch(`${ADSBFI_REGION_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
