@@ -34,3 +34,8 @@ test('ignores deleted lines and reports no email values', () => {
     '+There is no exposed address in this line',
   ])), []);
 });
+
+test('catches one-character email identifiers', () => {
+  const shortEmail = ['a', 'gmail.com'].join('@');
+  assert.equal(findAddedPrivateEmails(patch(['+' + shortEmail])).length, 1);
+});
