@@ -9,13 +9,17 @@ describe('server-only tagged ADS-B provider and controlled fallback', () => {
     const feed = await fetchTaggedMilitaryFeed(fn);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn.mock.calls[0][0]).toBe(TAGGED_FEED_PRIMARY);
-    expect(fn.mock.calls[0][1]?.headers).toEqual({ Accept: 'application/json' });
+    expect(fn.mock.calls[0][1]?.headers).toEqual({
+      Accept: 'application/json',
+      'User-Agent': 'M3TM-WORLD/1.0 (+https://m3tm-world.vercel.app)',
+    });
     expect(feed).toMatchObject({ provider: 'adsb.lol', primaryState: 'active', backupState: 'not_requested', primaryCount: 1 });
   });
   it('does not use non-commercial backup by default on HTTP 403', async () => {
     const fn = vi.fn(async () => new Response('Forbidden', { status: 403 }));
     expect(await fetchTaggedMilitaryFeed(fn)).toMatchObject({ provider: null, aircraft: [], backupState: 'not_requested' });
     expect(fn).toHaveBeenCalledTimes(1);
+    expect((await fetchTaggedMilitaryFeed(async () => new Response('Forbidden', {status:403}))).primaryHttpStatus).toBe(403);
   });
   it('does not treat a successful empty array as observed absence', async () => {
     const fn = vi.fn(async () => ok([]));
