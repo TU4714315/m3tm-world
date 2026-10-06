@@ -8,6 +8,7 @@ import {
   Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
+import { publicMilitaryActivityOverview } from '@/lib/publicMilitaryActivityOverview';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
 
 interface LayerPanelProps {
@@ -305,9 +306,40 @@ function MilitaryActivityStatus({ data }: { data: any }) {
   const openSkyAge = source?.providers?.opensky_age_s;
   const stale = meta?.stale_fallback === true;
   const taggedUnhealthy = meta?.provider_healthy === false;
+  const overview = publicMilitaryActivityOverview(data?.military_activity, stale);
+  const reportedAt = typeof meta?.observed_at === 'string' && Number.isFinite(Date.parse(meta.observed_at))
+    ? meta.observed_at.slice(0, 16).replace('T', ' ') + ' UTC'
+    : null;
+  const share = (count: number) => overview.total > 0 ? `${(count / overview.total) * 100}%` : '0%';
   return (
     <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      <div>نشاط جوي عام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      <div className="font-semibold text-white/70">مناطق النشاط الجوي العام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
+      <div className="mt-1 text-white/45">توزيع الكثافة عبر مساحات واسعة (كل خلية نحو 6°)، وليس مسارات طائرات.</div>
+      {overview.total > 0 && (
+        <div className="mt-2" role="group" aria-label="توزيع مستويات نشاط الطيران العام في الخلايا الإقليمية">
+          <div className="flex w-full h-2 overflow-hidden rounded bg-white/[0.06]">
+            <div style={{ width: share(overview.low) }} className="bg-amber-300/70" />
+            <div style={{ width: share(overview.medium) }} className="bg-orange-400/75" />
+            <div style={{ width: share(overview.high) }} className="bg-red-400/70" />
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-white/60">
+            <span>محدود: {overview.low.toLocaleString('ar-SA')}</span>
+            <span>متوسط: {overview.medium.toLocaleString('ar-SA')}</span>
+            <span>مرتفع: {overview.high.toLocaleString('ar-SA')}</span>
+          </div>
+          {!overview.stale && overview.compared >= 3 ? (
+            <div className="mt-1.5 text-white/50">
+              تغير كثافة المناطق القابلة للمقارنة فقط: ↑ {overview.increased.toLocaleString('ar-SA')} / ↓ {overview.decreased.toLocaleString('ar-SA')} / مستقر {overview.unchanged.toLocaleString('ar-SA')}
+            </div>
+          ) : (
+            <div className="mt-1.5 text-white/40">
+              {overview.stale ? 'تعذرت مقارنة الاتجاهات لأن اللقطة محفوظة أو قديمة.'
+                : 'لا توجد عينات إقليمية مقارنة كافية لإثبات اتجاه التغير.'}
+            </div>
+          )}
+        </div>
+      )}
+      {reportedAt && <div className="mt-1 text-white/45">وقت رصد الخلايا المُعلن: {reportedAt}</div>}
       <div className={stale || taggedUnhealthy ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
         البيانات: {stale ? 'آخر لقطة مخزنة · ليست رصدًا حيًا'
           : taggedUnhealthy ? 'المصدر الموسوم عسكريًا متعذر؛ التصنيف الإقليمي العام ليس تأكيدًا عسكريًا'
