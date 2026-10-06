@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { fetchFastRssNews, fusePublicNews, type RoutedNews } from '@/lib/fastNews';
 
 /**
  * M3TM.WORLD — Public News Aggregation API
@@ -74,7 +75,8 @@ function parseTelegramHTML(html: string, channel: string): any[] {
     const dateRegex = /<a class="tgme_widget_message_date" href="(https:\/\/t\.me\/[^"]+)".*?<time datetime="([^"]+)"/i;
     const dateMatch = blockHtml.match(dateRegex);
     const link = dateMatch ? dateMatch[1] : `https://t.me/${channel}`;
-    const pubDate = dateMatch ? dateMatch[2] : new Date().toISOString();
+    if (!dateMatch) continue; // Do not invent a publication time.
+    const pubDate = dateMatch[2];
 
     const title = text.split('\n')[0].substring(0, 100);
 
@@ -102,7 +104,7 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
       title: title.length > 100 ? title.substring(0, 100) + '...' : title,
       description: desc,
       link: getTag('link'),
-      pubDate: getTag('pubDate') || new Date().toISOString(),
+      pubDate: getTag('pubDate'),
       source: sourceName
     });
   }
@@ -111,12 +113,17 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 
 export async function GET() {
   try {
+    // Start independent RSS concurrently with APP. Neither stream waits for
+    // the other's 15-minute publisher cadence. No inferred map locations.
+    const fastRssPromise = fetchFastRssNews();
+    let appNews: RoutedNews[] = [];
+    let appPublishedAt: string | null = null;
     // M3TM.APP already publishes a sanitized, source-backed Arabic feed. Reuse
     // that public contract first so the standalone WORLD surface and the APP
     // embed speak the same language and do not independently reinterpret news.
     try {
       const published = await fetch(M3TM_APP_PUBLIC_NEWS, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(3200),
         next: { revalidate: 60 },
       });
       if (published.ok) {
@@ -128,11 +135,12 @@ export async function GET() {
           ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
           : [];
         const arabicRows = rows.filter((item) => /[\u0600-\u06FF]/.test(String(item.title || '')));
-        const news = arabicRows.slice(0, 160).map((item) => {
-          const lat = Number(item.latitude);
-          const lng = Number(item.longitude);
-          const hasCoords = Number.isFinite(lat) && Math.abs(lat) <= 90
-            && Number.isFinite(lng) && Math.abs(lng) <= 180;
+        const news: RoutedNews[] = arabicRows.slice(0, 160).map((item) => {
+          const lat = item.latitude;
+          const lng = item.longitude;
+          const hasCoords = typeof lat === 'number' && typeof lng === 'number' &&
+            Number.isFinite(lat) && Math.abs(lat) <= 90 &&
+            Number.isFinite(lng) && Math.abs(lng) <= 180;
           const severityScore: Record<string, number> = {
             critical: 9,
             high: 7,
@@ -145,36 +153,49 @@ export async function GET() {
             title: String(item.title || 'خبر منشور'),
             description: String(item.summary || ''),
             link: String(item.sourceUrl || ''),
-            published: String(item.publishedAt || fetchedAt),
+            published: String(item.publishedAt || ''),
             source: String(item.source || 'M3TM.APP'),
             risk_score: severityScore[String(item.severity || '').toLowerCase()] ?? 1,
-            coords: hasCoords ? [lat, lng] : null,
+            coords: hasCoords ? [lat as number, lng as number] as [number,number] : null,
             coords_default: !hasCoords,
             language: 'ar',
             feed_origin: 'm3tm-app',
             location_basis: hasCoords ? 'published-feed-coordinate' : 'none',
-            verification_status: 'source-reported',
+            verification_status: 'source-reported' as const,
             machine_assessment: null,
           };
         });
-        if (news.length > 0) {
-          return NextResponse.json({
-            news,
-            total: news.length,
-            timestamp: fetchedAt,
-            language: 'ar',
-            source: 'M3TM.APP public feed',
-          }, {
-            headers: {
-              'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-            },
-          });
-        }
+        appNews = news;
+        appPublishedAt = fetchedAt;
       }
     } catch {
-      // WORLD keeps its independent public-source fallback below.
+      // WORLD still has the independent published-source feed.
+    }
+    const rss = await fastRssPromise;
+    if (appNews.length || rss.news.length) {
+      const news = fusePublicNews(appNews, rss.news);
+      const freshest = news.reduce<string | null>((best,item) =>
+        !best || Date.parse(item.published)>Date.parse(best) ? item.published : best, null);
+      return NextResponse.json({
+        news, total: news.length,
+        timestamp: new Date().toISOString(),
+        source_published_at: freshest,
+        app_fetched_at: appPublishedAt,
+        language: 'mixed',
+        source: 'M3TM.APP + independent fast RSS',
+        source_status: {
+          app: { available: appNews.length>0, count: appNews.length },
+          rss: { succeeded: rss.succeeded, failed: rss.failed, count: rss.news.length },
+        },
+        geo_contract: 'APP published coordinates only; RSS headlines are unlocated',
+      }, {headers:{
+        'Cache-Control':'public, s-maxage=45, stale-while-revalidate=90',
+        'Access-Control-Allow-Origin':'https://m3tm.app',
+      }});
     }
 
+    // Legacy public Telegram and RSS fallbacks remain available whenever
+    // both APP and fast RSS are unavailable.
     const feedPromises = TELEGRAM_CHANNELS.map(async (channel) => {
       try {
         const res = await fetch(`https://t.me/s/${channel}`, {
@@ -211,7 +232,11 @@ export async function GET() {
       }
     }
 
-    const newsItems = allArticles.map(article => {
+    const newsItems = allArticles.filter(article =>
+      typeof article.pubDate === 'string' &&
+      Number.isFinite(Date.parse(article.pubDate)) &&
+      Date.parse(article.pubDate) <= Date.now() + 10 * 60_000
+    ).map(article => {
       const riskScore = scoreRisk(article.description || article.title);
       const coords = findCoords(article.description || article.title);
 
@@ -242,7 +267,8 @@ export async function GET() {
       source: allArticles.length ? 'Telegram / RSS independent fallback' : 'none',
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'public, s-maxage=45, stale-while-revalidate=90',
+        'Access-Control-Allow-Origin': 'https://m3tm.app',
       },
     });
   } catch (error) {
