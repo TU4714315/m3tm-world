@@ -1,8 +1,8 @@
 
 import { NextResponse } from 'next/server';
-import { stealthFetch } from '@/lib/stealthFetch';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
+import { fetchTaggedMilitaryFeed } from '@/lib/militaryTaggedFeed';
 
 export const maxDuration = 60;
 
@@ -111,20 +111,12 @@ const CALLSIGN_RE = /^[A-Z0-9]{3,8}$/;
 const JET_CRUISE_ALT_M = 8500;
 const JET_CRUISE_KTS = 300;
 
-// adsb.fi is the last free tar1090/ADSBexchange-v2 shaped feed still serving
-// data without an API key, so classifyFlight() works on it unchanged. The two
-// providers this route used to fan out to have both stopped returning aircraft:
-//   api.airplanes.live  → 403 on every endpoint (now key-gated)
-//   api.adsb.lol/v2     → 200 but always {"ac":[],"total":0}
-//   api.adsb.one/v2     → 403 (checked as a replacement, also unusable)
-// Because both failure modes are silent (403 bodies are discarded, an empty
-// ac[] is indistinguishable from quiet airspace), the fallback path degraded to
-// zero aircraft without ever throwing. Provider counts are reported in the
-// response now so the next feed to die is visible instead of silent.
+// Military-tagged input: ADSB.lol (ODbL, key-free public API) through an
+// honest server request. Optional ADSB.fi backup is gated by explicit license
+// confirmation, never treated as commercial production access by default.
 const ADSB_MAX_DIST = 250; // nm — hard cap the provider enforces
 const ADSBFI_ROOT = 'https://opendata.adsb.fi/api';
 const ADSBFI_REGION_BASE = `${ADSBFI_ROOT}/v3`;
-const ADSBFI_MIL_URL = `${ADSBFI_ROOT}/v2/mil`;
 
 // adsb.fi allows roughly one request per second and soft-throttles over that by
 // returning 200 with an empty ac[] rather than 429, so a parallel fanout looks
@@ -139,9 +131,12 @@ const FLIGHT_REFRESH_STOP_MARGIN_MS = 2_500;
 // adsb.fi serves /mil but returns 400 for /ladd, /pia and /squawk/{code},
 // so the global type feeds collapse to the military one.
 async function fetchAdsbFiRegion(lat: number, lon: number, timeoutMs = REGIONAL_REQUEST_TIMEOUT_MS): Promise<any[]> {
+  // Preserve the existing civilian regional fallback. Operators can turn it
+  // off if their use does not qualify for ADSB.fi's non-commercial API terms.
+  if (process.env.ADSBFI_REGIONAL_DISABLED === 'true') return [];
   try {
     const boundedTimeout = Math.max(500, Math.min(REGIONAL_REQUEST_TIMEOUT_MS, timeoutMs));
-    const res = await stealthFetch(`${ADSBFI_REGION_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
+    const res = await fetch(`${ADSBFI_REGION_BASE}/lat/${lat}/lon/${lon}/dist/${ADSB_MAX_DIST}`, {
       signal: AbortSignal.timeout(boundedTimeout),
     });
     if (res.ok) {
@@ -451,31 +446,24 @@ export async function GET(req: Request) {
       : { signal: AbortSignal.timeout(OPENSKY_FETCH_TIMEOUT_MS) };
 
     const [milRes, osRes] = await Promise.allSettled([
-      stealthFetch(ADSBFI_MIL_URL, { signal: AbortSignal.timeout(OPENSKY_FETCH_TIMEOUT_MS) }),
+      fetchTaggedMilitaryFeed(fetch, {
+        timeoutMs: OPENSKY_FETCH_TIMEOUT_MS,
+        backupEnabled: process.env.ADSBFI_PERSONAL_USE_CONFIRMED === 'true',
+      }),
       skipOpenSky
         ? Promise.reject(new Error('OpenSky in cooldown'))
         // extended=1 appends the ADS-B emitter category as an 18th field. Without
         // it the state vector is 17 long and s[17] below is silently undefined,
         // which is what made every category_os test in classifyFlight() dead.
         // It does not change the credit cost — that is set by the area queried.
-        : stealthFetch('https://opensky-network.org/api/states/all?extended=1', osInit),
+        : fetch('https://opensky-network.org/api/states/all?extended=1', osInit),
     ]);
 
-    // Drain the military feed — parse on ok, discard the body otherwise to free the connection.
-    if (milRes.status === 'fulfilled') {
-      if (milRes.value.ok) {
-        try {
-          const data = await milRes.value.json();
-          milProviderHealthy = Array.isArray(data.ac);
-          ingestAc(data.ac || [], allRaw, seenHex);
-        } catch (e) {
-          console.warn('[OSIRIS] adsb.fi mil parse error:', e);
-        }
-      } else {
-        console.warn('[OSIRIS] adsb.fi mil feed returned', milRes.value.status);
-        await milRes.value.body?.cancel();
-      }
-    }
+    // A healthy HTTP transfer with no records is NOT evidence of no aircraft.
+    // Tagged metadata is reported, while raw aircraft remain server-side.
+    const taggedFeed = milRes.status === 'fulfilled' ? milRes.value : null;
+    milProviderHealthy = !!taggedFeed?.provider;
+    if (taggedFeed) ingestAc(taggedFeed.aircraft, allRaw, seenHex);
     const milCount = allRaw.length;
 
     // Refresh the OpenSky snapshot when one was due; otherwise the existing one
@@ -578,7 +566,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const militaryObservedAtMs = osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
+    const militaryObservedAtMs = milCount > 0 ? Date.now() : osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
     const observedAt = new Date(militaryObservedAtMs).toISOString();
     const previousMilitary = await durableGetJson<PublicMilitaryActivitySnapshot>(PUBLIC_MILITARY_CACHE_KEY);
     let militaryActivity = buildPublicMilitaryActivity(military, militaryObservedAtMs);
@@ -615,6 +603,9 @@ export async function GET(req: Request) {
         exact_tracks_exposed: false,
         trend_basis: 'aggregate-cell-level-only',
         provider_healthy: milProviderHealthy,
+        tagged_feed_provider: taggedFeed?.provider ?? null,
+        primary_feed_state: taggedFeed?.primaryState ?? 'unavailable',
+        backup_feed_state: taggedFeed?.backupState ?? 'unavailable',
         stale_fallback: militaryActivityStale,
         observed_at: militaryActivity[0]?.observed_at ?? observedAt,
         cache_backend: militaryActivityCacheBackend,
@@ -634,8 +625,11 @@ export async function GET(req: Request) {
       // Per-feed counts so a provider that starts answering 200 with no aircraft
       // is visible in the payload rather than silently emptying the map.
       providers: {
-        adsbfi_mil:      milCount,
-        adsbfi_mil_healthy: milProviderHealthy,
+        adsbfi_mil: taggedFeed?.backupCount ?? 0,
+        adsbfi_mil_healthy: taggedFeed?.backupState === 'active',
+        adsblol_mil: taggedFeed?.primaryCount ?? 0,
+        adsblol_mil_healthy: taggedFeed?.primaryState === 'active',
+        tagged_feed_provider: taggedFeed?.provider ?? null,
         adsbfi_regional: openSkyWorked ? 0 : allRaw.length - milCount,
         opensky:         osSnapshot.length,
         opensky_auth:    hasOpenSkyCreds(),
@@ -649,8 +643,11 @@ export async function GET(req: Request) {
             : 'empty',
         provider: source,
         providers: {
-          adsbfi_mil: milCount,
-          adsbfi_mil_healthy: milProviderHealthy,
+          adsbfi_mil: taggedFeed?.backupCount ?? 0,
+          adsbfi_mil_healthy: taggedFeed?.backupState === 'active',
+          adsblol_mil: taggedFeed?.primaryCount ?? 0,
+          adsblol_mil_healthy: taggedFeed?.primaryState === 'active',
+          tagged_feed_provider: taggedFeed?.provider ?? null,
           adsbfi_regional: openSkyWorked ? 0 : allRaw.length - milCount,
           opensky: osSnapshot.length,
           opensky_auth: hasOpenSkyCreds(),
