@@ -17,28 +17,46 @@ export interface TaggedMilitaryFeedResult {
   backupState: TaggedFeedState;
   primaryCount: number;
   backupCount: number;
+  primaryHttpStatus: number | null;
+  primaryFailure: 'http_error' | 'invalid_json' | 'invalid_payload' | 'network' | null;
 }
 type TaggedFetcher = (url: string, init?: RequestInit) => Promise<Response>;
-type ProviderResult = { state: Exclude<TaggedFeedState, 'not_requested'>; aircraft: Record<string, unknown>[] };
+type ProviderResult = {
+  state: Exclude<TaggedFeedState, 'not_requested'>;
+  aircraft: Record<string, unknown>[];
+  httpStatus: number | null;
+  failure: TaggedMilitaryFeedResult['primaryFailure'];
+};
 
 async function queryProvider(fetcher: TaggedFetcher, url: string, timeoutMs: number): Promise<ProviderResult> {
   try {
     // No spoofed X-Forwarded-For / X-Real-IP; respect origin IP policy.
     const response = await fetcher(url, {
       signal: AbortSignal.timeout(timeoutMs),
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        // Transparent app identification, never invented IP/identity headers.
+        'User-Agent': 'M3TM-WORLD/1.0 (+https://m3tm-world.vercel.app)',
+      },
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
-      return { state: 'unavailable', aircraft: [] };
+      return { state: 'unavailable', aircraft: [], httpStatus: response.status, failure: 'http_error' };
     }
-    const data = await response.json();
-    if (!data || !Array.isArray(data.ac)) return { state: 'unavailable', aircraft: [] };
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      return { state: 'unavailable', aircraft: [], httpStatus: response.status, failure: 'invalid_json' };
+    }
+    if (!data || typeof data !== 'object' || !('ac' in data) || !Array.isArray(data.ac)) {
+      return { state: 'unavailable', aircraft: [], httpStatus: response.status, failure: 'invalid_payload' };
+    }
     // HTTP 200 + [] can also signal source throttling.
-    if (data.ac.length === 0) return { state: 'empty', aircraft: [] };
-    return { state: 'active', aircraft: data.ac };
+    if (data.ac.length === 0) return { state: 'empty', aircraft: [], httpStatus: response.status, failure: null };
+    return { state: 'active', aircraft: data.ac, httpStatus: response.status, failure: null };
   } catch {
-    return { state: 'unavailable', aircraft: [] };
+    return { state: 'unavailable', aircraft: [], httpStatus: null, failure: 'network' };
   }
 }
 
@@ -52,12 +70,14 @@ export async function fetchTaggedMilitaryFeed(
     return {
       aircraft: primary.aircraft, provider: 'adsb.lol', primaryState: 'active',
       backupState: 'not_requested', primaryCount: primary.aircraft.length, backupCount: 0,
+      primaryHttpStatus: primary.httpStatus, primaryFailure: primary.failure,
     };
   }
   if (opts.backupEnabled !== true) {
     return {
       aircraft: [], provider: null, primaryState: primary.state,
       backupState: 'not_requested', primaryCount: 0, backupCount: 0,
+      primaryHttpStatus: primary.httpStatus, primaryFailure: primary.failure,
     };
   }
   const backup = await queryProvider(fetcher, TAGGED_FEED_BACKUP, timeoutMs);
@@ -68,5 +88,7 @@ export async function fetchTaggedMilitaryFeed(
     backupState: backup.state,
     primaryCount: 0,
     backupCount: backup.aircraft.length,
+    primaryHttpStatus: primary.httpStatus,
+    primaryFailure: primary.failure,
   };
 }
