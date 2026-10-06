@@ -7,6 +7,9 @@ import crypto from 'node:crypto';
  * Source names represent the publisher, not a determination of truth.
  */
 export const FAST_NEWS_FEEDS = [
+  // Arabic primary text: show the publisher's actual headline, no invented
+  // automatic translation and no inferred coordinates from country mentions.
+  { name: 'BBC عربي', url: 'https://feeds.bbci.co.uk/arabic/rss.xml', hosts: ['bbc.co.uk','bbc.com'], focus: 'mena' },
   { name: 'BBC Middle East', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', hosts: ['bbc.co.uk', 'bbc.com'], focus: 'mena' },
   { name: 'UN News Arabic', url: 'https://news.un.org/feed/subscribe/ar/news/region/middle-east/feed/rss.xml', hosts: ['news.un.org'], focus: 'mena' },
   { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', hosts: ['aljazeera.com'], focus: 'global' },
