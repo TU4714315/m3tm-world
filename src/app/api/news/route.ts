@@ -123,7 +123,7 @@ export async function GET() {
     // embed speak the same language and do not independently reinterpret news.
     try {
       const published = await fetch(M3TM_APP_PUBLIC_NEWS, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(3200),
         next: { revalidate: 60 },
       });
       if (published.ok) {
