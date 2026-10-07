@@ -56,6 +56,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
   const visibleNews=newsLanguage==='ar' ? arabicNews : publishedNews;
   const preliminary=visible.filter(e=>!e.multiplePublishers).length;
   const multiple=visible.length-preliminary;
+  const globalAirCells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
   const air=visible.filter(e=>e.category==='aerial_attack').length;
   const clash=visible.filter(e=>COMBAT.has(e.category)).length;
   const unrest=visible.filter(e=>e.category==='civil_unrest').length;
@@ -200,7 +201,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
     </div>
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-2">
       <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري: وعي إقليمي مجمّع فقط</strong>
-      <p className="mt-1 text-[11px] text-white/80">مناطق منشورة مجمّعة: {radar.airObservation.regionalCells} · ارتفاع/ظهور بتجميع حي: {radar.airObservation.upwardOrNew} · بيانات قديمة: {radar.airObservation.staleCells}</p>
+      <p className="mt-1 text-[11px] text-white/80">داخل الشرق الأوسط والبحر الأحمر: {radar.airObservation.regionalCells} خلية · عالميًا: {globalAirCells} خلية · ارتفاع/ظهور إقليمي: {radar.airObservation.upwardOrNew} · قديمة: {radar.airObservation.staleCells}</p>
+      {radar.airObservation.regionalCells === 0 && globalAirCells > 0 &&
+        <p className="mt-1 rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
+          المزوّد يستقبل نشاطًا عالميًا، لكن الدفعة الحالية لا تحتوي خلايا ضمن نطاق الشرق الأوسط المحدد؛ العدد صفر هنا ليس عطلًا عالميًا ولا دليلًا على انعدام النشاط.
+        </p>}
       <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
     </div>
