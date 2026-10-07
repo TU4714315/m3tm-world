@@ -82,12 +82,14 @@ export default function WorldBrandMark({ variant = 'header', className = '' }: W
           <span className="text-[#D9B650]">M3TM</span>
           <span className="text-[#F5F1E8]">.WORLD</span>
         </div>
-        <div
-          dir="rtl"
-          className={`${hero ? 'mt-1.5 text-[9px] md:text-[10px]' : 'mt-1 text-[7px] md:text-[8px]'} whitespace-nowrap font-medium tracking-[0.055em] text-[#D8D2C4]/62`}
-        >
-          بيانات عالمية · مصادر منشورة · عرض حي
-        </div>
+        {hero && (
+          <div
+            dir="rtl"
+            className="mt-1.5 whitespace-nowrap text-[9px] font-medium tracking-[0.055em] text-[#D8D2C4]/62 md:text-[10px]"
+          >
+            بيانات عالمية · مصادر منشورة · عرض حي
+          </div>
+        )}
       </div>
     </div>
   );
