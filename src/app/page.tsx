@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Pentagon, Radio , PenLine } from 'lucide-react';
+import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Pentagon, Radio, PenLine, Save } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
@@ -29,6 +29,7 @@ import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
+import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -216,7 +217,7 @@ export default function Dashboard() {
   const data = dataRef.current;
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-  const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
+  const [mapView, setMapView] = useState<{ zoom: number; latitude: number; longitude?: number }>({ zoom: 2.5, latitude: 20, longitude: 0 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
   const [embedMode, setEmbedMode] = useState(false);
   const [embedSurface, setEmbedSurface] = useState<'public' | 'internal'>('internal');
@@ -460,6 +461,26 @@ export default function Dashboard() {
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
   const [showPublicEmbedLayers, setShowPublicEmbedLayers] = useState(false);
+  const workspaceAutoSaveReadyRef = useRef(false);
+  const [saveConfirmed, setSaveConfirmed] = useState(false);
+
+  const saveWorkspaceNow = useCallback(() => {
+    const savedAt = saveWorldWorkspaceSnapshot({
+      activeLayers,
+      projection: mapProjection,
+      mapStyle,
+      theme: worldTheme,
+      satelliteVisual,
+      view: {
+        lat: Number.isFinite(mapView.latitude) ? mapView.latitude : 20,
+        lng: Number.isFinite(mapView.longitude) ? Number(mapView.longitude) : 0,
+        zoom: Number.isFinite(mapView.zoom) ? mapView.zoom : 2.5,
+      },
+    });
+    if (!savedAt) return;
+    setSaveConfirmed(true);
+    window.setTimeout(() => setSaveConfirmed(false), 1600);
+  }, [activeLayers, mapProjection, mapStyle, mapView.latitude, mapView.longitude, mapView.zoom, satelliteVisual, worldTheme]);
 
   useEffect(() => {
     // Never overwrite URL-selected layers on the standalone public WORLD page.
@@ -507,8 +528,36 @@ export default function Dashboard() {
     // arbitrary URL layer state or auto-geolocate behind the parent app.
     const p = new URLSearchParams(window.location.search);
     const isEmbeddedFrame = p.get('embed') === '1' && window.parent !== window;
-    if (!isEmbeddedFrame && p.has('layers')) {
-      setActiveLayers(prev => restoreLayerState(prev, p));
+    if (!isEmbeddedFrame) {
+      const savedWorkspace = loadWorldWorkspaceSnapshot();
+      const explicitLayers = p.has('layers');
+      const lat = Number(p.get('lat'));
+      const lng = Number(p.get('lon'));
+      const zoom = Number(p.get('zoom'));
+      const explicitView = p.has('lat') && p.has('lon') && p.has('zoom')
+        && Number.isFinite(lat) && Math.abs(lat) <= 90
+        && Number.isFinite(lng) && Math.abs(lng) <= 180
+        && Number.isFinite(zoom) && zoom >= 0 && zoom <= 24;
+
+      if (savedWorkspace) {
+        if (!explicitLayers) setActiveLayers(prev => ({ ...prev, ...savedWorkspace.activeLayers }));
+        setMapProjection(savedWorkspace.projection);
+        setMapStyle(savedWorkspace.mapStyle);
+        setWorldTheme(savedWorkspace.theme);
+        setSatelliteVisual(savedWorkspace.satelliteVisual);
+        if (!explicitView) {
+          autoLocateCancelled.current = true;
+          setFlyToLocation({ ...savedWorkspace.view, ts: Date.now() });
+        }
+      }
+
+      if (explicitLayers) setActiveLayers(prev => restoreLayerState(prev, p));
+      if (explicitView) {
+        autoLocateCancelled.current = true;
+        setFlyToLocation({ lat, lng, zoom, ts: Date.now() });
+      }
+
+      window.setTimeout(() => { workspaceAutoSaveReadyRef.current = true; }, 0);
     }
     // Probe credential-gated feeds without exposing credentials. Provider
     // readiness is status only and never overrides the user's layer selection.
@@ -586,6 +635,39 @@ export default function Dashboard() {
     }, 1500);
   }, [activeLayers]);
 
+  // Local workspace continuity: one-click save is backed by a quiet autosave.
+  // Embedded instances do not write host-specific state into this browser.
+  useEffect(() => {
+    if (embedMode || !workspaceAutoSaveReadyRef.current) return;
+    const timer = window.setTimeout(() => {
+      saveWorldWorkspaceSnapshot({
+        activeLayers,
+        projection: mapProjection,
+        mapStyle,
+        theme: worldTheme,
+        satelliteVisual,
+        view: {
+          lat: Number.isFinite(mapView.latitude) ? mapView.latitude : 20,
+          lng: Number.isFinite(mapView.longitude) ? Number(mapView.longitude) : 0,
+          zoom: Number.isFinite(mapView.zoom) ? mapView.zoom : 2.5,
+        },
+      });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [activeLayers, embedMode, mapProjection, mapStyle, mapView.latitude, mapView.longitude, mapView.zoom, satelliteVisual, worldTheme]);
+
+  useEffect(() => {
+    if (embedMode) return;
+    const saveShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveWorkspaceNow();
+      }
+    };
+    window.addEventListener('keydown', saveShortcut);
+    return () => window.removeEventListener('keydown', saveShortcut);
+  }, [embedMode, saveWorkspaceNow]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -596,7 +678,7 @@ export default function Dashboard() {
       }
       if (e.key === 'l') setShowLayers(p => !p);
       if (e.key === 'c') setShowScmPanel(p => !p);
-      if (e.key === 's') { setShowDesktopSearch(p => !p); setShowAlerts(false); setShowSpaceCam(false); }
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey) { setShowDesktopSearch(p => !p); setShowAlerts(false); setShowSpaceCam(false); }
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey) setFlyToLocation({ lat: 20, lng: 0, zoom: 2.5, ts: Date.now() });
       if (e.key === 'g') {
         setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
@@ -1634,6 +1716,17 @@ export default function Dashboard() {
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
           <ViewSegment layoutId="view-style" active={mapStyle === 'dark'} onClick={() => setMapStyle('dark')} title="الوضع الليلي" icon={Moon} label="خريطة" />
           <ViewSegment layoutId="view-style" active={mapStyle === 'satellite'} onClick={() => setMapStyle('satellite')} title="عرض الأقمار الصناعية" icon={Satellite} label="قمر" />
+          <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
+          <button
+            type="button"
+            onClick={saveWorkspaceNow}
+            title="حفظ العرض الحالي الآن — الحفظ التلقائي يعمل أيضًا (Ctrl+S)"
+            aria-label="حفظ العرض الحالي"
+            className={`flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[11px] font-semibold transition-colors ${saveConfirmed ? 'bg-emerald-400/20 text-emerald-200' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
+          >
+            <Save className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{saveConfirmed ? 'تم الحفظ' : 'حفظ'}</span>
+          </button>
         </div>
 
 
