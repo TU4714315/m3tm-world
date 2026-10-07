@@ -2089,10 +2089,27 @@ export default function Dashboard() {
                     </>
                   )}
                   {mobilePanel === 'intel' && <div className="space-y-3">
-                    <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
-                      publishedAt={data.conflict_source_published_at}
-                      onFocus={() => {setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});setMobilePanel(null);}}/>
-                    <WorldFeed data={data} onLocate={(lat,lng) => {setFlyToLocation({lat,lng,ts:Date.now()});setMobilePanel(null);}}/>
+                    {/* A phone user opens أخبار to read headlines, not to
+                        scroll past an entire 700px evidence console first. */}
+                    <WorldFeed data={data} onLocate={(lat,lng) => {
+                      setFlyToLocation({lat,lng,zoom:6,ts:Date.now()});
+                      setMobilePanel(null);
+                    }}/>
+                    <details className="rounded-xl border border-cyan-300/25 bg-black/60 p-2">
+                      <summary className="cursor-pointer py-2 text-sm font-semibold text-cyan-100">
+                        مرصد الشرق الأوسط · الاشتباكات والنزاعات والمواقع
+                      </summary>
+                      <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+                        publishedAt={data.conflict_source_published_at}
+                        onFocus={() => {
+                          setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});
+                          setMobilePanel(null);
+                        }}
+                        onLocate={(lat,lng) => {
+                          setFlyToLocation({lat,lng,zoom:6,ts:Date.now()});
+                          setMobilePanel(null);
+                        }}/>
+                    </details>
                   </div>}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
