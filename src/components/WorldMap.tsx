@@ -271,15 +271,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
-    // MapLibre 6.7 needs an RTL shaping plugin. Without it Arabic local
-    // place names appear in reversed/disconnected order on Safari/iPhone.
-    // Host this pinned BSD-licensed script ourselves rather than relying on
-    // a third-party CDN, which may be blocked in embedded mobile browsers.
-    const rtlStatus = maplibregl.getRTLTextPluginStatus();
-    if (rtlStatus === 'unavailable' || rtlStatus === 'error') {
-      void maplibregl.setRTLTextPlugin('/vendor/maplibre/rtl-text-0.3.0.js', false)
-        .catch(error => console.warn('[M3TM.WORLD] Arabic map text shaping unavailable:', error));
-    }
+    // Arabic glyph plugin is held back: its initialization stalled the map
+    // canvas in production Chromium and WebKit after 2026-10-07 rollout.
+    // Keep geographic rendering functional while a compatible shaping path
+    // is verified in an isolated map/worker integration test.
     maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
     const baseOptions = {
       container,
