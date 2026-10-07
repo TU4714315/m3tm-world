@@ -284,7 +284,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const baseOptions = {
       container,
       style: styleUrl,
-      center: [43.5, 26.0] as [number, number], zoom: 4.5, minZoom: 1.5, maxZoom: 20,
+      // A 390px phone at zoom 4.5 sees a few cities rather than the MENA
+      // region. Begin with a regional overview; manual/published flyTo still wins.
+      center: [43.5, 26.0] as [number, number],
+      zoom: window.innerWidth < 768 ? 3.25 : 4.5, minZoom: 1.5, maxZoom: 20,
       // Show live attribution for CARTO/OSM, the active Mapzen DEM and imagery.
       // Source declarations alone are invisible when this control is disabled.
       attributionControl: MAP_ATTRIBUTION_OPTIONS,
