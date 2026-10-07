@@ -16,6 +16,11 @@ const COMBAT=new Set(['heavy_weapons','armed_clash','bombing','material_conflict
 const timestamp=(v:string|null|undefined)=>v&&Number.isFinite(Date.parse(v))
   ?new Date(v).toLocaleString('ar-SA',{timeZone:'UTC',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC'
   :'غير معلوم';
+const decodeHtmlText=(value:string)=>value
+  .replace(/&#x([0-9a-f]+);/gi,(_,hex)=>String.fromCodePoint(Number.parseInt(hex,16)))
+  .replace(/&#(\d+);/g,(_,dec)=>String.fromCodePoint(Number.parseInt(dec,10)))
+  .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+  .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
 
 export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
   data:any;stale?:boolean;publishedAt?:string|null;onFocus:()=>void;
@@ -116,12 +121,12 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
             className={`rounded border px-2 py-1 text-[11px] ${newsLanguage==='all'?'border-emerald-200 bg-emerald-300/20 text-emerald-100':'border-white/20 text-white/60'}`}>كل اللغات</button>
         </div>
       </div>
-      <p className="mt-1 text-[11px] text-white/55">تحديد الموقع ينقلك إلى إحداثية سبق أن نشرها M3TM.APP بعد تعميمها؛ الأخبار دون موقع منشور لا تُنشأ لها نقاط تخمينية.</p>
+      <p className="mt-1 text-[11px] text-white/55">تحديد الموقع يستخدم الإحداثية المنشورة فقط.</p>
       <div className="mt-1.5 max-h-[195px] divide-y divide-white/10 overflow-y-auto styled-scrollbar">
         {visibleNews.slice(0,8).map(n=>{
           const location=locatePublishedMenaNews(data,n.url);
           return <div key={n.id} className="py-2">
-            <p dir="auto" className="text-[12px] leading-5 font-semibold text-white/90">{n.title}</p>
+            <p dir="auto" className="text-[12px] leading-5 font-semibold text-white/90">{decodeHtmlText(n.title)}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-white/60">
               <span>{n.source} · {timestamp(n.time)}</span>
               {location&&<button type="button" onClick={()=>onLocate?.(location.lat,location.lng)}
@@ -138,11 +143,8 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
           'لا توجد أخبار مرتبطة بإحداثية منشورة ضمن هذه الفترة؛ الأخبار غير المحددة الموقع تبقى في موجز الأخبار العام.'}
         </div>}
       </div>
-      <div className="mt-1.5 text-[10px] text-emerald-100/70">
-        عناوين عربية: {arabicNews.length} · إجمالي منشورات الموقع: {publishedNews.length}
-      </div>
     </section>
-    <section aria-label="البلاغات المؤرخة ومواقعها على الخريطة"
+    {visible.length>0&&<section aria-label="البلاغات المؤرخة ومواقعها على الخريطة"
       className="mt-2 rounded-lg border border-white/15 bg-white/[0.035] p-2.5">
       <strong className="text-[12px] text-white/90">أحدث البلاغات المرتبطة بالخريطة</strong>
       <div className="mt-1 max-h-[130px] divide-y divide-white/10 overflow-y-auto styled-scrollbar">
@@ -150,19 +152,22 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
           const location=locatePublishedMenaReport(data,e.id);
           return <div key={e.id} className="flex items-start justify-between gap-2 py-1.5">
             <div className="min-w-0">
-              <p dir="auto" className="text-[11px] leading-5 text-white/85">{e.title}</p>
+              <p dir="auto" className="text-[11px] leading-5 text-white/85">{decodeHtmlText(e.title)}</p>
               <p className="text-[10px] text-white/50">{e.source} · {timestamp(e.time)}</p>
             </div>
-            {location&&<button type="button" onClick={()=>onLocate?.(location.lat,location.lng)}
-              className="shrink-0 rounded border border-cyan-300/40 px-2 py-1.5 text-[10px] text-cyan-100 hover:bg-cyan-300/15">
-              الموقع <MapPinned className="inline h-3 w-3"/>
-            </button>}
+            <span className="flex shrink-0 items-center gap-1">
+              {location&&<button type="button" onClick={()=>onLocate?.(location.lat,location.lng)}
+                className="rounded border border-cyan-300/40 px-2 py-1.5 text-[10px] text-cyan-100 hover:bg-cyan-300/15">
+                الموقع <MapPinned className="inline h-3 w-3"/>
+              </button>}
+              {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer"
+                className="rounded border border-white/15 px-2 py-1.5 text-[10px] text-white/70 hover:bg-white/10">المصدر</a>}
+            </span>
           </div>;
         })}
-        {visible.length===0&&<p className="py-2 text-[11px] text-white/55">لا توجد بلاغات مؤرخة في العينة والفترة المختارتين.</p>}
       </div>
-    </section>
-    <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.035] px-2.5 py-2">
+    </section>}
+    {visible.length>0&&<div className="mt-2 rounded-lg border border-white/15 bg-white/[0.035] px-2.5 py-2">
       <strong className="flex items-center gap-1 text-xs text-white/90"><Activity className="h-3.5 w-3.5 text-cyan-300"/>مؤشرات الأدلة — ليست احتمالات مؤكدة</strong>
       <div className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
         <span className="rounded bg-slate-400/15 px-2 py-1">ناشر واحد · {preliminary}</span>
@@ -171,7 +176,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
         <span className="rounded bg-orange-400/15 px-2 py-1">نزاعات · {clash}</span>
         <span className="rounded bg-yellow-400/15 px-2 py-1">اضطرابات · {unrest}</span>
       </div>
-    </div>
+    </div>}
     <details className="mt-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.035] p-2 text-white/75">
       <summary className="cursor-pointer select-none text-[11px] font-semibold text-cyan-100">تفاصيل المصادر</summary>
       <div className="pt-1">
@@ -212,26 +217,6 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
       {radar.airObservation.staleFallback && globalAirCells > 0 &&
         <p className="mt-1 text-[10px] leading-4 text-amber-100/70">خلايا عالمية من لقطة محفوظة قديمة؛ لا تُعد رصدًا مباشرًا حاليًا.</p>}
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/45"><Waves className="h-3 w-3"/>عرض إقليمي تقريبي بلا مسارات أو معرفات فردية.</p>
-    </div>
-    <div className="mt-1 divide-y divide-white/10">
-      {visible.slice(0,16).map(e=><div key={e.id} className="py-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="text-xs leading-5 font-medium">{e.title}</div>
-          <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${e.multiplePublishers?'border-amber-200/40 text-amber-100':'border-slate-300/40 text-slate-200'}`}>{e.multiplePublishers?'عدة ناشرين':'أولي'}</span>
-        </div>
-        {e.actors.length>0&&<p className="mt-1 text-[10px] text-amber-100/75">الجهات المذكورة في الخبر (دون إثبات المسؤولية): {e.actors.join(' / ')}</p>}
-        <div className="mt-1 flex justify-between gap-2 text-[10px] text-white/65">
-          <span>{e.source} · {timestamp(e.time)}</span>
-          <span className="flex items-center gap-2">
-            {locatePublishedMenaReport(data,e.id)&&<button type="button" className="text-cyan-200 underline"
-              onClick={()=>{const point=locatePublishedMenaReport(data,e.id);if(point)onLocate?.(point.lat,point.lng);}}>
-              الموقع
-            </button>}
-            {/^https?:\/\//i.test(e.url)&&<a href={e.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-cyan-300 underline">المصدر<ExternalLink className="h-3 w-3"/></a>}
-          </span>
-        </div>
-      </div>)}
-      {visible.length===0&&<p className="py-3 text-center text-xs text-white/65">لا توجد بلاغات مؤرخة ضمن الفترة المختارة؛ لا يعني ذلك عدم وقوع أحداث.</p>}
     </div>
   </section>;
 }

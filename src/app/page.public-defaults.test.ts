@@ -19,9 +19,15 @@ describe('WORLD public defaults and branding', () => {
     expect(brand).toContain('<svg');
     expect(brand).toContain('bg-transparent');
     expect(brand).toContain('بيانات عالمية · مصادر منشورة · عرض حي');
+    expect(brand).toContain('{hero && (');
     expect(brand).toContain('ellipse');
     expect(brand).toContain('m3tm-gold');
     expect(brand).not.toContain('<img');
     expect(brand).not.toContain('<rect');
+  });
+
+  it('keeps operational explanations collapsed in the public map chrome', () => {
+    expect(page).toContain('دليل الرموز ▾');
+    expect(page).not.toContain('open={!isMobile}');
   });
 });

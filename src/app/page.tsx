@@ -1724,15 +1724,16 @@ export default function Dashboard() {
           </>}
         </div>
         {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <details dir="rtl"
-          open={!isMobile}
           className="pointer-events-auto max-w-[min(92vw,460px)] rounded-xl border border-white/12 bg-[#05080d]/48 px-2.5 py-1.5 text-[11px] leading-5 text-white/90 shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl" aria-label="دليل رموز الأحداث">
-          <summary className={isMobile ? 'cursor-pointer text-amber-100 py-1' : 'hidden'}>دليل رموز الأحداث ▾</summary>
-          <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
-          <span className="mx-2 text-white/30">|</span>
-          <span className="text-orange-300 font-semibold">⬡ عدة ناشرين</span>
-          <span className="mx-2 text-white/30">|</span>
-          <span className="text-amber-200">● رقم = مجموعة تقارير</span>
-          <span className="block text-[10px] text-white/60">الترميز والموقع آليان؛ لا تعني الرموز وقوع هجوم مؤكدًا.</span>
+          <summary className="cursor-pointer list-none py-1 font-semibold text-amber-100">دليل الرموز ▾</summary>
+          <div className="pt-1">
+            <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
+            <span className="mx-2 text-white/30">|</span>
+            <span className="text-orange-300 font-semibold">⬡ عدة ناشرين</span>
+            <span className="mx-2 text-white/30">|</span>
+            <span className="text-amber-200">● رقم = مجموعة تقارير</span>
+            <span className="block text-[10px] text-white/60">الرموز تلخص بلاغات منشورة ولا تعني تأكيد الواقعة.</span>
+          </div>
         </details>}
         {/* Scale Bar */}
         {!isMobile && (
