@@ -1830,7 +1830,13 @@ export default function Dashboard() {
 
         <div className="relative group">
           <button type="button" aria-label="موجز الشرق الأوسط والبحر الأحمر" aria-expanded={showMenaPulse}
-            onClick={() => {setShowMenaPulse(p=>!p);setShowAlerts(false);setShowSpaceCam(false);}}
+            onClick={() => {
+              setShowMenaPulse(p=>!p);
+              setShowArcGIS(false);
+              setShowAlerts(false);
+              setShowSpaceCam(false);
+              setShowDesktopSearch(false);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-full text-cyan-300 hover:bg-cyan-300/20 focus-visible:ring-1">
             <MapPinned className="h-4 w-4"/>
           </button>
@@ -1913,7 +1919,13 @@ export default function Dashboard() {
 
         {/* ── ARCGIS INTEL ── */}
         <div className="relative group">
-          <button onClick={() => { setShowArcGIS(!showArcGIS); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="مكتبة الخرائط العامة — إضافة طبقات مرجعية اختيارية" aria-label="مكتبة الخرائط العامة" aria-expanded={showArcGIS}>
+          <button onClick={() => {
+            setShowArcGIS(v => !v);
+            setShowMenaPulse(false);
+            setShowAlerts(false);
+            setShowSpaceCam(false);
+            setShowDesktopSearch(false);
+          }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="مكتبة الخرائط العامة — إضافة طبقات مرجعية اختيارية" aria-label="مكتبة الخرائط العامة" aria-expanded={showArcGIS}>
             <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showArcGIS && (
               <span
