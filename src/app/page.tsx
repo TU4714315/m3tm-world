@@ -1660,15 +1660,17 @@ export default function Dashboard() {
             ))}
           </>}
         </div>
-        {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <div dir="rtl"
-          className="pointer-events-none max-w-[min(92vw,460px)] rounded-md border border-white/15 bg-black/75 px-2.5 py-1.5 text-[11px] leading-5 text-white/90" aria-label="دليل رموز الأحداث">
+        {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <details dir="rtl"
+          open={!isMobile}
+          className="pointer-events-auto max-w-[min(92vw,460px)] rounded-md border border-white/15 bg-black/85 px-2.5 py-1.5 text-[11px] leading-5 text-white/90" aria-label="دليل رموز الأحداث">
+          <summary className={isMobile ? 'cursor-pointer text-amber-100 py-1' : 'hidden'}>دليل رموز الأحداث ▾</summary>
           <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
           <span className="mx-2 text-white/30">|</span>
           <span className="text-orange-300 font-semibold">⬡ عدة ناشرين</span>
           <span className="mx-2 text-white/30">|</span>
           <span className="text-amber-200">● رقم = مجموعة تقارير</span>
           <span className="block text-[10px] text-white/60">الترميز والموقع آليان؛ لا تعني الرموز وقوع هجوم مؤكدًا.</span>
-        </div>}
+        </details>}
         {/* Scale Bar */}
         {!isMobile && (
           <div className="pl-0.5">
