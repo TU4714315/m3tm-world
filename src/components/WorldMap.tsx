@@ -271,6 +271,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
+    // MapLibre 6.7 needs an RTL shaping plugin. Without it Arabic local
+    // place names appear in reversed/disconnected order on Safari/iPhone.
+    // Host this pinned BSD-licensed script ourselves rather than relying on
+    // a third-party CDN, which may be blocked in embedded mobile browsers.
+    const rtlStatus = maplibregl.getRTLTextPluginStatus();
+    if (rtlStatus === 'unavailable' || rtlStatus === 'error') {
+      void maplibregl.setRTLTextPlugin('/vendor/maplibre/rtl-text-0.3.0.js', false)
+        .catch(error => console.warn('[M3TM.WORLD] Arabic map text shaping unavailable:', error));
+    }
     maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
     const baseOptions = {
       container,
