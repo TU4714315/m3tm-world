@@ -30,6 +30,7 @@ import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
+import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -215,6 +216,10 @@ export default function Dashboard() {
   const dataRef = useRef<any>({});
   const [dataVersion, setDataVersion] = useState(0);
   const data = dataRef.current;
+
+  useEffect(() => {
+    void recordWorldVisitOnce();
+  }, []);
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState<{ zoom: number; latitude: number; longitude?: number }>({ zoom: 2.5, latitude: 20, longitude: 0 });
