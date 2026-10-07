@@ -2,6 +2,15 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — One-click WORLD workspace persistence (2026-10-07)
+**DONE:** PR #82 adds validated local workspace persistence on top of current protected `main`: explicit **حفظ** control, Ctrl/Cmd+S, debounced autosave, and restoration of layers, projection, basemap style, theme, satellite visual preset, and full map center/zoom. Shared URL `layers` / `lat` / `lon` / `zoom` remain higher priority than the local snapshot. APP-embedded WORLD neither autosaves nor responds to the save shortcut, preserving host/standalone separation.
+
+**VERIFY:** Focused persistence/layer/Arabic-basemap tests PASS (9/9); TypeScript PASS; Next production build PASS. Review follow-up also requires `WorldMap` to report longitude with latitude/zoom and prevents Ctrl/Cmd+S from triggering the existing unmodified `s` search shortcut. Re-run protected CI/Vercel on the final PR head before merge.
+
+**BLOCKERS:** None in the persistence implementation itself. Protected merge still requires all review threads resolved and final required checks green; production smoke must confirm the deployed `main` SHA after merge.
+
+**NEXT:** Resolve PR #82 review threads, merge only on green checks, then verify live restore/save behavior on desktop/mobile and confirm standalone saved state is not altered by APP embed usage.
+
 ## Commands & actual baseline
 - WORLD `TU4714315/m3tm-world` → `https://m3tm-world.vercel.app`. Protected `main` baseline `1b1e0cd18a801e260930d8f8e36b05ac9bd8c44f` from merged PR #58. The baseline production passed Vercel deploy, reported `health=operational`, conflicts/GDELT `live`, ACLED OAuth `ok` with **0 ACLED event rows**. Sample counts (2026-10-04): 45 conflict items, 83 GDELT, 82 single-publisher and 1 multiple-publisher report. Counts change.
 - APP `TU4714315/m3tm-app`, `https://m3tm.app`. Protected `main` at inspection `3124d9a3470c64760964798276d48b2427b46c48`. First read `AGENTS.md`, `docs/M3TM_EXECUTION_CONTRACT.md`, and `docs/AI_HANDOFF.md`; APP contract scopes current work to P0 Reliability/Auth and P1 Consolidation. Do not introduce a new public operational shell.

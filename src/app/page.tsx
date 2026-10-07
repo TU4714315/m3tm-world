@@ -657,6 +657,7 @@ export default function Dashboard() {
   }, [activeLayers, embedMode, mapProjection, mapStyle, mapView.latitude, mapView.longitude, mapView.zoom, satelliteVisual, worldTheme]);
 
   useEffect(() => {
+    if (embedMode) return;
     const saveShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
@@ -665,7 +666,7 @@ export default function Dashboard() {
     };
     window.addEventListener('keydown', saveShortcut);
     return () => window.removeEventListener('keydown', saveShortcut);
-  }, [saveWorkspaceNow]);
+  }, [embedMode, saveWorkspaceNow]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -677,7 +678,7 @@ export default function Dashboard() {
       }
       if (e.key === 'l') setShowLayers(p => !p);
       if (e.key === 'c') setShowScmPanel(p => !p);
-      if (e.key === 's') { setShowDesktopSearch(p => !p); setShowAlerts(false); setShowSpaceCam(false); }
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey) { setShowDesktopSearch(p => !p); setShowAlerts(false); setShowSpaceCam(false); }
       if (e.key === 'r' && !e.ctrlKey && !e.metaKey) setFlyToLocation({ lat: 20, lng: 0, zoom: 2.5, ts: Date.now() });
       if (e.key === 'g') {
         setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));

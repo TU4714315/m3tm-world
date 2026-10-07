@@ -44,7 +44,7 @@ interface WorldMapProps {
   onReady?: () => void;
   onMouseCoords?: (coords: { lat: number; lng: number }) => void;
   onRightClick?: (coords: { lat: number; lng: number }) => void;
-  onViewStateChange?: (vs: { zoom: number; latitude: number }) => void;
+  onViewStateChange?: (vs: { zoom: number; latitude: number; longitude: number }) => void;
   flyToLocation?: { lat: number; lng: number; zoom?: number; ts: number } | null;
   projection?: 'mercator' | 'globe';
   terrainEnabled?: boolean;
@@ -1263,7 +1263,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         lastRightClick = { at: now, x, y };
       }
     });
-    const reportViewState = () => { const c = map.getCenter(); onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat }); };
+    const reportViewState = () => {
+      const c = map.getCenter();
+      onViewStateChange?.({ zoom: map.getZoom(), latitude: c.lat, longitude: c.lng });
+    };
     map.on('load', reportViewState);
     map.on('moveend', reportViewState);
     // Lightweight settled-view diagnostics for camera/terrain regressions.
