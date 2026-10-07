@@ -3,6 +3,7 @@
 import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
@@ -516,10 +517,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
 
       map.addLayer({ id: 'conflict-density-heat', type: 'heatmap', source: 'conflict-zones', filter: ['==',['get','kind'],'event'], maxzoom: 8, paint: {
-        'heatmap-weight': ['*', ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,0.1, 40,0.45, 70,0.75, 100,1], ['coalesce',['get','recencyWeight'],0.45]],
+        'heatmap-weight': conflictHeatmapWeight as unknown as maplibregl.ExpressionSpecification,
         'heatmap-intensity': ['interpolate',['linear'],['zoom'], 0,0.6, 4,1.1, 8,1.8],
         'heatmap-radius': ['interpolate',['linear'],['zoom'], 0,12, 4,24, 8,42],
-        'heatmap-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.12,['interpolate',['linear'],['zoom'], 0,0.55, 6,0.42, 8,0.18]],
+        'heatmap-opacity': conflictHeatmapOpacity as unknown as maplibregl.ExpressionSpecification,
         'heatmap-color': ['interpolate',['linear'],['heatmap-density'],
           0,'rgba(0,0,0,0)',
           0.2,'rgba(255,193,7,0.18)',
