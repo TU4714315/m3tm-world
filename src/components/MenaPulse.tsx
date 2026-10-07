@@ -203,10 +203,14 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
       <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري: وعي إقليمي مجمّع فقط</strong>
       <p className="mt-1 text-[11px] text-white/80">داخل الشرق الأوسط والبحر الأحمر: {radar.airObservation.regionalCells} خلية · عالميًا: {globalAirCells} خلية · ارتفاع/ظهور إقليمي: {radar.airObservation.upwardOrNew} · قديمة: {radar.airObservation.staleCells}</p>
       {radar.airObservation.regionalCells === 0 && globalAirCells > 0 &&
+       radar.airObservation.providerHealthy === true &&
+       radar.airObservation.staleFallback === false &&
         <p className="mt-1 rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
           المزوّد يستقبل نشاطًا عالميًا، لكن الدفعة الحالية لا تحتوي خلايا ضمن نطاق الشرق الأوسط المحدد؛ العدد صفر هنا ليس عطلًا عالميًا ولا دليلًا على انعدام النشاط.
         </p>}
       <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
+      {radar.airObservation.staleFallback && globalAirCells > 0 &&
+        <p className="mt-1 text-[10px] leading-4 text-amber-100/70">خلايا عالمية من لقطة محفوظة قديمة؛ لا تُعد رصدًا مباشرًا حاليًا.</p>}
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
     </div>
     <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 text-white/60"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0"/>تعدد الناشرين لا يثبت استقلالهم، ولا يدل ترميز الخبر على المسؤولية. تحقق من الرابط الأصلي.</p>
