@@ -271,11 +271,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
+    // MapLibre 6.7 needs an RTL shaping plugin. Without it Arabic local
+    // place names appear in reversed/disconnected order on Safari/iPhone.
+    // Host this pinned BSD-licensed script ourselves rather than relying on
+    // a third-party CDN, which may be blocked in embedded mobile browsers.
+    const rtlStatus = maplibregl.getRTLTextPluginStatus();
+    if (rtlStatus === 'unavailable' || rtlStatus === 'error') {
+      void maplibregl.setRTLTextPlugin('/vendor/maplibre/rtl-text-0.3.0.js', false)
+        .catch(error => console.warn('[M3TM.WORLD] Arabic map text shaping unavailable:', error));
+    }
     maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
     const baseOptions = {
       container,
       style: styleUrl,
-      center: [43.5, 26.0] as [number, number], zoom: 4.5, minZoom: 1.5, maxZoom: 20,
+      // A 390px phone at zoom 4.5 sees a few cities rather than the MENA
+      // region. Begin with a regional overview; manual/published flyTo still wins.
+      center: [43.5, 26.0] as [number, number],
+      zoom: (window.innerWidth < 768 || (window.innerHeight < 500 && window.innerWidth < 1024)) ? 3.25 : 4.5, minZoom: 1.5, maxZoom: 20,
       // Show live attribution for CARTO/OSM, the active Mapzen DEM and imagery.
       // Source declarations alone are invisible when this control is disabled.
       attributionControl: MAP_ATTRIBUTION_OPTIONS,
