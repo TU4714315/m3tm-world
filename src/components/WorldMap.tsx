@@ -7,7 +7,7 @@ import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHea
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
-import { satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
+import { satelliteInsertionAnchor, satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { publicClusterOptions } from '@/lib/map-visual-density';
 import { syncEtopo2022Relief } from '@/lib/etopo-relief';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
@@ -583,10 +583,20 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'circle-stroke-width': ['case',['==',['get','trend'],'up'],2.4,1.5],
         'circle-stroke-color': '#FFF3E0', 'circle-stroke-opacity': 0.6,
       }});
-      map.addLayer({ id: 'military-activity-label', type: 'symbol', source: 'military-activity', minzoom: 3, layout: {
-        'text-field': ['concat','نشاط عسكري · ',['get','activity'],' · ',['get','approximate_count']],
-        'text-size': 9, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.5], 'text-allow-overlap': false,
-      }, paint: { 'text-color':'#FFCCBC', 'text-halo-color':'#000', 'text-halo-width':1.5 }});
+      // Public military awareness stays deliberately coarse. The aircraft glyph
+      // represents an aggregate 6° cell, not an individual airframe or track.
+      map.addLayer({ id: 'military-activity-label', type: 'symbol', source: 'military-activity', minzoom: 2.2, layout: {
+        'icon-image': 'plane-red',
+        'icon-size': ['interpolate',['linear'],['get','level'],1,0.54,2,0.68,3,0.82],
+        'icon-allow-overlap': true, 'icon-ignore-placement': true,
+        'text-field': ['concat','≈', ['to-string',['get','approximate_count']]],
+        'text-size': 10, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.55],
+        'text-allow-overlap': true, 'text-ignore-placement': true,
+      }, paint: {
+        'icon-opacity': ['case',['==',['get','data_state'],'cached-stale'],0.4,0.86],
+        'text-color':'#FFE2D6', 'text-halo-color':'#080A0D', 'text-halo-width':1.7,
+        'text-opacity': ['case',['==',['get','data_state'],'cached-stale'],0.42,0.92],
+      }});
 
       map.addLayer({ id: 'naval-activity-halo', type: 'circle', source: 'naval-activity', paint: {
         'circle-radius': ['interpolate',['linear'],['get','level'], 1,18, 2,28, 3,40],
@@ -1028,15 +1038,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       map.addLayer({ id: 'country-boundary-reference', type: 'line', source: 'public-boundaries',
         filter: ['==', ['get', 'kind'], 'ordinary'],
         paint: {
-          'line-color': '#E1CF9C', 'line-width': ['interpolate',['linear'],['zoom'], 1,0.65, 6,1.3, 12,1.9],
-          'line-opacity': 0.8,
+          'line-color': '#DCE5EC', 'line-width': ['interpolate',['linear'],['zoom'], 1,0.38, 6,0.72, 12,1.15],
+          'line-opacity': 0.48,
         },
       });
       map.addLayer({ id: 'country-boundary-contested', type: 'line', source: 'public-boundaries',
         filter: ['==', ['get', 'kind'], 'contested'],
         paint: {
-          'line-color': '#F0A455', 'line-width': ['interpolate',['linear'],['zoom'], 1,1, 6,1.8, 12,2.5],
-          'line-opacity': 0.8, 'line-dasharray': [2, 3],
+          'line-color': '#F0B66D', 'line-width': ['interpolate',['linear'],['zoom'], 1,0.7, 6,1.15, 12,1.7],
+          'line-opacity': 0.62, 'line-dasharray': [2, 3],
         },
       });
 
@@ -2344,19 +2354,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   // Flight data → GeoJSON (GPU rendered)
   useEffect(() => {
     if (!mapReady) return;
-    const toFeatures = (arr: any[], decimate: number = 1) => {
-      let filtered = arr || [];
-      if (decimate > 1) {
-        filtered = filtered.filter((_, i) => i % decimate === 0);
-      }
+    const toFeatures = (arr: any[]) => {
+      const filtered = (arr || []).filter((f: any) =>
+        Number.isFinite(Number(f?.lat)) && Number.isFinite(Number(f?.lng))
+        && Number(f.lat) >= -90 && Number(f.lat) <= 90
+        && Number(f.lng) >= -180 && Number(f.lng) <= 180);
       return filtered.map((f: any) => ({
         type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [f.lng, f.lat] },
         properties: { callsign: f.callsign, heading: f.heading || 0, alt: f.alt, model: f.model, speed_knots: f.speed_knots, registration: f.registration, icao24: f.icao24 },
       }));
     };
-    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights, 10) : []);
-    setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights, 2) : []);
-    setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets, 2) : []);
+    // The API currently carries only thousands of public civilian points, well
+    // within a single MapLibre symbol layer. Fixed index sampling erased sparse
+    // regions even when valid aircraft were present, so retain every valid row.
+    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
+    setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
+    setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
     setGeo('military-activity',
       (activeLayers as any).military_activity
@@ -3331,12 +3344,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         }
         const rasterPaint = satelliteRasterPaint(satelliteVisual);
         if (!map.getLayer('satellite-layer')) {
+          // Keep imagery below vector labels. The previous late insertion sat
+          // above CARTO place names, so Arabic labels only ghosted through the
+          // raster opacity instead of rendering crisply over the imagery.
+          const labelAnchor = satelliteInsertionAnchor(map.getStyle()?.layers);
           map.addLayer({
             id: 'satellite-layer',
             type: 'raster',
             source: 'satellite-tiles',
             paint: rasterPaint,
-          }, 'day-night-fill');
+          }, labelAnchor || 'day-night-fill');
         } else {
           // NOAA's ETOPO mode owns raster visibility at overview zoom;
           // changing image grading must not reveal imagery beneath relief.

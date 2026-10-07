@@ -41,10 +41,12 @@ export function applyArabicBasemapLabels(map:LabelMap):string[]{
     // Arabic font support is provided by the existing CARTO Noto Sans glyph
     // stack; keep styling and geographic source attribution intact.
     map.setLayoutProperty(id,'text-transform','none');
-    if(isCountry){
-      map.setLayoutProperty(id,'text-font',['Noto Sans Regular']);
-      map.setPaintProperty(id,'text-halo-width',1.5);
-    }
+    map.setLayoutProperty(id,'text-font',['Noto Sans Regular']);
+    map.setPaintProperty(id,'text-color',isCountry?'#F5F1E7':'#E8EEF2');
+    map.setPaintProperty(id,'text-halo-color','#071018');
+    map.setPaintProperty(id,'text-halo-width',isCountry?1.7:1.35);
+    map.setPaintProperty(id,'text-halo-blur',0.35);
+    map.setPaintProperty(id,'text-opacity',isCountry?0.96:0.9);
     changed.push(id);
   }
   return changed;
