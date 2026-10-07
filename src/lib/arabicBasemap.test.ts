@@ -22,6 +22,8 @@ describe('Arabic worldwide map labels without geometry changes',()=>{
    };
    expect(applyArabicBasemapLabels(map)).toEqual(['place_country_2','place_city_r2']);
    expect(map.setLayoutProperty).not.toHaveBeenCalledWith('public-boundaries',expect.anything(),expect.anything());
-   expect(map.setPaintProperty).toHaveBeenCalledWith('place_country_2','text-halo-width',1.5);
+   expect(map.setPaintProperty).toHaveBeenCalledWith('place_country_2','text-halo-width',1.7);
+   expect(map.setPaintProperty).toHaveBeenCalledWith('place_country_2','text-color','#F5F1E7');
+   expect(map.setPaintProperty).toHaveBeenCalledWith('place_city_r2','text-color','#E8EEF2');
  });
 });

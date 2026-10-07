@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useMemo, useState} from 'react';
-import {MapPinned, Radio, ExternalLink, Clock3, Plane, Waves, Activity, ShieldAlert, Newspaper} from 'lucide-react';
+import {MapPinned, Radio, ExternalLink, Clock3, Plane, Waves, Activity, Newspaper} from 'lucide-react';
 import { locatePublishedMenaNews, locatePublishedMenaReport } from '@/lib/menaNewsLocation';
 import {
   buildMenaFusionRadar, gdeltWindowTime, FUSION_WINDOWS,
@@ -78,19 +78,18 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
     :standaloneAge===null?'وقت المصدر غير معلوم'
     :standaloneAge<=30?'دفعة حديثة'
     :standaloneAge<=120?'تأخر دفعة المصدر':'دفعة قديمة';
-  return <section dir="rtl" aria-label="M3TM Fusion Radar للشرق الأوسط"
-    className="glass-panel pointer-events-auto max-h-[min(76dvh,720px)] w-full overflow-y-auto styled-scrollbar rounded-xl border border-cyan-300/25 bg-black/80 p-3 text-white shadow-2xl">
+  return <section dir="rtl" aria-label="مرصد M3TM للشرق الأوسط"
+    className="pointer-events-auto max-h-[min(76dvh,720px)] w-full overflow-y-auto styled-scrollbar rounded-2xl border border-cyan-200/20 bg-[#03070d]/52 p-3 text-white shadow-[0_20px_70px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
     <header className="flex items-center justify-between gap-2 border-b border-cyan-300/20 pb-2">
       <div>
-        <strong className="flex items-center gap-1.5 text-sm text-cyan-100"><Radio className="h-4 w-4 text-cyan-300"/>M3TM Fusion Radar</strong>
-        <p className="mt-0.5 text-[11px] text-white/65">الشرق الأوسط والبحر الأحمر · بلاغات منشورة</p>
+        <strong className="flex items-center gap-1.5 text-sm text-cyan-100"><Radio className="h-4 w-4 text-cyan-300"/>مرصد M3TM</strong>
+        <p className="mt-0.5 text-[11px] text-white/60">الشرق الأوسط والبحر الأحمر</p>
       </div>
       <button type="button" onClick={onFocus}
         className="flex items-center gap-1 rounded-md border border-cyan-300/45 bg-cyan-300/10 p-1.5 text-xs text-cyan-100 hover:bg-cyan-300/20">
         <MapPinned className="h-3.5 w-3.5"/>الخريطة
       </button>
     </header>
-    <p className="mt-2 text-[11px] leading-5 text-white/65">الرصد يقيس <strong>توقيت ترميز/نشر البلاغ</strong> ولا يثبت وقت الواقعة أو المسؤولية؛ الإحداثيات المنشورة معمّمة.</p>
     <div className="mt-2 grid grid-cols-4 gap-1" aria-label="فرز عينة البلاغات المحمّلة بحسب زمن الترميز">
       {PERIODS.map(p=><button key={p.id} type="button" onClick={()=>setPeriod(p.id)}
         aria-pressed={period===p.id}
@@ -99,7 +98,6 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
         <span className="text-[10px]">{p.label}</span>
       </button>)}
     </div>
-    <p className="mt-1.5 text-[10px] leading-4 text-amber-100/75">هذه النوافذ تفرز بلاغات أحدث دفعة محمّلة، ولا تمثل أرشيفًا متصلًا لكل ساعة أو ٧ أيام.</p>
     <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-cyan-200">{visible.length}</strong><p className="text-[10px] text-white/70">بلاغات الفترة</p></div>
       <div className="rounded-lg bg-white/5 p-2"><strong className="text-base text-amber-200">{radar.airRegions}</strong><p className="text-[10px] text-white/70">مناطق جوية مجمّعة</p></div>
@@ -173,10 +171,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
         <span className="rounded bg-orange-400/15 px-2 py-1">نزاعات · {clash}</span>
         <span className="rounded bg-yellow-400/15 px-2 py-1">اضطرابات · {unrest}</span>
       </div>
-      <p className="mt-1.5 text-[10px] leading-4 text-white/60">مؤشرات هذه العينة فقط؛ المقارنة الفعلية بين فترات الرصد تتطلب سجلًا تاريخيًا متصلًا، ولا يثبت ترميز الخبر تصاعد القتال.</p>
     </div>
-    <div className="mt-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.055] p-2">
-      <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>سلامة وحداثة المصدر</strong>
+    <details className="mt-2 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.035] p-2 text-white/75">
+      <summary className="cursor-pointer select-none text-[11px] font-semibold text-cyan-100">تفاصيل المصادر</summary>
+      <div className="pt-1">
+      <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>حداثة البيانات</strong>
       <p className="mt-1 text-[11px] leading-5 text-white/85">GDELT النزاعات: {conflictFreshness} · {timestamp(sourceTime)}</p>
       <p className="text-[11px] leading-5 text-white/85">GDELT الأحداث والاضطرابات: {standaloneFreshness} · {timestamp(standaloneTime)}</p>
       <p className="text-[10px] text-white/65">زمن دفعة النزاعات: {src.publishedAgeMinutes===null?'غير معلوم':`${src.publishedAgeMinutes} دقيقة`} · زمن دفعة الأحداث: {standaloneAge===null?'غير معلوم':`${standaloneAge} دقيقة`}</p>
@@ -198,22 +197,22 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
           :src.acledStatus==='unavailable'?'المصدر غير متاح الآن':'حالة المصدر قيد التحقق'}
         {' '}<a href="https://acleddata.com/" target="_blank" rel="noopener noreferrer" className="text-cyan-200 underline">ACLED</a>
       </p>
-    </div>
+      </div>
+    </details>
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-2">
-      <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري: وعي إقليمي مجمّع فقط</strong>
-      <p className="mt-1 text-[11px] text-white/80">داخل الشرق الأوسط والبحر الأحمر: {radar.airObservation.regionalCells} خلية · عالميًا: {globalAirCells} خلية · ارتفاع/ظهور إقليمي: {radar.airObservation.upwardOrNew} · قديمة: {radar.airObservation.staleCells}</p>
+      <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري المجمّع</strong>
+      <p className="mt-1 text-[11px] text-white/80">المنطقة: {radar.airObservation.regionalCells} · عالميًا: {globalAirCells}</p>
       {radar.airObservation.regionalCells === 0 && globalAirCells > 0 &&
        radar.airObservation.providerHealthy === true &&
        radar.airObservation.staleFallback === false &&
         <p className="mt-1 rounded border border-amber-300/25 bg-amber-300/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
           المزوّد يستقبل نشاطًا عالميًا، لكن الدفعة الحالية لا تحتوي خلايا ضمن نطاق الشرق الأوسط المحدد؛ العدد صفر هنا ليس عطلًا عالميًا ولا دليلًا على انعدام النشاط.
         </p>}
-      <p className="mt-1 text-[10px] leading-4 text-white/60">{radar.airObservation.providerHealthy===false?'مزود الطيران العسكري متعثر؛ لا تفسر الصفر بغياب الطائرات.':radar.airObservation.providerHealthy===true?'المزود يستجيب، لكن تغطية البث العسكري جزئية.':'صحة المزود غير مثبتة.'} {radar.airObservation.staleFallback?'آخر حالة محفوظة (ليست مباشرة).':''}</p>
+      <p className="mt-1 text-[10px] leading-4 text-white/55">{radar.airObservation.staleFallback?'آخر لقطة محفوظة · ':''}تغطية البث العسكري جزئية.</p>
       {radar.airObservation.staleFallback && globalAirCells > 0 &&
         <p className="mt-1 text-[10px] leading-4 text-amber-100/70">خلايا عالمية من لقطة محفوظة قديمة؛ لا تُعد رصدًا مباشرًا حاليًا.</p>}
-      <p className="mt-1 flex items-center gap-1 text-[10px] text-white/55"><Waves className="h-3 w-3"/>لا يُعرض تعريف أو مسار أو موقع تشغيلي دقيق لأي طائرة عسكرية.</p>
+      <p className="mt-1 flex items-center gap-1 text-[10px] text-white/45"><Waves className="h-3 w-3"/>عرض إقليمي تقريبي بلا مسارات أو معرفات فردية.</p>
     </div>
-    <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 text-white/60"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0"/>تعدد الناشرين لا يثبت استقلالهم، ولا يدل ترميز الخبر على المسؤولية. تحقق من الرابط الأصلي.</p>
     <div className="mt-1 divide-y divide-white/10">
       {visible.slice(0,16).map(e=><div key={e.id} className="py-2">
         <div className="flex items-start justify-between gap-2">

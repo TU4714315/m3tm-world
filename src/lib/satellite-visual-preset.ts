@@ -15,13 +15,13 @@ export const SATELLITE_VISUAL_PRESETS = {
     brightnessMax: 1,
   },
   clarity: {
-    labelAr: 'رصد',
-    descriptionAr: 'صورة أوضح في المناطق الداكنة مع الحفاظ على تضاريس الأرض وألوان الإشارات',
-    opacity: 0.98,
-    contrast: 0.12,
-    saturation: 0.08,
-    brightnessMin: 0.10,
-    brightnessMax: 1,
+    labelAr: 'واضح',
+    descriptionAr: 'صورة أقل تشبعًا وأقصر نطاقًا لتبرز الحدود والأسماء والأحداث فوق القمر الصناعي',
+    opacity: 1,
+    contrast: 0.18,
+    saturation: -0.08,
+    brightnessMin: 0.03,
+    brightnessMax: 0.90,
   },
   bright: {
     labelAr: 'مضاء',
@@ -34,6 +34,13 @@ export const SATELLITE_VISUAL_PRESETS = {
   },
 } as const;
 export type SatelliteVisualPreset = keyof typeof SATELLITE_VISUAL_PRESETS;
+
+type StyleLayerLike = { id?: string; type?: string; source?: string; 'source-layer'?: string };
+
+/** Place imagery below vector labels while leaving later M3TM overlays above it. */
+export function satelliteInsertionAnchor(layers: readonly StyleLayerLike[] | undefined): string | undefined {
+  return layers?.find(layer => layer.type === 'symbol' && typeof layer['source-layer'] === 'string')?.id;
+}
 
 /** Source tiles, labels and attribution remain unchanged. */
 export function satelliteRasterPaint(mode: SatelliteVisualPreset) {

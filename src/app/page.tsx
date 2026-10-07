@@ -138,41 +138,6 @@ function useIsMobile() {
   }, []);
   return isMobile;
 }
-const UptimeClock = () => {
-  const [uptime, setUptime] = useState('00:00:00');
-  const startTime = useRef(0);
-  if (startTime.current === 0) startTime.current = Date.now();
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const e = Math.floor((Date.now() - startTime.current) / 1000);
-      setUptime(`${String(Math.floor(e/3600)).padStart(2,'0')}:${String(Math.floor((e%3600)/60)).padStart(2,'0')}:${String(e%60).padStart(2,'0')}`);
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
-  return <span className="hidden lg:inline">مدة التشغيل: <span className="text-[var(--gold-primary)]">{uptime}</span></span>;
-};
-
-const ZuluClock = () => {
-  const [time, setTime] = useState('');
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const now = new Date();
-      setTime(`التوقيت العالمي ${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')} UTC`);
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
-  return <span className="text-[var(--cyan-primary)] font-bold tabular-nums">{time || 'التوقيت العالمي --:--:-- UTC'}</span>;
-};
-
-/** Real entity count — no fake throughput metrics */
-const ActiveEntityCount = ({ data }: { data: Record<string, unknown[]> }) => {
-  const count = useMemo(() => {
-    if (!data) return 0;
-    return Object.values(data).reduce((sum, v) => sum + (Array.isArray(v) ? v.length : 0), 0);
-  }, [data]);
-  return <span className="text-[var(--alert-green)] font-bold tabular-nums">{count.toLocaleString('en-US')}</span>;
-};
-
 /** Extracts a watchable YouTube URL from embed/channel URLs */
 function getYouTubeWatchUrl(url: string): string {
   if (url.includes('channel=')) return `https://www.youtube.com/channel/${url.split('channel=')[1].split('&')[0]}/live`;
@@ -221,7 +186,7 @@ export default function Dashboard() {
     void recordWorldVisitOnce();
   }, []);
 
-  const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState<{ zoom: number; latitude: number; longitude?: number }>({ zoom: 2.5, latitude: 20, longitude: 0 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
   const [embedMode, setEmbedMode] = useState(false);
@@ -329,7 +294,7 @@ export default function Dashboard() {
   }, []);
 
   const [activeCamera, setActiveCamera] = useState<any>(null);
-  const [spaceWeather, setSpaceWeather] = useState<any>(null);
+  const [, setSpaceWeather] = useState<any>(null);
   const [showLayers, setShowLayers] = useState(true);  const [showAlerts, setShowAlerts] = useState(false);
   const [showSpaceCam, setShowSpaceCam] = useState(false);
   const [showScmPanel, setShowScmPanel] = useState(true);
@@ -1760,7 +1725,7 @@ export default function Dashboard() {
         </div>
         {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <details dir="rtl"
           open={!isMobile}
-          className="pointer-events-auto max-w-[min(92vw,460px)] rounded-md border border-white/15 bg-black/85 px-2.5 py-1.5 text-[11px] leading-5 text-white/90" aria-label="دليل رموز الأحداث">
+          className="pointer-events-auto max-w-[min(92vw,460px)] rounded-xl border border-white/12 bg-[#05080d]/48 px-2.5 py-1.5 text-[11px] leading-5 text-white/90 shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl" aria-label="دليل رموز الأحداث">
           <summary className={isMobile ? 'cursor-pointer text-amber-100 py-1' : 'hidden'}>دليل رموز الأحداث ▾</summary>
           <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
           <span className="mx-2 text-white/30">|</span>
@@ -1778,44 +1743,13 @@ export default function Dashboard() {
       </motion.div>
 
             {/* ── HEADER ── */}
-      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 2.5 }} className={`absolute top-4 z-[201] pointer-events-none flex flex-col ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px', right: '24px' }}>
-        <div dir="ltr" className="flex items-center gap-3 w-fit">
-          <WorldBrandMark variant="header" className="shrink-0" />
-          <div dir="rtl" className="hidden sm:flex flex-col items-start gap-0.5 pr-1">
-            <span className="text-[11px] md:text-[12px] font-semibold tracking-[0.04em] text-[#F0D060]">بيانات عامة · مصادر منشورة · عرض مباشر</span>
-          </div>
-        </div>
-        <div dir="rtl" className="hidden md:flex items-center gap-3 mt-1.5 pl-[44px] min-w-0 pr-[400px]">
-          <span className="text-[10px] md:text-[10px] text-[var(--text-secondary)] font-mono tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-60 truncate max-w-[55vw]">
-            مراقبة عالمية لحظية · طائرات · ملاحة · أقمار صناعية · كاميرات · طقس · تهديدات سيبرانية
-          </span>
-        </div>
+      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.3 }} className={`absolute top-4 z-[201] pointer-events-none ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px' }}>
+        <WorldBrandMark variant="header" className="shrink-0" />
       </motion.div>
 
       {/* ── TOP-RIGHT STATUS (desktop) ── */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3 }} className={`status-bar-desktop absolute top-4 right-6 z-[200] pointer-events-none flex items-center gap-3 text-[11px] font-mono tracking-widest text-[var(--text-secondary)] ${embedMode ? 'hidden' : ''}`}>
-
-        <span className="hidden lg:inline-flex items-center gap-1.5">
-          <ZuluClock />
-        </span>
-
-        <span className="flex items-center gap-1" title="حالة اتصال الخادم">الحالة: <span className={backendStatus === 'connected' ? 'text-[var(--alert-green)]' : 'text-[var(--alert-red)]'}>{backendStatus === 'connected' ? 'مباشر' : backendStatus === 'connecting' ? 'يتصل' : 'خطأ'}</span></span>
-
-        <span className="hidden lg:inline-flex items-center gap-1" title="عدد طبقات البيانات النشطة">
-          <span className="text-[var(--cyan-primary)] font-bold">{Object.values(activeLayers).filter(Boolean).length}</span>
-          <span className="opacity-60">طبقات</span>
-        </span>
-
-        <span className="hidden lg:inline-flex items-center gap-1" title="الكيانات المتتبعة على الخريطة">
-          <ActiveEntityCount data={data} />
-          <span className="opacity-60">كيانات</span>
-        </span>
-
-        {spaceWeather && <span className="hidden lg:inline" title={`Geomagnetic Storm Index — Kp${spaceWeather.kp_index}`}>الشمس: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
-
-        <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
-
-        <a href={M3TM_APP_ORIGIN} title="الرجوع إلى M3TM.APP" aria-label="الرجوع إلى M3TM.APP" className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 ml-3 shadow-[0_0_10px_rgba(255,215,0,0.1)]">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className={`status-bar-desktop absolute top-4 right-6 z-[200] pointer-events-none ${embedMode ? 'hidden' : ''}`}>
+        <a href={M3TM_APP_ORIGIN} title="الرجوع إلى M3TM.APP" aria-label="الرجوع إلى M3TM.APP" className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-[var(--gold-primary)]/30 bg-[#05080d]/35 px-3 py-1.5 text-[9px] font-mono tracking-widest text-[var(--gold-primary)] shadow-[0_8px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl transition hover:bg-[#05080d]/55">
           <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-world-pulse" />
           <span className="text-[var(--gold-primary)] font-bold">الرجوع إلى M3TM.APP</span>
         </a>
@@ -1873,7 +1807,7 @@ export default function Dashboard() {
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
-      {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
+      {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto rounded-full border border-white/10 bg-[#05080d]/20 p-1 shadow-[0_14px_50px_rgba(0,0,0,0.25)] backdrop-blur-2xl">
         <div className="relative group">
           <button onClick={() => { setShowAlerts(false); setShowSpaceCam(v => !v); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
@@ -1884,7 +1818,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">الفضاء</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">الفضاء</span>
           <AnimatePresence>
             {showSpaceCam && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
@@ -1900,7 +1834,7 @@ export default function Dashboard() {
             className="flex h-8 w-8 items-center justify-center rounded-full text-cyan-300 hover:bg-cyan-300/20 focus-visible:ring-1">
             <MapPinned className="h-4 w-4"/>
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-black/85 px-2 py-1 text-[11px] text-white opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">الشرق الأوسط والبحر الأحمر</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-[#05080d]/65 px-2 py-1 text-[11px] text-white backdrop-blur-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">المرصد</span>
           {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(89vw,440px)]">
             <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
               publishedAt={data.conflict_source_published_at}
@@ -1918,7 +1852,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">تنبيهات</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">تنبيهات</span>
           <AnimatePresence>
             {showAlerts && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
@@ -1938,7 +1872,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">رسم</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">رسم</span>
         </div>
 
         <div className="relative group">
@@ -1951,7 +1885,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">مسار</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">مسار</span>
         </div>
 
         <div className="relative group">
@@ -1964,7 +1898,7 @@ export default function Dashboard() {
               />
             )}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">بحث</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">بحث</span>
           <AnimatePresence>
             {showDesktopSearch && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
@@ -1979,7 +1913,7 @@ export default function Dashboard() {
 
         {/* ── ARCGIS INTEL ── */}
         <div className="relative group">
-          <button onClick={() => { setShowArcGIS(!showArcGIS); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — البحث عن طبقات جغرافية واستيرادها" aria-label="ArcGIS" aria-expanded={showArcGIS}>
+          <button onClick={() => { setShowArcGIS(!showArcGIS); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="مكتبة الخرائط العامة — إضافة طبقات مرجعية اختيارية" aria-label="مكتبة الخرائط العامة" aria-expanded={showArcGIS}>
             <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showArcGIS && (
               <span
@@ -1989,11 +1923,11 @@ export default function Dashboard() {
             )}
             {arcgisLayers.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-[var(--gold-primary)] text-black text-[9px] font-mono font-bold leading-none px-0.5">{arcgisLayers.length}</span>}
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-black/85 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">ARCGIS</span>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">مكتبة الخرائط</span>
           <AnimatePresence>
             {showArcGIS && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-[340px]">
-                <div className="glass-panel p-3 max-h-[70vh] overflow-y-auto styled-scrollbar">
+                <div className="rounded-2xl border border-white/10 bg-[#05080d]/52 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl max-h-[70vh] overflow-y-auto styled-scrollbar">
                   <ArcGISPanel
                     onImportLayer={(layer) => setArcgisLayers(prev => [...prev.filter(l => l.id !== layer.id), { ...layer, color: layer.color || '#D4AF37', visible: true, opacity: layer.opacity ?? 0.8 }])}
                     onRemoveLayer={(id) => setArcgisLayers(prev => prev.filter(l => l.id !== id))}
