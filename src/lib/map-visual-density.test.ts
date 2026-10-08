@@ -13,6 +13,11 @@ describe('world public visual density',()=>{
       });
     }
   });
+  it('clusters APP-published regional news without changing the underlying reports',()=>{
+    expect(publicClusterOptions('app-news')).toEqual({
+      cluster:true,clusterRadius:48,clusterMaxZoom:8,
+    });
+  });
   it('does not group live flights, marine tracks, naval or satellite cells',()=>{
     for(const name of ['flights','military','maritime','naval-activity','satellites']){
       expect(publicClusterOptions(name)).toEqual({});

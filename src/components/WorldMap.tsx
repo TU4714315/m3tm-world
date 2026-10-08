@@ -996,17 +996,27 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-offset': [0, 1.8], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#EC407A', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
 
+      // News clusters count source reports, not independently verified incidents.
+      map.addLayer({ id:'app-news-clusters',type:'circle',source:'app-news',filter:['has','point_count'],paint:{
+        'circle-radius':['step',['get','point_count'],18,10,24,50,30],
+        'circle-color':'#238D89','circle-opacity':0.88,
+        'circle-stroke-width':1.5,'circle-stroke-color':'#A7F6EF',
+      }});
+      map.addLayer({ id:'app-news-cluster-count',type:'symbol',source:'app-news',filter:['has','point_count'],layout:{
+        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
+        'text-size':12,'text-allow-overlap':true,
+      },paint:{'text-color':'#FFFFFF','text-halo-color':'#08292A','text-halo-width':1.2}});
       // Only published M3TM.APP news with source-provided, generalized location.
-      map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', paint: {
+      map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,16, 10,22],
         'circle-color': '#5CD9CE', 'circle-opacity': 0.11, 'circle-blur': 1,
       }});
-      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', paint: {
+      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,7, 10,10],
         'circle-color': '#5CD9CE', 'circle-opacity': 0.86,
         'circle-stroke-width': 1.3, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.45,
       }});
-      map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', minzoom: 4, layout: {
+      map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', filter:['!',['has','point_count']], minzoom: 4, layout: {
         'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
         'text-offset': [0, 1.7], 'text-max-width': 13, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#5CD9CE', 'text-halo-color': '#000', 'text-halo-width': 1 }});
@@ -1713,7 +1723,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Cluster counts are observations, never verified attacks. Cameras have
     // a source-defined expansion zoom: a constant +2 can leave the same
     // cluster intact (especially when opening country-level clusters).
-    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters']) {
+    for (const layer of ['gdelt-event-clusters','civil-unrest-clusters','app-news-clusters']) {
       map.on('click',layer,e=>{
         const geom=e.features?.[0]?.geometry;
         if (geom?.type !== 'Point') return;
@@ -2073,7 +2083,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2957,7 +2967,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       ? data.app_news.map((n: any) => ({
           type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
           properties: { id: n.id, title: n.title, source: n.source,
-            url: n.url, published: n.published, precision: n.precision },
+            url: n.url, published: n.published, precision: n.precision,
+            publication_count:n.publicationCount,
+            evidence_links:JSON.stringify(n.evidenceLinks || []) },
         }))
       : []);
   }, [mapReady, data.app_news, (activeLayers as any).app_news, setGeo]);
@@ -3140,7 +3152,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
-    setVis(['app-news-glow','app-news-dots','app-news-label'], (activeLayers as any).app_news);
+    setVis(['app-news-glow','app-news-dots','app-news-label','app-news-clusters','app-news-cluster-count'], (activeLayers as any).app_news);
     setVis(['country-boundary-reference','country-boundary-contested'], (activeLayers as any).country_borders);
     setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-halo','conflict-event-icons','conflict-icons'], activeLayers.conflict_zones !== false);
