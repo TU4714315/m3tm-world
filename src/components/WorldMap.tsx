@@ -23,6 +23,7 @@ import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
+import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -360,7 +361,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
       // Clusters group only the *visual* symbol footprints. Public records
       // and source attribution are retained and expand on zoom.
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
@@ -1116,6 +1117,31 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         },paint:{'icon-opacity':l.id==='fl-military'
           ? 0.94 : ['interpolate',['linear'],['zoom'],1,0.74,4,0.82,10,0.96]}});
       });
+
+      // Durable degraded-mode civilian density. These markers are generalized
+      // 2° last-good cells, never stale individual aircraft identities/tracks.
+      map.addLayer({ id: 'civilian-flight-activity-halo', type: 'circle', source: 'civilian-flight-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','total'], 1,8, 10,14, 50,24],
+        'circle-color': flightCom,
+        'circle-opacity': 0.08,
+        'circle-blur': 0.85,
+      }});
+      map.addLayer({ id: 'civilian-flight-activity-dots', type: 'circle', source: 'civilian-flight-activity', paint: {
+        'circle-radius': ['interpolate',['linear'],['get','total'], 1,3.5, 10,6, 50,9],
+        'circle-color': flightCom,
+        'circle-opacity': ['case',['==',['get','data_state'],'cached-stale'],0.46,0.78],
+        'circle-stroke-width': 1.2,
+        'circle-stroke-color': '#D7F8FF',
+        'circle-stroke-opacity': 0.55,
+      }});
+      map.addLayer({ id: 'civilian-flight-activity-label', type: 'symbol', source: 'civilian-flight-activity', minzoom: 2.5, layout: {
+        'text-field': ['concat','≈',['to-string',['get','total']]],
+        'text-size': 10, 'text-font': ['Open Sans Bold'], 'text-offset': [0,1.35],
+        'text-allow-overlap': false,
+      }, paint: {
+        'text-color':'#C8F4FF', 'text-halo-color':'#07090D', 'text-halo-width':1.5,
+        'text-opacity':['case',['==',['get','data_state'],'cached-stale'],0.55,0.9],
+      }});
 
       map.addLayer({ id: 'selected-flight-track-halo', type: 'line', source: 'selected-flight-track', layout: {
         'line-cap':'round', 'line-join':'round',
@@ -2369,12 +2395,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
+    const anyCivilianFlightLayer = activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air;
+    setGeo('civilian-flight-activity',
+      anyCivilianFlightLayer ? civilianFlightMapFeatures(data.civilian_flight_activity ?? []) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
     setGeo('military-activity',
       (activeLayers as any).military_activity
         ? coarseFlightMapFeatures(data.military_activity ?? [], coarseFlightSourceStale(data))
         : []);
-  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.military_flights, data.military_activity, data.military_activity_meta, data.flight_source_status, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
+  }, [mapReady, data.commercial_flights, data.private_flights, data.private_jets, data.civilian_flight_activity, data.military_flights, data.military_activity, data.military_activity_meta, data.flight_source_status, activeLayers.flights, activeLayers.private, activeLayers.jets, activeLayers.sdk_air, activeLayers.military, (activeLayers as any).military_activity, setGeo]);
 
   // When a browser loses successful flight refreshes, the immutable data
   // payload never changes. Age *only* the small coarse military layer every
@@ -3091,6 +3120,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights);
     setVis(['fl-private-halo','fl-private'], activeLayers.private);
     setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
+    setVis(
+      ['civilian-flight-activity-halo','civilian-flight-activity-dots','civilian-flight-activity-label'],
+      activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air,
+    );
     setVis(['fl-military-halo','fl-military'], activeLayers.military);
     setVis(['military-activity-halo','military-activity-dots','military-activity-label'], (activeLayers as any).military_activity);
     setVis(['naval-activity-halo','naval-activity-dots','naval-activity-label'], (activeLayers as any).naval_activity);
