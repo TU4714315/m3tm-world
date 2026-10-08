@@ -13,17 +13,17 @@ describe('APP news map provenance', () => {
   });
   it('keeps distinct public publishers attached to an APP sourced pin only',()=>{
     const input={...row,evidence_links:[
-      {publisher:'Publisher A',url:'https://publisher.example/a'},
-      {publisher:'Publisher B',url:'https://publisher-b.example/b'},
+      {publisher:'Publisher A',url:'https://publisher.example.org/a'},
+      {publisher:'Publisher B',url:'https://publisher-b.example.org/b'},
       {publisher:'Local',url:'http://127.0.0.1/internal'},
-      {publisher:'Duplicate',url:'https://publisher.example/c'},
+      {publisher:'Duplicate',url:'https://publisher.example.org/c'},
     ]};
     const pins=buildAppNewsPins([input]);
     expect(pins).toHaveLength(1);
     expect(pins[0]).toMatchObject({publicationCount:2,
       evidenceLinks:[
-        {publisher:'Publisher A',url:'https://publisher.example/a'},
-        {publisher:'Publisher B',url:'https://publisher-b.example/b'},
+        {publisher:'Publisher A',url:'https://publisher.example.org/a'},
+        {publisher:'Publisher B',url:'https://publisher-b.example.org/b'},
       ],
     });
     expect(buildAppNewsPins([{...input,feed_origin:'independent-rss'}])).toEqual([]);

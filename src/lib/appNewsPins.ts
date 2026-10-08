@@ -1,3 +1,5 @@
+import { publicPublisherLink } from './publicPublisherLink';
+
 /**
  * Source-backed public news markers from M3TM.APP.
  *
@@ -24,16 +26,7 @@ export interface AppNewsPin {
 
 const regional = (coord: number) => Math.round(coord * 2) / 2;
 function publicEvidenceLink(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  try {
-    const url = new URL(value);
-    const hostname = url.hostname.toLowerCase();
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
-        !hostname.includes('.') || hostname === 'localhost' || hostname.endsWith('.local') ||
-        /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname))
-      return '';
-    return url.href;
-  } catch { return ''; }
+  return publicPublisherLink(value) ?? '';
 }
 
 export function buildAppNewsPins(value: unknown): AppNewsPin[] {

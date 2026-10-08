@@ -1,5 +1,6 @@
 import Parser from 'rss-parser';
 import crypto from 'node:crypto';
+import { publicPublisherLink } from './publicPublisherLink';
 
 /**
  * Public RSS is a parallel, low-latency witness stream; it never invents
@@ -30,25 +31,7 @@ export type RoutedNews = {
 };
 
 export function publicArticleLink(raw: unknown, allowedHosts?: readonly string[]): string | null {
-  if (typeof raw !== 'string') return null;
-  try {
-    const url = new URL(raw);
-    const host = url.hostname.toLowerCase().replace(/\.$/, '');
-    if ((url.protocol !== 'https:' && url.protocol !== 'http:') ||
-      url.username || url.password || url.port && !['80','443'].includes(url.port) ||
-      host === 'localhost' || host.endsWith('.localhost') ||
-      host.startsWith('127.') || host.startsWith('10.') ||
-      host.startsWith('192.168.') || host.startsWith('169.254.') ||
-      host.startsWith('172.16.') || host.endsWith('.local') ||
-      !host.includes('.')) return null;
-    if (allowedHosts?.length &&
-      !allowedHosts.some(allowed => host === allowed || host.endsWith('.'+allowed))) return null;
-    url.hash = '';
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(utm_.+|fbclid|gclid|mc_cid|mc_eid|ref_src|ref_url)$/i.test(key)) url.searchParams.delete(key);
-    }
-    return url.href;
-  } catch { return null; }
+  return publicPublisherLink(raw, allowedHosts);
 }
 
 export function publishedTime(value: unknown, nowMs = Date.now()): string | null {
