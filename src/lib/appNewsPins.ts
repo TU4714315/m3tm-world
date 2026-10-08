@@ -18,9 +18,23 @@ export interface AppNewsPin {
   provenance: 'M3TM.APP public feed';
   status: 'source-reported';
   language: string;
+  evidenceLinks: Array<{publisher:string;url:string}>;
+  publicationCount: number;
 }
 
 const regional = (coord: number) => Math.round(coord * 2) / 2;
+function publicEvidenceLink(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+        !hostname.includes('.') || hostname === 'localhost' || hostname.endsWith('.local') ||
+        /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname))
+      return '';
+    return url.href;
+  } catch { return ''; }
+}
 
 export function buildAppNewsPins(value: unknown): AppNewsPin[] {
   if (!Array.isArray(value)) return [];
@@ -41,14 +55,27 @@ export function buildAppNewsPins(value: unknown): AppNewsPin[] {
     if (!title) continue;
     const id = typeof item.id === 'string' && item.id.trim() ? item.id : `${item.link || ''}:${item.published || ''}`;
     if (!id || seen.has(id)) continue;
-    const candidate = typeof item.link === 'string' ? item.link : '';
-    let url = '';
-    try { if (/^https?:\/\//i.test(candidate)) url = new URL(candidate).href; } catch { /* link unavailable */ }
+    const url = publicEvidenceLink(item.link);
+    const evidenceLinks: Array<{publisher:string;url:string}> = [];
+    const seenPublishers = new Set<string>();
+    for (const evidence of Array.isArray(item.evidence_links) ? item.evidence_links.slice(0,8) : []) {
+      if (!evidence || typeof evidence !== 'object') continue;
+      const row = evidence as Record<string,unknown>;
+      const href = publicEvidenceLink(row.url);
+      const publisher = typeof row.publisher === 'string' ? row.publisher.trim().slice(0,90) : '';
+      if (!href || !publisher || seenPublishers.has(new URL(href).hostname)) continue;
+      seenPublishers.add(new URL(href).hostname);
+      evidenceLinks.push({publisher,url:href});
+    }
+    if (!evidenceLinks.length && url) evidenceLinks.push({
+      publisher:typeof item.source === 'string' ? item.source.slice(0,90) : 'الناشر',url,
+    });
     result.push({
       id, title, url,
       source: typeof item.source === 'string' && item.source.trim() ? item.source : 'M3TM.APP',
       published: typeof item.published === 'string' ? item.published : '',
       language: typeof item.language === 'string' ? item.language : '',
+      evidenceLinks, publicationCount:evidenceLinks.length,
       lat: regional(lat), lng: regional(lng),
       precision: 'regional-0.5deg', provenance: 'M3TM.APP public feed', status: 'source-reported',
     });

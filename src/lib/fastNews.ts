@@ -24,6 +24,9 @@ export type RoutedNews = {
   coords: [number, number] | null; coords_default: boolean;
   language: string; feed_origin: string; location_basis: string;
   verification_status: 'source-reported'; machine_assessment: null;
+  publication_count?: number;
+  evidence_links?: Array<{ publisher: string; url: string }>;
+  evidence_label?: string;
 };
 
 export function publicArticleLink(raw: unknown, allowedHosts?: readonly string[]): string | null {
@@ -86,14 +89,53 @@ export function sourceRssNews(
 }
 
 export function fusePublicNews(app: RoutedNews[], extra: RoutedNews[], limit=220): RoutedNews[] {
-  // Original geo provenance from APP always wins if a URL repeats in RSS.
-  const chosen = new Map<string,RoutedNews>();
+  // Match the original article URL or an identical normalized headline inside
+  // a narrow time window. Similar subjects are not evidence of one incident.
+  const titleKey = (text: string) => text.normalize('NFKC').toLocaleLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+  type Group = {
+    item: RoutedNews; title: string; time: number;
+    urls: Set<string>; publishers: Map<string, { publisher: string; url: string }>;
+  };
+  const groups: Group[] = [];
   for (const item of [...app,...extra]) {
-    const key = publicArticleLink(item.link);
-    if (!key || !item.title || !Number.isFinite(Date.parse(item.published))) continue;
-    if (!chosen.has(key)) chosen.set(key,item);
+    const url = publicArticleLink(item.link);
+    const time = Date.parse(item.published);
+    const title = titleKey(item.title || '');
+    if (!url || !item.title?.trim() || !Number.isFinite(time)) continue;
+    const group = groups.find(g => g.urls.has(url) ||
+      (title.length >= 12 && g.title === title && Math.abs(g.time-time) <= 90 * 60_000 &&
+        // Two APP-located reports from different regions are never collapsed
+        // merely because a publisher reused the same generic headline.
+        !(g.item.feed_origin === 'm3tm-app' && item.feed_origin === 'm3tm-app' &&
+          g.item.coords && item.coords &&
+          (Math.abs(g.item.coords[0]-item.coords[0]) > .5 ||
+           Math.abs(g.item.coords[1]-item.coords[1]) > .5))));
+    const target: Group = group || {
+      item, title, time, urls:new Set<string>(),
+      publishers:new Map<string,{publisher:string;url:string}>(),
+    };
+    if (!group) groups.push(target);
+    target.urls.add(url);
+    // Article host is a conservative publication-venue key; the same link
+    // appearing twice through APP and RSS is still just one publication.
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    if (!target.publishers.has(host) && target.publishers.size < 8) {
+      target.publishers.set(host, {publisher:item.source.slice(0,90),url});
+    }
+    if (item.feed_origin === 'm3tm-app' && target.item.feed_origin !== 'm3tm-app') {
+      target.item = item;
+    }
   }
-  return [...chosen.values()]
+  return groups.map(g => ({
+    ...g.item,
+    publication_count:g.publishers.size,
+    evidence_links:[...g.publishers.values()],
+    evidence_label:g.publishers.size > 1
+      ? 'عدة جهات نشر؛ لا يعني تحققًا مستقلًا'
+      : 'مصدر منشور؛ غير متحقق منه مستقلاً',
+  }))
     .sort((a,b) => Date.parse(b.published)-Date.parse(a.published))
     .slice(0,limit);
 }

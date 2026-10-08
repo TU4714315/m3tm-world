@@ -168,6 +168,23 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
                             <p className="mb-1 text-[10px] text-white/55">
                               {item.location_basis==='published-feed-coordinate' ? 'الموقع منشور ومُعمّم؛ استخدم علامة الموقع لتحديده.' : 'المصدر لم ينشر إحداثية موثقة؛ لا تُنشأ نقطة تخمينية.'}
                             </p>
+                            {Number(item.publication_count) > 1 && (
+                              <p className="mb-2 text-[10px] text-emerald-200">
+                                {item.publication_count} جهات نشر؛ لا يعني ذلك تحققًا مستقلاً من الواقعة.
+                              </p>
+                            )}
+                            {Array.isArray(item.evidence_links) && item.evidence_links.length > 1 && (
+                              <div className="mb-2 flex flex-col gap-1" aria-label="روابط جهات النشر">
+                                {item.evidence_links.slice(0,4).filter((row: any) =>
+                                  typeof row?.url === 'string' && /^https?:\/\//i.test(row.url)).map((row: any, index: number) => (
+                                  <a key={index} href={row.url} target="_blank" rel="noopener noreferrer"
+                                    className="text-[10px] text-emerald-200 underline"
+                                    onClick={e => e.stopPropagation()}>
+                                    {String(row.publisher || 'الناشر').slice(0,90)}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                             {typeof item.link === 'string' && /^https?:\/\//i.test(item.link) && <a
                               href={item.link}
                               target="_blank"
