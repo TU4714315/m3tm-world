@@ -583,7 +583,7 @@ export async function GET(req: Request) {
       jets,
     }, civilianObservedAtMs);
     const previousCivilian = await durableGetJson<PublicCivilianFlightSnapshot>(PUBLIC_CIVILIAN_CACHE_KEY);
-    let civilianFlightActivity = [];
+    let civilianFlightActivity: ReturnType<typeof buildCivilianFlightAggregate> = [];
     let civilianFlightActivityStale = false;
     let civilianFlightCacheBackend: string = previousCivilian.backend;
     if (civilianPublicTotal >= PUBLIC_CIVILIAN_MIN_CACHE_TOTAL && currentCivilianAggregate.length) {
