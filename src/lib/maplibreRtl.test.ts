@@ -21,7 +21,7 @@ describe('MapLibre Arabic RTL configuration', () => {
       .toBeLessThan((mock.setRTLTextPlugin as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]);
   });
 
-  it.each(['deferred', 'loading', 'loaded'])('does not configure the plugin twice when status is %s', status => {
+  it.each(['deferred', 'loading', 'loaded', 'error'])('does not configure the plugin twice when status is %s', status => {
     const mock = api(status);
     configureMaplibreArabicText(mock);
     expect(mock.setWorkerUrl).toHaveBeenCalledOnce();

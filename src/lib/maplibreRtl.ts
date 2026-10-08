@@ -23,6 +23,11 @@ export function configureMaplibreArabicText(api: MapLibreRtlApi): void {
   api.setWorkerUrl(`/vendor/maplibre/${api.getVersion()}/maplibre-gl-worker.mjs`);
 
   const status = api.getRTLTextPluginStatus();
+  // MapLibre 6.7 keeps the configured plugin URL after an import error and its
+  // public `setRTLTextPlugin()` rejects a second registration in the same JS
+  // session. Do not turn a transient import failure into a remount loop; a
+  // normal page reload recreates the module state and attempts the lazy import
+  // again. `requested` is safe because no URL has been registered yet.
   if (status !== 'unavailable' && status !== 'requested') return;
 
   void api.setRTLTextPlugin(RTL_TEXT_PLUGIN_URL, true).catch(error => {
