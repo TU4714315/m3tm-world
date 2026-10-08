@@ -94,6 +94,25 @@ function compactPublished(value: string): string {
   return `قبل ${days.toLocaleString('ar-SA')} ي`;
 }
 
+function decodeHtmlText(value: string): string {
+  const decodeNumericEntity = (entity: string, digits: string, radix: 10 | 16): string => {
+    const codePoint = Number.parseInt(digits, radix);
+    if (!Number.isInteger(codePoint)
+      || codePoint < 0
+      || codePoint > 0x10ffff
+      || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return entity;
+    return String.fromCodePoint(codePoint);
+  };
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (entity, hex) => decodeNumericEntity(entity, hex, 16))
+    .replace(/&#(\d+);/g, (entity, dec) => decodeNumericEntity(entity, dec, 10))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
 export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[] }) {
   const [sourceHealth, setSourceHealth] = useState<SourceHealth | null>(null);
   const tickerItems = useMemo(() => sortImportantNews(news), [news]);
@@ -185,11 +204,11 @@ export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[]
                       rel="noopener noreferrer"
                       tabIndex={repeatIdx === 0 ? undefined : -1}
                       className="inline-flex items-center gap-1.5 mx-3 pointer-events-auto text-white/70 hover:text-white transition-colors"
-                      aria-label={repeatIdx === 0 ? `فتح الخبر في M3TM.APP: ${item.title}` : undefined}
+                      aria-label={repeatIdx === 0 ? `فتح الخبر في M3TM.APP: ${decodeHtmlText(item.title)}` : undefined}
                       title={`${item.source} · ${importanceLabel(item.risk_score)}`}
                     >
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${importanceTone(item.risk_score)}`} />
-                      <span className="font-bold text-white/90">{item.title}</span>
+                      <span className="font-bold text-white/90">{decodeHtmlText(item.title)}</span>
                       <span className="text-[8px] text-[var(--gold-primary)]/80">{importanceLabel(item.risk_score)}</span>
                       <span className="text-[8px] text-white/30">{compactPublished(item.published)}</span>
                     </a>
