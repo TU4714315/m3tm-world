@@ -1,6 +1,15 @@
 # M3TM — MASTER CONTINUATION / خريطة الاستكمال (2026-10-04)
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
+
+## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
+**DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD uses MapLibre 6.7, whose installed worker explicitly requires an RTL shaping plugin, while hotfix `0d97990` removed the earlier eager plugin after it stalled first paint. The self-hosted BSD-2-Clause `rtl-text-0.3.0.js` remains in `public/vendor/maplibre/`. Current repair configures the versioned worker first and registers that plugin with `lazy=true`, so the map paints immediately and shaping is fetched only when RTL text is encountered. Unit tests lock ordering and prevent duplicate plugin registration.
+
+**VERIFY:** TypeScript, focused RTL/Arabic tests, full Vitest, Next build, protected public-layer/privacy checks, Vercel Preview, then browser smoke must show a painted map and correctly ordered Arabic labels before production merge.
+
+**BLOCKERS:** No source-data blocker for Arabic shaping. APP live news still has a separate unmerged current-WORLD bridge (#361) that must be reconciled onto current APP main rather than force-merging its stale base.
+
+**NEXT:** Complete #361 reconciliation after WORLD RTL production verification; independently reconcile stale durable-GDELT PR #68 against the actual Supabase schema instead of merging its old branch wholesale.
 ## CHECKPOINT — Public chrome cleanup after live QA (2026-10-08)
 **DONE:** PR #88 trims the remaining verbose public military-provider wording in `MenaPulse` and decodes common/numeric HTML entities in the M3TM.APP ticker. Reviewer follow-up preserves the explicit zero-region qualification and rejects invalid/out-of-range numeric entities instead of allowing a malformed upstream headline to throw during render.
 

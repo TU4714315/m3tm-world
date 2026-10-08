@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
+import { configureMaplibreArabicText } from '@/lib/maplibreRtl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteInsertionAnchor, satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
@@ -272,11 +273,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
-    // Arabic glyph plugin is held back: its initialization stalled the map
-    // canvas in production Chromium and WebKit after 2026-10-07 rollout.
-    // Keep geographic rendering functional while a compatible shaping path
-    // is verified in an isolated map/worker integration test.
-    maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
+    // MapLibre 6.7 requires bidi/Arabic shaping for correct country-name order.
+    // Load the pinned self-hosted plugin lazily so map paint is never blocked.
+    configureMaplibreArabicText(maplibregl);
     const baseOptions = {
       container,
       style: styleUrl,
