@@ -15,14 +15,15 @@ describe('Arabic worldwide map labels without geometry changes',()=>{
    expect(str).toContain('name_en');
    expect(str).toContain('name:ar');
  });
- it('falls back through source Arabic then CARTO name_en mapping when ISO code is missing or unmatched',()=>{
+ it('uses only formatted/string fallbacks accepted by MapLibre text-field',()=>{
    const expression=arabicCountryLabelExpression();
-   const match=expression[1] as unknown[];
-   expect(match.at(-1)).toBeNull();
-   const englishMatch=expression[3] as unknown[];
+   expect(JSON.stringify(expression)).not.toContain('null');
+   expect(expression[0]).toBe('match');
+   const englishMatch=expression.at(-1) as unknown[];
    expect(englishMatch[0]).toBe('match');
    expect(JSON.stringify(englishMatch)).toContain('"Saudi Arabia","السعودية"');
-   expect(expression).toEqual(expect.arrayContaining([['get','name:ar'],['get','name'],['get','name_en']]));
+   const sourceFallback=englishMatch.at(-1) as unknown[];
+   expect(sourceFallback).toEqual(['coalesce',['get','name:ar'],['get','name_en'],['get','name'],'']);
  });
  it('changes only vector text labels and does not mutate boundaries',()=>{
    const map={
