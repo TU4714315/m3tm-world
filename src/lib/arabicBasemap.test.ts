@@ -8,13 +8,21 @@ describe('Arabic worldwide map labels without geometry changes',()=>{
    expect(str).toContain('"IR","إيران"');
    expect(str).toContain('"YE","اليمن"');
    expect(str).toContain('"DE",');
+   expect(str).toContain('"Saudi Arabia","السعودية"');
+   expect(str).toContain('"Iran","إيران"');
+   expect(str).toContain('"Yemen","اليمن"');
+   expect(str).toContain('"Germany",');
+   expect(str).toContain('name_en');
    expect(str).toContain('name:ar');
  });
- it('falls back to source Arabic/name when ISO code is missing or unmatched',()=>{
+ it('falls back through source Arabic then CARTO name_en mapping when ISO code is missing or unmatched',()=>{
    const expression=arabicCountryLabelExpression();
    const match=expression[1] as unknown[];
    expect(match.at(-1)).toBeNull();
-   expect(expression).toEqual(expect.arrayContaining([['get','name:ar'],['get','name']]));
+   const englishMatch=expression[3] as unknown[];
+   expect(englishMatch[0]).toBe('match');
+   expect(JSON.stringify(englishMatch)).toContain('"Saudi Arabia","السعودية"');
+   expect(expression).toEqual(expect.arrayContaining([['get','name:ar'],['get','name'],['get','name_en']]));
  });
  it('changes only vector text labels and does not mutate boundaries',()=>{
    const map={
