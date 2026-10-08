@@ -30,16 +30,14 @@ export function arabicCountryLabelExpression():unknown[]{
       if(english&&english!==code&&!englishEntries.has(english)) englishEntries.set(english,localized);
     }
   }
-  return ['coalesce',
-    ['match',['upcase',['coalesce',['get','iso_a2'],'']],...entries,null],
-    ['get','name:ar'],
-    // CARTO place_country tiles do not consistently expose iso_a2/name:ar.
-    // Their style itself renders `name_en`, so retain a deterministic Arabic
-    // fallback keyed by that published English country label before falling
-    // back to the raw source name. This changes text only, never geometry.
-    ['match',['coalesce',['get','name_en'],['get','name'],''],
-      ...Array.from(englishEntries.entries()).flat(),null],
-    ['get','name'],['get','name_en']];
+  const sourceName=['coalesce',['get','name:ar'],['get','name_en'],['get','name'],''];
+  const englishFallback=['match',['coalesce',['get','name_en'],['get','name'],''],
+    ...Array.from(englishEntries.entries()).flat(),sourceName];
+  // `text-field` is a formatted/string expression. Literal null branches make
+  // MapLibre reject the whole expression at runtime, so each match falls back
+  // to another text-producing expression instead of null.
+  return ['match',['upcase',['coalesce',['get','iso_a2'],'']],
+    ...entries,englishFallback];
 }
 const ARABIC_LOCAL_NAME=['coalesce',['get','name:ar'],['get','name']];
 export function applyArabicBasemapLabels(map:LabelMap):string[]{
