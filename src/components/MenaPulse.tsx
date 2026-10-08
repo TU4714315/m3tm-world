@@ -7,12 +7,20 @@ import {
   buildMenaFusionRadar, gdeltWindowTime, FUSION_WINDOWS,
   type FusionWindow,
 } from '@/lib/menaSignals';
+import type {GdeltHistoryView} from '@/lib/gdeltPublicHistory';
+import {isArabicNews} from '@/lib/newsLanguage';
 
 const PERIODS:{id:FusionWindow;label:string}[]=[
   {id:'h1',label:'ساعة'}, {id:'h6',label:'٦ ساعات'},
   {id:'h24',label:'٢٤ ساعة'}, {id:'d7',label:'٧ أيام'},
 ];
 const COMBAT=new Set(['heavy_weapons','armed_clash','bombing','material_conflict','mass_violence','assault']);
+const CODE_LABELS:Record<string,string>={
+  aerial_attack:'ترميز نشاط جوي',heavy_weapons:'أسلحة ثقيلة',bombing:'تفجير',
+  armed_clash:'اشتباك مُبلّغ',mass_violence:'عنف جماعي',assault:'اعتداء',
+  civil_unrest:'اضطرابات',material_conflict:'نزاع مادي',verbal_report:'تصريح',
+};
+const HISTORY_HOURS:Record<FusionWindow,number>={h1:1,h6:6,h24:24,d7:168};
 const timestamp=(v:string|null|undefined)=>v&&Number.isFinite(Date.parse(v))
   ?new Date(v).toLocaleString('ar-SA',{timeZone:'UTC',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' UTC'
   :'غير معلوم';
@@ -29,8 +37,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
 }){
   const [period,setPeriod]=useState<FusionWindow>('h24');
   const [newsLanguage,setNewsLanguage]=useState<'ar'|'all'>('ar');
+  const [archiveHistory,setArchiveHistory]=useState<GdeltHistoryView|null>(null);
+  const [historyStatus,setHistoryStatus]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [archiveCoverage,setArchiveCoverage]=useState<{
     observedWindows:number|null;expectedWindows:number;coveragePercent:number|null;
+    fullWindowTarget?:number;sampling?:string;backend?:string;coverageStart?:string;
     durable:boolean;firstSeenLagMinutes:{p50:number|null;p95:number|null};
   }|null>(null);
   const [nowMs,setNowMs]=useState(()=>Date.now());
@@ -47,17 +58,35 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
     let live=true;
     const load=()=>fetch('/api/source-coverage')
       .then(r=>r.ok?r.json():null)
-      .then(r=>{if(live&&r?.expectedWindows===672)setArchiveCoverage(r);})
+      .then(r=>{if(live&&typeof r?.expectedWindows==='number')setArchiveCoverage(r);})
       .catch(()=>{if(live)setArchiveCoverage(null);});
     load();
     const id=window.setInterval(load,5*60_000);
     return ()=>{live=false;window.clearInterval(id);};
   },[]);
+  useEffect(()=>{
+    let active=true;
+    const load=async()=>{
+      try{
+        const response=await fetch('/api/gdelt-history?hours='+HISTORY_HOURS[period]+'&limit=90');
+        if(!response.ok)throw new Error('Archive unavailable');
+        const result=await response.json();
+        if(!active)return;
+        if(result?.data_state!=='historical-sample')throw new Error('Unusable history');
+        setArchiveHistory(result);
+        setHistoryStatus('ready');
+      }catch{if(active){setArchiveHistory(null);setHistoryStatus('unavailable');}}
+    };
+    setHistoryStatus('loading');
+    load();
+    const id=window.setInterval(load,2*60_000);
+    return ()=>{active=false;window.clearInterval(id);};
+  },[period]);
   const sourceTime=publishedAt??gdeltWindowTime(data.conflict_source_status?.gdelt?.window||'');
   const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime,nowMs),[data,sourceTime,nowMs]);
   const visible=radar.events.filter(e=>e.ageMs!==null && e.ageMs<=FUSION_WINDOWS[period]);
   const publishedNews=radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]);
-  const arabicNews=publishedNews.filter(n=>/[\u0600-\u06FF]/.test(n.title));
+  const arabicNews=publishedNews.filter(n=>isArabicNews(n.language,n.title));
   const visibleNews=newsLanguage==='ar' ? arabicNews : publishedNews;
   const preliminary=visible.filter(e=>!e.multiplePublishers).length;
   const multiple=visible.length-preliminary;
@@ -188,9 +217,11 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
       <div className="mt-1.5 rounded-md border border-white/10 bg-black/25 p-2 text-[10px] leading-5 text-white/80" aria-label="سجل جودة استقبال ملفات GDELT">
         <strong className="text-cyan-100">تغطية استقبال ملفات GDELT خلال ٧ أيام</strong>
         {archiveCoverage?.durable
-          ? <><p>نوافذ موثقة: {archiveCoverage.observedWindows} / {archiveCoverage.expectedWindows} ({archiveCoverage.coveragePercent}%)</p>
-             <p>تأخر أول وصول للخادم P95: {archiveCoverage.firstSeenLagMinutes.p95 ?? '—'} دقيقة</p></>
-          : <p className="text-amber-100/80">تعذّر قياس تغطية الأسبوع: التخزين المشترك Redis/KV غير مهيأ أو متعثر؛ لا يعني ذلك انقطاع الأخبار.</p>}
+          ? archiveCoverage.expectedWindows>0
+            ? <><p>نوافذ موثقة منذ بدء الجمع: {archiveCoverage.observedWindows} / {archiveCoverage.expectedWindows} ({archiveCoverage.coveragePercent}%) · المستهدف ٦٧٢ نافذة خلال أسبوع</p>
+               <p>تأخر وصول الملف الأول للخادم P95: {archiveCoverage.firstSeenLagMinutes.p95 ?? '—'} دقيقة</p></>
+            : <p className="text-amber-100/80">الأرشيف موصول، وفي مرحلة التجميع الأولى؛ لا توجد تغطية أسبوعية مكتملة بعد.</p>
+          : <p className="text-amber-100/80">تعذّر توثيق التغطية بالتخزين المشترك؛ لا يعني ذلك انقطاع الأخبار.</p>}
         <p className="text-amber-100/75">القياس يخص استقبال ملفات النشر، وليس أرشيف حوادث كاملًا أو زمن عرض البلاغ للمستخدم.</p>
       </div>
       <p className="mt-1 text-[10px] leading-4 text-white/65">
@@ -204,6 +235,50 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
       </p>
       </div>
     </details>
+    <div className="mt-2 rounded-xl border border-cyan-300/25 bg-[#061b24]/85 p-2.5" aria-label="الأرشيف الزمني المنشور للشرق الأوسط">
+      <div className="flex items-center justify-between gap-2">
+        <strong className="flex items-center gap-1 text-xs text-cyan-100"><Clock3 className="h-3.5 w-3.5"/>أرشيف التقارير المنشورة</strong>
+        <span className="rounded border border-cyan-300/20 px-1.5 py-0.5 text-[10px] text-cyan-100/65">GDELT · إسناد تاريخي</span>
+      </div>
+      {historyStatus==='ready'&&archiveHistory ? <>
+        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+          <div className="rounded-md bg-cyan-300/10 p-1.5"><strong className="text-cyan-200">{archiveHistory.totalReportRows}</strong><p className="text-[10px] text-white/65">تقارير مؤرشفة للفترة</p></div>
+          <div className="rounded-md bg-white/5 p-1.5"><strong>{archiveHistory.singlePublisher}</strong><p className="text-[10px] text-white/65">ناشر واحد</p></div>
+          <div className="rounded-md bg-amber-200/10 p-1.5"><strong className="text-amber-100">{archiveHistory.multiplePublishers}</strong><p className="text-[10px] text-white/65">عدة ناشرين</p></div>
+        </div>
+        <p className="mt-1.5 text-[10px] text-cyan-100/75">التوزيع حسب تاريخ ترميز التقرير، لا وقت وقوع الحادثة.</p>
+        <div dir="ltr" role="img" aria-label="تسلسل كثافة نشر تقارير GDELT خلال الفترة المحددة" className="mt-1 flex h-14 items-end gap-[3px] rounded-md border border-white/10 bg-black/25 p-1.5">
+          {archiveHistory.timeline.map((slot,i)=>{
+            const max=Math.max(1,...archiveHistory.timeline.map(t=>t.reports));
+            return <div key={slot.publishedAt+'-'+i}
+              title={slot.publishedAt+' · '+slot.reports+' بلاغًا مخزّنًا في الأرشيف (صفر لا يعني عدم وقوع أحداث)'}
+              className="min-w-[2px] flex-1 rounded-t-[2px] bg-cyan-300/70"
+              style={{height:Math.max(3,Math.round(slot.reports/max*100))+'%'}}/>;
+          })}
+        </div>
+        <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+          {[...archiveHistory.categories].sort((a,b)=>b.reports-a.reports).slice(0,6).map(item=><span key={item.category}
+            className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-white/75">{CODE_LABELS[item.category]??item.category} · {item.reports}</span>)}
+        </div>
+        <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-white/65">
+          أحدث {Math.min(archiveHistory.events.length,5)} من عيّنة {archiveHistory.events.length} سجلًا؛ الإحصاء للدفعات المحفوظة فقط وليس جميع وقائع المنطقة.
+        </p>
+        <div className="divide-y divide-white/10">
+          {archiveHistory.events.slice(0,5).map(e=><div key={e.id} className="py-1.5">
+            <div className="flex items-start justify-between gap-2 text-[11px] text-white/90">
+              <span>{CODE_LABELS[e.category]??e.category} · {e.place||e.country||'موضع منشور تقريبي'}</span>
+              <span className="shrink-0 text-[10px] text-cyan-100/65">{e.publisherCoverage==='multi-source-report'?'عدة ناشرين':'أولي'}</span>
+            </div>
+            <div className="mt-0.5 flex justify-between gap-2 text-[10px] text-white/60">
+              <span>{timestamp(e.publishedAt)}</span>
+              {e.url&&<a href={e.url} target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-1 text-cyan-300 underline">الخبر الأصلي<ExternalLink className="h-3 w-3"/></a>}
+            </div>
+          </div>)}
+        </div>
+        <p className="mt-1 text-[10px] leading-4 text-amber-100/80">ترميز إخباري آلي، وليس تأكيدًا ميدانيًا مستقلًا. المواقع معممة إلى ربع درجة، ولا تُستنتج منها مسارات تشغيلية.</p>
+      </> : <p className="mt-2 text-[11px] leading-5 text-white/65">{historyStatus==='loading'?'جارٍ استرجاع التقارير المؤرشفة…':'الأرشيف غير متاح مؤقتًا؛ تبقى طبقات الرصد المباشر تعمل بصورة مستقلة.'}</p>}
+    </div>
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-2">
       <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري المجمّع</strong>
       <p className="mt-1 text-[11px] text-white/80">المنطقة: {radar.airObservation.regionalCells} · عالميًا: {globalAirCells}</p>

@@ -155,7 +155,7 @@ export function buildMenaFusionRadar(
   // APP public geo-tagged news is a separate published witness, not a GDELT
   // event and not proof of an attack, actor, or operational position.
   const appNewsSignals: Array<{
-    id:string;title:string;source:string;url:string;time:string;ageMs:number;
+    id:string;title:string;source:string;url:string;time:string;ageMs:number;language:string;
   }> = [];
   const seenNewsUrls=new Set<string>();
   for(const pin of data.app_news??[]){
@@ -171,7 +171,7 @@ export function buildMenaFusionRadar(
     seenNewsUrls.add(key);
     appNewsSignals.push({
       id:`app-news-${seenNewsUrls.size}`,title:pin.title,source:pin.source,
-      url:pin.url,time:pin.published,ageMs,
+      url:pin.url,time:pin.published,ageMs,language:pin.language,
     });
   }
   appNewsSignals.sort((a,b)=>a.ageMs-b.ageMs);

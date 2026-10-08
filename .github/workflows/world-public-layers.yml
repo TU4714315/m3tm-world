@@ -26,6 +26,12 @@ on:
       - 'src/lib/satellite-layer*'
       - 'src/lib/menaSignals*'
       - 'src/lib/gdeltCoverageLedger*'
+      - 'src/lib/gdeltPublicHistory*'
+      - 'src/app/api/gdelt-history/**'
+      - 'supabase/functions/world-gdelt-archive/**'
+      - 'infra/supabase_applied/**'
+      - 'docs/WORLD_GDELT_DURABLE_ARCHIVE_2026-10-05.md'
+      - 'tools/verify-world-archive.mjs'
       - 'src/app/api/gdelt-events/**'
       - 'src/app/api/source-coverage/**'
       - 'src/components/MenaPulse.tsx'
@@ -45,6 +51,7 @@ on:
       - 'public/m3tm-mark.png'
       - 'public/site.webmanifest'
       - 'public/manifest.json'
+      - 'tsconfig.json'
       - 'vercel.json'
       - '.github/workflows/world-public-layers.yml'
   workflow_dispatch:
@@ -72,3 +79,10 @@ jobs:
       - run: npx tsc --noEmit --incremental false
       - run: npm test
       - run: npm run build
+      # Typecheck the deployed Supabase Edge worker independently from Next.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --config supabase/functions/world-gdelt-archive/deno.json supabase/functions/world-gdelt-archive/index.ts
+      # Offline migration privilege contract review; does not contact APP DB.
+      - run: node tools/verify-world-archive.mjs

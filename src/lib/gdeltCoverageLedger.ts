@@ -103,7 +103,33 @@ export function summarizeGdeltCoverage(rows: Observation[], now = Date.now(), ba
       : 'Observed publication windows only; no historical GDELT event rows or client-render latency.',
   };
 }
-export async function getGdeltCoverage(now = Date.now()) {
+/**
+ * Prefer the independently scheduled durable Supabase archive. This endpoint
+ * publishes sanitized public-source metadata only; WORLD needs no APP secrets,
+ * and a storage outage never interrupts the separate live GDELT map feed.
+ */
+async function remoteGdeltCoverage() {
+  const res=await fetch('https://heibzaolhwlzqaweludm.supabase.co/functions/v1/world-gdelt-archive?mode=coverage',{
+    next:{revalidate:60},signal:AbortSignal.timeout(5200),
+  });
+  if(!res.ok)throw new Error('Public archive service is unavailable');
+  const data=await res.json();
+  if(data?.backend!=='supabase'||data?.durable!==true||
+    !['observed-export-checkpoints','not-yet-collected'].includes(data?.sampling)||
+    typeof data?.expectedWindows!=='number'||
+    !Number.isFinite(data.expectedWindows))throw new Error('Invalid coverage provenance');
+  return data;
+}
+export async function getGdeltCoverage(
+  now = Date.now(),
+  options: { allowRemote?: boolean } = {},
+) {
+  // An explicit offline mode makes synthetic-clock tests deterministic;
+  // production always attempts the public durable archive first.
+  if (options.allowRemote !== false) {
+    try { return await remoteGdeltCoverage(); }
+    catch { /* Keep independent GDELT and durable Redis fallback active. */ }
+  }
   // Vercel route functions do not necessarily share the same memory.
   // Never present memory count=0 as observed full-week source failure.
   const local = () => ({

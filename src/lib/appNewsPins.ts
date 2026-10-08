@@ -17,6 +17,7 @@ export interface AppNewsPin {
   precision: 'regional-0.5deg';
   provenance: 'M3TM.APP public feed';
   status: 'source-reported';
+  language: string;
 }
 
 const regional = (coord: number) => Math.round(coord * 2) / 2;
@@ -47,6 +48,7 @@ export function buildAppNewsPins(value: unknown): AppNewsPin[] {
       id, title, url,
       source: typeof item.source === 'string' && item.source.trim() ? item.source : 'M3TM.APP',
       published: typeof item.published === 'string' ? item.published : '',
+      language: typeof item.language === 'string' ? item.language : '',
       lat: regional(lat), lng: regional(lng),
       precision: 'regional-0.5deg', provenance: 'M3TM.APP public feed', status: 'source-reported',
     });

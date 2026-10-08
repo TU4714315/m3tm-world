@@ -158,6 +158,7 @@ describe('M3TM independent APP published news witness',()=>{
     precision:'regional-0.5deg' as const,
     provenance:'M3TM.APP public feed' as const,
     status:'source-reported' as const,
+    language:'ar',
   };
   it('keeps published APP news separate from classified GDELT conflicts',async()=>{
     const {buildMenaFusionRadar}=await import('./menaSignals');
@@ -173,7 +174,7 @@ describe('M3TM independent APP published news witness',()=>{
     expect(r.appNewsSignals).toHaveLength(1);
     expect(r.appNewsLast24h).toBe(1);
     expect(r.appNewsSignals[0]).toMatchObject({
-      title:pin.title,source:pin.source,url:pin.url,ageMs:30*60_000,
+      title:pin.title,source:pin.source,url:pin.url,ageMs:30*60_000,language:'ar',
     });
     expect(r.events).toHaveLength(0);
     expect(r.windows.h1).toBe(0);

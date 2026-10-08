@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { fetchFastRssNews, fusePublicNews, type RoutedNews } from '@/lib/fastNews';
+import { isLikelyArabicText } from '@/lib/newsLanguage';
 
 /**
  * M3TM.WORLD — Public News Aggregation API
@@ -134,7 +135,7 @@ export async function GET() {
         const rows: Record<string, unknown>[] = Array.isArray(payload.items)
           ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
           : [];
-        const arabicRows = rows.filter((item) => /[\u0600-\u06FF]/.test(String(item.title || '')));
+        const arabicRows = rows.filter((item) => isLikelyArabicText(item.title));
         const news: RoutedNews[] = arabicRows.slice(0, 160).map((item) => {
           const lat = item.latitude;
           const lng = item.longitude;

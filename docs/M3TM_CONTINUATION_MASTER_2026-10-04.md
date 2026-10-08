@@ -34,6 +34,12 @@
 - Local WORLD worktree has historically been dirty; **never** reset, clean, stash, checkout over or publish its changes without `git status --short --branch`. The latest direct workspace command returned `Tool exec_command not found`; use isolated GitHub branches if local status cannot be established.
 - Tests: `npx tsc --noEmit --incremental false`, `npm test`, `npm run build`; Vercel Preview and protected merge gate; production `/api/health?deep=1`, `/api/conflicts`, `/api/gdelt-events`, plus WebGL desktop/mobile view.
 
+## CHECKPOINT — Arabic labels + news freshness + durable MENA history (2026-10-08)
+- Arabic labels: PR #89 replaced the legacy RTL plugin path with MapLibre 6.9 native Arabic/bidi shaping and corrected ISO-name fallback to `name:ar`/`name` when ISO is absent. Production verification must use the deployed SHA, not merely CI.
+- News freshness: WORLD `/api/news` combines the APP published feed with independent RSS; measured live on 2026-10-08 with the newest MENA item about seven minutes old. APP's scheduled static publisher can incur GitHub cron jitter, so the fast bridge is intentionally independent rather than claiming zero delay.
+- Durable GDELT history: the already-deployed Supabase `world_gdelt_*` archive/cron is now reconciled into current WORLD through `/api/gdelt-history` and the MENA Observatory. This preserves live feeds independently if history is temporarily unavailable.
+- Correctness follow-up: Arabic-only tabs now reject common Persian-specific characters instead of treating the entire Arabic Unicode block as Arabic; malformed GDELT dates stay unknown instead of being synthesized as the current time.
+
 ## Product specification
 - Maximize source-backed **fresh reporting of the Middle East/Red Sea**, global coverage preserved; aim to match/exceed WorldMonitor's information organization and measured alert latency, not copy its branding or unlicensed code. Assess feed freshness by original publication time, deduplication, geographic certainty and publisher independence.
 - All public layers, notably `military_activity`, `naval_activity`, `maritime`, `conflict_zones`, `conflict_density`, `frontlines`, `reported_routes`, `gdelt_events`, `civil_unrest`, `global_incidents`, `app_news`, `alert_pins`, flights/satellites/cameras and borders, stay enabled as user choices permit. Fix weak layers rather than delete them.

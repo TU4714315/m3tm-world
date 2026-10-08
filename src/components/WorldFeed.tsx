@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Newspaper, ChevronDown, ChevronUp, ExternalLink, MapPin, Zap } from 'lucide-react';
+import { isArabicNews } from '@/lib/newsLanguage';
 
 /* ═══════════════════════════════════════════════════════════════
    M3TM.WORLD — موجز الأخبار
@@ -47,7 +48,7 @@ export default function WorldFeed({ data, onLocate }: WorldFeedProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [language,setLanguage] = useState<'ar'|'all'>('ar');
   const news: any[] = Array.isArray(data?.news) ? data.news : [];
-  const arabicNews = news.filter((item: any) => /[\u0600-\u06FF]/.test(String(item.title || '')));
+  const arabicNews = news.filter((item: any) => isArabicNews(item.language,item.title));
   const visibleNews = language === 'ar' ? arabicNews : news;
 
   return (
