@@ -59,9 +59,24 @@ describe('public WORLD source-backed layer projection', () => {
       ],
       satellites: [{ id: 'sat-1', category: 'navigation' }, { id: 'sat-2', category: 'military' }],
       commercial_flights: [{ id: 'civil-1' }],
+      civilian_flight_activity: [{
+        id: 'civilian-cell', lat: 24, lng: 46, total: 17, commercial: 12, private: 3, jets: 2,
+        cell_degrees: 2, precision: 'coarse-2deg', data_state: 'cached-stale',
+        observed_at: '2026-10-03T04:00:00Z', age_seconds: 120,
+        callsign: 'civil-secret', icao24: 'civil-hex',
+      }],
+      civilian_flight_activity_meta: {
+        mode: 'coarse-civilian-last-good', cell_degrees: 2, fallback_active: true,
+        public_total: 0, fallback_cells: 1, cache_backend: 'redis',
+        durable_cache_configured: true, exact_tracks_exposed: false, identifiers_exposed: false,
+        internalEndpoint: 'http://10.0.0.7',
+      },
       military_activity: [{ id: 'aggregate-cell', lat: 24, lng: 48, count: 5, trend: 'up', data_state: 'cached-stale', observed_at: '2026-10-03T04:00:00Z', age_seconds: 120, icao24: 'should-strip', token: 'strip-me' }],
       military_activity_meta: { mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, stale_fallback: true, cache_backend: 'redis', durable_cache_configured: true, internalEndpoint: 'http://10.0.0.4' },
-      flight_source_status: { status: 'active', exact_military_tracks_exposed: false, hostToken: 'strip-me' },
+      flight_source_status: {
+        status: 'degraded', public_total: 0, civilian_fallback_cells: 1,
+        civilian_fallback_active: true, exact_military_tracks_exposed: false, hostToken: 'strip-me',
+      },
       gdelt_data_state: 'cached-stale',
       gdelt_source_published_at: '2026-10-04T15:00:00Z',
       conflict_data_state: 'live',
@@ -76,10 +91,23 @@ describe('public WORLD source-backed layer projection', () => {
     expect(result.maritime_ships).toEqual([{ id: 'cargo', type: 'cargo' }]);
     expect(result.satellites).toEqual([{ id: 'sat-1', category: 'navigation' }]);
     expect(result.commercial_flights).toHaveLength(1);
+    expect(result.civilian_flight_activity).toEqual([expect.objectContaining({
+      id: 'civilian-cell', lat: 24, lng: 46, total: 17,
+      commercial: 12, private: 3, jets: 2, cell_degrees: 2,
+      data_state: 'cached-stale', age_seconds: 120,
+    })]);
+    expect(result.civilian_flight_activity_meta).toMatchObject({
+      mode: 'coarse-civilian-last-good', fallback_active: true, public_total: 0,
+      fallback_cells: 1, cache_backend: 'redis', durable_cache_configured: true,
+      exact_tracks_exposed: false, identifiers_exposed: false,
+    });
     expect(result.military_activity).toHaveLength(1);
     expect(result.military_activity[0]).toMatchObject({ id: 'aggregate-cell', lat: 24, lng: 48, trend: 'up', data_state: 'cached-stale', age_seconds: 120 });
     expect(result.military_activity_meta).toMatchObject({ mode: 'coarse-regional-aggregate', exact_tracks_exposed: false, stale_fallback: true, cache_backend: 'redis', durable_cache_configured: true });
-    expect(result.flight_source_status).toMatchObject({ status: 'active', exact_military_tracks_exposed: false });
+    expect(result.flight_source_status).toMatchObject({
+      status: 'degraded', public_total: 0, civilian_fallback_cells: 1,
+      civilian_fallback_active: true, exact_military_tracks_exposed: false,
+    });
     expect(result.gdelt_data_state).toBe('cached-stale');
     expect(result.conflict_data_state).toBe('live');
     expect(result.gdelt_source_published_at).toBe('2026-10-04T15:00:00Z');
@@ -95,7 +123,7 @@ describe('public WORLD source-backed layer projection', () => {
     ]));
     expect(result.sdk_entities).toEqual([]);
     const serialized = JSON.stringify(result);
-    for (const forbidden of ['sensitive-track', 'sensitive-satellite', 'should-strip', 'strip-me', '10.0.0.4', '10.0.0.5', '10.0.0.6', '99999']) {
+    for (const forbidden of ['sensitive-track', 'sensitive-satellite', 'should-strip', 'strip-me', 'civil-secret', 'civil-hex', '10.0.0.4', '10.0.0.5', '10.0.0.6', '10.0.0.7', '99999']) {
       expect(serialized).not.toContain(forbidden);
     }
   });
