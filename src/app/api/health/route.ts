@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchAcledPublicEvents } from '@/lib/acled';
 import { durableCacheConfigured } from '@/lib/durableCache';
+import { classifyFlightProviderHealth, type FlightFailureClass, type FlightProviderReachability } from '@/lib/flightReliability';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +114,8 @@ async function probeFlights(request: Request): Promise<{
   source: string | null;
   providers: Record<string, unknown>;
   alert: string | null;
+  providerReachability: FlightProviderReachability;
+  failureClass: FlightFailureClass;
 }> {
   try {
     const url = new URL('/api/flights?summary=1', request.url);
@@ -121,10 +124,15 @@ async function probeFlights(request: Request): Promise<{
       signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) {
+      const providerHealth = classifyFlightProviderHealth({
+        httpOk: false, status: null, publicTotal: null, fallbackActive: false,
+      });
       return {
         status: 'unavailable', detail: `/api/flights HTTP ${res.status}`,
         publicTotal: null, fallbackCells: 0, source: null, providers: {},
         alert: 'flight_route_unavailable',
+        providerReachability: providerHealth.reachability,
+        failureClass: providerHealth.failureClass,
       };
     }
     const data = await res.json();
@@ -133,10 +141,15 @@ async function probeFlights(request: Request): Promise<{
     const fallbackCells = Number.isFinite(Number(data?.civilian_activity?.cells))
       ? Number(data.civilian_activity.cells) : 0;
     const fallbackActive = data?.civilian_activity?.fallback_active === true;
-    const active = data?.status === 'operational' && (publicTotal ?? 0) > 0;
-    const degraded = fallbackActive || data?.status === 'degraded' || publicTotal === 0;
+    const providerHealth = classifyFlightProviderHealth({
+      httpOk: true,
+      status: typeof data?.status === 'string' ? data.status : null,
+      publicTotal,
+      fallbackActive,
+    });
+    const active = providerHealth.reachability === 'reachable';
     return {
-      status: active ? 'active' : degraded ? 'degraded' : 'unavailable',
+      status: active ? 'active' : providerHealth.reachability === 'degraded' ? 'degraded' : 'unavailable',
       detail: active
         ? `Public flight route active with ${publicTotal} civilian observations.`
         : fallbackActive
@@ -147,6 +160,8 @@ async function probeFlights(request: Request): Promise<{
       source: typeof data?.source === 'string' ? data.source : null,
       providers: data?.providers && typeof data.providers === 'object' ? data.providers : {},
       alert: publicTotal === 0 ? 'public_total_zero' : null,
+      providerReachability: providerHealth.reachability,
+      failureClass: providerHealth.failureClass,
     };
   } catch (error) {
     return {
@@ -154,6 +169,8 @@ async function probeFlights(request: Request): Promise<{
       detail: error instanceof Error ? error.message : 'Flight reachability probe failed',
       publicTotal: null, fallbackCells: 0, source: null, providers: {},
       alert: 'flight_probe_failed',
+      providerReachability: 'unreachable',
+      failureClass: 'probe_exception',
     };
   }
 }
@@ -184,6 +201,8 @@ export async function GET(request: Request) {
           source: null,
           providers: {} as Record<string, unknown>,
           alert: null,
+          providerReachability: 'not_probed' as FlightProviderReachability,
+          failureClass: null as FlightFailureClass,
         },
       ];
 
@@ -225,6 +244,8 @@ export async function GET(request: Request) {
       source: flightProbe.source,
       providers: flightProbe.providers,
       alert: flightProbe.alert,
+      providerReachability: flightProbe.providerReachability,
+      failureClass: flightProbe.failureClass,
     },
     ais: {
       role: 'public-maritime-observation',

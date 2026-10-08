@@ -31,6 +31,7 @@ import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
+import { retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -873,6 +874,7 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
+  const flightLoadInFlightRef = useRef(false);
   useEffect(() => {
     if (!activeLayers.cctv) return;
     return loadCameraCatalog(cameras => {
@@ -903,25 +905,24 @@ export default function Dashboard() {
 
   useEffect(() => {
 
-    // Flights: only mark the one-shot load complete after usable data lands.
-    // Empty/failed provider responses get two bounded retries before normal polling.
-    let flightRetryCancelled = false;
+    // Flights: keep in-flight work separate from the fetched marker. The marker
+    // is written only after an active/degraded payload lands; otherwise the bounded
+    // retry budget runs out and normal polling remains responsible for recovery.
     const wantsFlights = activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air;
-    const loadFlights = async () => {
-      if (!wantsFlights || layerFetchedRef.current.has('flights')) return;
-      layerFetchedRef.current.add('flights');
-      for (let attempt = 0; attempt < 3 && !flightRetryCancelled; attempt += 1) {
-        const ok = await fetchEndpoint('/api/flights');
-        const state = dataRef.current.flight_source_status?.status;
-        if (ok && state !== 'empty') return;
-        layerFetchedRef.current.delete('flights');
-        if (attempt < 2) {
-          await new Promise(resolve => setTimeout(resolve, 5000 * (attempt + 1)));
-          if (!flightRetryCancelled) layerFetchedRef.current.add('flights');
-        }
-      }
-    };
-    void loadFlights();
+    if (wantsFlights && !layerFetchedRef.current.has('flights') && !flightLoadInFlightRef.current) {
+      flightLoadInFlightRef.current = true;
+      void retryFlightLayerLoad(
+        () => fetchEndpoint('/api/flights'),
+        () => {
+          const state = dataRef.current.flight_source_status?.status;
+          return state === 'active' || state === 'degraded';
+        },
+      ).then(usable => {
+        if (usable) layerFetchedRef.current.add('flights');
+      }).finally(() => {
+        flightLoadInFlightRef.current = false;
+      });
+    }
     // Satellites (any satellite sub-layer triggers fetch)
     const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
     if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
@@ -1082,7 +1083,6 @@ export default function Dashboard() {
     }
 
 
-    return () => { flightRetryCancelled = true; };
   }, [activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
