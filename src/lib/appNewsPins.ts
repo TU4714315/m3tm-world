@@ -18,8 +18,8 @@ export interface AppNewsPin {
   provenance: 'M3TM.APP public feed';
   status: 'source-reported';
   language: string;
-  evidenceLinks: Array<{publisher:string;url:string}>;
-  publicationCount: number;
+  evidenceLinks?: Array<{publisher:string;url:string}>;
+  publicationCount?: number;
 }
 
 const regional = (coord: number) => Math.round(coord * 2) / 2;
