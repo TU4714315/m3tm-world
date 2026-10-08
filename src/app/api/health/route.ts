@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 type SourceStatus =
   | 'active'
+  | 'degraded'
   | 'restricted'
   | 'configured'
   | 'not_configured'
@@ -104,6 +105,59 @@ async function probeAcled(): Promise<{
   };
 }
 
+async function probeFlights(request: Request): Promise<{
+  status: SourceStatus;
+  detail: string;
+  publicTotal: number | null;
+  fallbackCells: number;
+  source: string | null;
+  providers: Record<string, unknown>;
+  alert: string | null;
+}> {
+  try {
+    const url = new URL('/api/flights?summary=1', request.url);
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) {
+      return {
+        status: 'unavailable', detail: `/api/flights HTTP ${res.status}`,
+        publicTotal: null, fallbackCells: 0, source: null, providers: {},
+        alert: 'flight_route_unavailable',
+      };
+    }
+    const data = await res.json();
+    const publicTotal = Number.isFinite(Number(data?.counts?.public_total))
+      ? Number(data.counts.public_total) : null;
+    const fallbackCells = Number.isFinite(Number(data?.civilian_activity?.cells))
+      ? Number(data.civilian_activity.cells) : 0;
+    const fallbackActive = data?.civilian_activity?.fallback_active === true;
+    const active = data?.status === 'operational' && (publicTotal ?? 0) > 0;
+    const degraded = fallbackActive || data?.status === 'degraded' || publicTotal === 0;
+    return {
+      status: active ? 'active' : degraded ? 'degraded' : 'unavailable',
+      detail: active
+        ? `Public flight route active with ${publicTotal} civilian observations.`
+        : fallbackActive
+          ? `Live civilian feed degraded; ${fallbackCells} coarse last-good cells available.`
+          : 'Public flight route returned no civilian observations.',
+      publicTotal,
+      fallbackCells,
+      source: typeof data?.source === 'string' ? data.source : null,
+      providers: data?.providers && typeof data.providers === 'object' ? data.providers : {},
+      alert: publicTotal === 0 ? 'public_total_zero' : null,
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      detail: error instanceof Error ? error.message : 'Flight reachability probe failed',
+      publicTotal: null, fallbackCells: 0, source: null, providers: {},
+      alert: 'flight_probe_failed',
+    };
+  }
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const deep = url.searchParams.get('deep') === '1';
@@ -114,13 +168,22 @@ export async function GET(request: Request) {
   const cloudflareConfigured = hasCloudflareRadarCredentials();
   const durableConfigured = durableCacheConfigured();
 
-  const [gdeltProbe, acledProbe] = deep
-    ? await Promise.all([probeGdelt(), probeAcled()])
+  const [gdeltProbe, acledProbe, flightProbe] = deep
+    ? await Promise.all([probeGdelt(), probeAcled(), probeFlights(request)])
     : [
         { status: 'not_probed' as SourceStatus, detail: 'Use ?deep=1 for an external reachability probe.' },
         {
           status: acledConfigured ? 'configured' as SourceStatus : 'not_configured' as SourceStatus,
           detail: acledConfigured ? 'Server credentials are present.' : 'No ACLED server credentials are configured.',
+        },
+        {
+          status: 'not_probed' as SourceStatus,
+          detail: 'Use ?deep=1 for the live /api/flights summary probe.',
+          publicTotal: null,
+          fallbackCells: 0,
+          source: null,
+          providers: {} as Record<string, unknown>,
+          alert: null,
         },
       ];
 
@@ -152,6 +215,16 @@ export async function GET(request: Request) {
       status: 'public_no_auth' as SourceStatus,
       auth: 'none',
       detail: 'Runtime counts are exposed by /api/flights.providers.',
+    },
+    flights: {
+      role: 'public-air-observation-runtime',
+      status: flightProbe.status,
+      detail: flightProbe.detail,
+      publicTotal: flightProbe.publicTotal,
+      civilianFallbackCells: flightProbe.fallbackCells,
+      source: flightProbe.source,
+      providers: flightProbe.providers,
+      alert: flightProbe.alert,
     },
     ais: {
       role: 'public-maritime-observation',
@@ -198,7 +271,8 @@ export async function GET(request: Request) {
 
   const degraded =
     sources.gdelt.status === 'unavailable'
-    || (acledConfigured && sources.acled.status === 'unavailable');
+    || (acledConfigured && sources.acled.status === 'unavailable')
+    || (deep && sources.flights.status !== 'active');
 
   return NextResponse.json({
     status: degraded ? 'degraded' : 'operational',

@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
 import { fetchTaggedMilitaryFeed } from '@/lib/militaryTaggedFeed';
+import {
+  buildCivilianFlightAggregate,
+  PUBLIC_CIVILIAN_MIN_CACHE_TOTAL,
+  staleCivilianFlightAggregate,
+  type PublicCivilianFlightSnapshot,
+} from '@/lib/civilianFlightAggregate';
 
 export const maxDuration = 60;
 
@@ -227,6 +233,8 @@ const PUBLIC_MILITARY_MIN_GROUP = 2;
 const PUBLIC_MILITARY_TIME_BUCKET_MS = 30 * 60 * 1000;
 const PUBLIC_MILITARY_CACHE_KEY = 'm3tm:public:military-activity:v2';
 const PUBLIC_MILITARY_CACHE_TTL_SECONDS = 60 * 60;
+const PUBLIC_CIVILIAN_CACHE_KEY = 'm3tm:public:civilian-flight-aggregate:v1';
+const PUBLIC_CIVILIAN_CACHE_TTL_SECONDS = 45 * 60;
 
 interface PublicMilitaryActivityCell {
   id: string;
@@ -566,6 +574,29 @@ export async function GET(req: Request) {
       }
     }
 
+    const civilianPublicTotal = commercial.length + privateFl.length + jets.length;
+    const civilianObservedAtMs = osSnapshotTime || Date.now();
+    const civilianObservedAt = new Date(civilianObservedAtMs).toISOString();
+    const currentCivilianAggregate = buildCivilianFlightAggregate({
+      commercial,
+      private: privateFl,
+      jets,
+    }, civilianObservedAtMs);
+    const previousCivilian = await durableGetJson<PublicCivilianFlightSnapshot>(PUBLIC_CIVILIAN_CACHE_KEY);
+    let civilianFlightActivity: ReturnType<typeof buildCivilianFlightAggregate> = [];
+    let civilianFlightActivityStale = false;
+    let civilianFlightCacheBackend: string = previousCivilian.backend;
+    if (civilianPublicTotal >= PUBLIC_CIVILIAN_MIN_CACHE_TOTAL && currentCivilianAggregate.length) {
+      civilianFlightCacheBackend = await durableSetJson(
+        PUBLIC_CIVILIAN_CACHE_KEY,
+        { cells: currentCivilianAggregate, observed_at: civilianObservedAt },
+        PUBLIC_CIVILIAN_CACHE_TTL_SECONDS,
+      );
+    } else if (previousCivilian.value?.cells?.length) {
+      civilianFlightActivity = staleCivilianFlightAggregate(previousCivilian.value, Date.now());
+      civilianFlightActivityStale = true;
+    }
+
     const militaryObservedAtMs = milCount > 0 ? Date.now() : osSnapshotTime ? Math.min(Date.now(), osSnapshotTime) : Date.now();
     const observedAt = new Date(militaryObservedAtMs).toISOString();
     const previousMilitary = await durableGetJson<PublicMilitaryActivitySnapshot>(PUBLIC_MILITARY_CACHE_KEY);
@@ -589,6 +620,27 @@ export async function GET(req: Request) {
       commercial_flights: commercial,
       private_flights:    privateFl,
       private_jets:       jets,
+      // A provider outage should not make the civil layer visually empty.
+      // Only a generalized 2° last-good density snapshot is persisted; no
+      // callsign, registration, ICAO address, heading or individual track is
+      // copied into this degraded-mode aggregate.
+      civilian_flight_activity: civilianFlightActivity,
+      civilian_flight_activity_meta: {
+        mode: 'coarse-civilian-last-good',
+        cell_degrees: 2,
+        minimum_live_total_to_refresh_cache: PUBLIC_CIVILIAN_MIN_CACHE_TOTAL,
+        fallback_active: civilianFlightActivityStale,
+        data_state: civilianFlightActivityStale ? 'cached-stale' : 'live',
+        observed_at: civilianFlightActivityStale
+          ? previousCivilian.value?.observed_at ?? null
+          : civilianObservedAt,
+        public_total: civilianPublicTotal,
+        fallback_cells: civilianFlightActivity.length,
+        cache_backend: civilianFlightCacheBackend,
+        durable_cache_configured: durableCacheConfigured(),
+        identifiers_exposed: false,
+        exact_tracks_exposed: false,
+      },
       // Precise military tracks and live interference indicators are not part
       // of the public WORLD contract. Keep classification server-side only.
       military_flights:   [],
@@ -640,9 +692,9 @@ export async function GET(req: Request) {
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
       flight_source_status: {
-        status: commercial.length || privateFl.length || jets.length || (!militaryActivityStale && militaryActivity.length)
+        status: civilianPublicTotal > 0
           ? 'active'
-          : militaryActivityStale
+          : civilianFlightActivityStale || militaryActivityStale || militaryActivity.length > 0
             ? 'degraded'
             : 'empty',
         provider: source,
@@ -659,6 +711,9 @@ export async function GET(req: Request) {
           opensky_auth: hasOpenSkyCreds(),
           opensky_age_s: osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
         },
+        public_total: civilianPublicTotal,
+        civilian_fallback_cells: civilianFlightActivity.length,
+        civilian_fallback_active: civilianFlightActivityStale,
         military_public_cells: militaryActivity.length,
         exact_military_tracks_exposed: false,
         timestamp: new Date().toISOString(),

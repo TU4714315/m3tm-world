@@ -903,13 +903,25 @@ export default function Dashboard() {
 
   useEffect(() => {
 
-    // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
+    // Flights: only mark the one-shot load complete after usable data lands.
+    // Empty/failed provider responses get two bounded retries before normal polling.
+    let flightRetryCancelled = false;
+    const wantsFlights = activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air;
+    const loadFlights = async () => {
+      if (!wantsFlights || layerFetchedRef.current.has('flights')) return;
+      layerFetchedRef.current.add('flights');
+      for (let attempt = 0; attempt < 3 && !flightRetryCancelled; attempt += 1) {
+        const ok = await fetchEndpoint('/api/flights');
+        const state = dataRef.current.flight_source_status?.status;
+        if (ok && state !== 'empty') return;
+        layerFetchedRef.current.delete('flights');
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 5000 * (attempt + 1)));
+          if (!flightRetryCancelled) layerFetchedRef.current.add('flights');
+        }
       }
-    }
+    };
+    void loadFlights();
     // Satellites (any satellite sub-layer triggers fetch)
     const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
     if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
@@ -1070,7 +1082,8 @@ export default function Dashboard() {
     }
 
 
-  }, [activeLayers]);
+    return () => { flightRetryCancelled = true; };
+  }, [activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {

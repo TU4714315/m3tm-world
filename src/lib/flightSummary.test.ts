@@ -7,6 +7,12 @@ describe('flight process-cache fallback',()=>{
     const good={
       source:'opensky-anon',timestamp:'2026-10-05T03:50:00Z',
       commercial_flights:[],military_flights:[],
+      civilian_flight_activity:[
+        {lat:24,lng:46,total:12,data_state:'live',observed_at:'2026-10-05T03:49:00Z',age_seconds:0,callsign:'never-public'},
+      ],
+      civilian_flight_activity_meta:{
+        mode:'coarse-civilian-last-good',fallback_active:false,exact_tracks_exposed:false,identifiers_exposed:false,
+      },
       military_activity:[
         {lat:24,lng:46,trend:'up',data_state:'live',observed_at:'2026-10-05T03:49:00Z',age_seconds:60},
         {lat:26,lng:42,trend:'new',data_state:'live'},
@@ -23,6 +29,10 @@ describe('flight process-cache fallback',()=>{
     expect(fallback.source).toBe('opensky-anon+stale');
     expect(fallback.timestamp).toBe('2026-10-05T03:50:00Z');
     expect(fallback.flight_source_status.status).toBe('degraded');
+    expect(fallback.civilian_flight_activity_meta.fallback_active).toBe(true);
+    expect(fallback.civilian_flight_activity[0].data_state).toBe('cached-stale');
+    expect(fallback.civilian_flight_activity[0].age_seconds).toBe(660);
+    expect(buildFlightSummary(fallback).civilian_activity).toEqual({cells:1,fallback_active:true});
     expect(fallback.military_activity_meta.stale_fallback).toBe(true);
     expect(fallback.military_activity_meta.exact_tracks_exposed).toBe(false);
     expect(fallback.military_activity[0].data_state).toBe('cached-stale');
@@ -35,6 +45,10 @@ describe('flight process-cache fallback',()=>{
     const text=JSON.stringify(fallback);
     expect(text).not.toContain('icao24');
     expect(text).not.toContain('trajectory');
+    // Process-cache fallback must not invent or add identifiers. The test
+    // fixture identifier is intentionally present only to prove the helper
+    // preserves the aggregate object shape; the public projection strips it.
+    expect(fallback.civilian_flight_activity[0].callsign).toBe('never-public');
   });
   it('keeps a safe degraded fallback when no aggregate is available',()=>{
     const out=markCachedFlightDataStale({source:'regional',military_activity:[],military_activity_meta:{stale_fallback:false}});
