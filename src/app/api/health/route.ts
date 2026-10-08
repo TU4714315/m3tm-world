@@ -121,7 +121,10 @@ async function probeFlights(request: Request): Promise<{
     const url = new URL('/api/flights?summary=1', request.url);
     const res = await fetch(url, {
       cache: 'no-store',
-      signal: AbortSignal.timeout(20_000),
+      // /api/flights has a 45s cold-start regional sweep budget. Give the deep
+      // health probe enough room to observe the route outcome rather than
+      // manufacturing a timeout while the route is still legitimately working.
+      signal: AbortSignal.timeout(50_000),
     });
     if (!res.ok) {
       const providerHealth = classifyFlightProviderHealth({

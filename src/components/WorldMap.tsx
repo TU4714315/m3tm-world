@@ -2395,9 +2395,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
-    const anyCivilianFlightLayer = activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air;
+    const anyCivilianFlightLayer = activeLayers.flights || activeLayers.private || activeLayers.jets;
     setGeo('civilian-flight-activity',
-      anyCivilianFlightLayer ? civilianFlightMapFeatures(data.civilian_flight_activity ?? []) : []);
+      anyCivilianFlightLayer ? civilianFlightMapFeatures(data.civilian_flight_activity ?? [], {
+        commercial: activeLayers.flights,
+        private: activeLayers.private,
+        jets: activeLayers.jets,
+      }) : []);
     setGeo('military', activeLayers.military ? toFeatures(data.military_flights) : []);
     setGeo('military-activity',
       (activeLayers as any).military_activity

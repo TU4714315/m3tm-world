@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { classifyFlightProviderHealth, retryFlightLayerLoad } from './flightReliability';
+import { classifyFlightProviderHealth, hasUsableCivilianFlightData, retryFlightLayerLoad } from './flightReliability';
 
 describe('flight reliability policy', () => {
   it('marks a layer fetched only after a usable response and bounds retries', async () => {
@@ -51,7 +51,17 @@ describe('flight reliability policy', () => {
     })).toEqual({ reachability: 'degraded', failureClass: 'public_total_zero' });
 
     expect(classifyFlightProviderHealth({
+      httpOk: true, status: 'degraded', publicTotal: 42, fallbackActive: false,
+    })).toEqual({ reachability: 'degraded', failureClass: 'insufficient_live_sample' });
+
+    expect(classifyFlightProviderHealth({
       httpOk: false, status: null, publicTotal: null, fallbackActive: false,
     })).toEqual({ reachability: 'unreachable', failureClass: 'http_error' });
+  });
+
+  it('treats only a sufficient live sample or coarse last-good fallback as usable', () => {
+    expect(hasUsableCivilianFlightData({ publicTotal: 99, fallbackActive: false })).toBe(false);
+    expect(hasUsableCivilianFlightData({ publicTotal: 100, fallbackActive: false })).toBe(true);
+    expect(hasUsableCivilianFlightData({ publicTotal: 0, fallbackActive: true })).toBe(true);
   });
 });

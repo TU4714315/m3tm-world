@@ -31,7 +31,7 @@ import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
-import { retryFlightLayerLoad } from '@/lib/flightReliability';
+import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
@@ -914,8 +914,11 @@ export default function Dashboard() {
       void retryFlightLayerLoad(
         () => fetchEndpoint('/api/flights'),
         () => {
-          const state = dataRef.current.flight_source_status?.status;
-          return state === 'active' || state === 'degraded';
+          const sourceStatus = dataRef.current.flight_source_status;
+          return hasUsableCivilianFlightData({
+            publicTotal: Number(sourceStatus?.public_total ?? 0),
+            fallbackActive: sourceStatus?.civilian_fallback_active === true,
+          });
         },
       ).then(usable => {
         if (usable) layerFetchedRef.current.add('flights');
