@@ -902,14 +902,24 @@ export default function Dashboard() {
   }, [activeLayers.cctv]);
 
   useEffect(() => {
+    const flightRetryTimers: ReturnType<typeof setTimeout>[] = [];
+    const wantsFlights = activeLayers.flights || activeLayers.military ||
+      activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air;
 
     // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
-    }
+    const loadFlights = (attempt = 0) => {
+      layerFetchedRef.current.add('flights');
+      void fetchEndpoint('/api/flights').then(ok => {
+        const state = dataRef.current.flight_source_status?.status;
+        if (ok && state !== 'empty') return;
+        layerFetchedRef.current.delete('flights');
+        if (attempt < 2 && wantsFlights) {
+          const timer = setTimeout(() => loadFlights(attempt + 1), 5000 * (attempt + 1));
+          flightRetryTimers.push(timer);
+        }
+      });
+    };
+    if (wantsFlights && !layerFetchedRef.current.has('flights')) loadFlights();
     // Satellites (any satellite sub-layer triggers fetch)
     const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
     if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
@@ -1069,8 +1079,8 @@ export default function Dashboard() {
       }));
     }
 
-
-  }, [activeLayers]);
+    return () => flightRetryTimers.forEach(clearTimeout);
+  }, [activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
