@@ -25,7 +25,7 @@ export function arabicCountryLabelExpression():unknown[]{
     if(localized&&localized!==code)entries.push(code,localized);
   }
   return ['coalesce',
-    ['match',['upcase',['coalesce',['get','iso_a2'],'']],...entries,''],
+    ['match',['upcase',['coalesce',['get','iso_a2'],'']],...entries,null],
     ['get','name:ar'],['get','name']];
 }
 const ARABIC_LOCAL_NAME=['coalesce',['get','name:ar'],['get','name']];

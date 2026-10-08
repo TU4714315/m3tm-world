@@ -3,9 +3,9 @@
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
-**DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD uses MapLibre 6.7, whose installed worker explicitly requires an RTL shaping plugin, while hotfix `0d97990` removed the earlier eager plugin after it stalled first paint. The self-hosted BSD-2-Clause `rtl-text-0.3.0.js` remains in `public/vendor/maplibre/`. Current repair configures the versioned worker first and registers that plugin with `lazy=true`, so the map paints immediately and shaping is fetched only when RTL text is encountered. Unit tests lock ordering and prevent duplicate plugin registration.
+**DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 
-**VERIFY:** TypeScript, focused RTL/Arabic tests, full Vitest, Next build, protected public-layer/privacy checks, Vercel Preview, then browser smoke must show a painted map and correctly ordered Arabic labels before production merge.
+**VERIFY:** TypeScript, focused Arabic/satellite tests, full Vitest, Next build, protected public-layer/privacy checks, Vercel Preview, then browser smoke must show a painted map and correctly ordered Arabic labels before production merge.
 
 **BLOCKERS:** No source-data blocker for Arabic shaping. APP live news still has a separate unmerged current-WORLD bridge (#361) that must be reconciled onto current APP main rather than force-merging its stale base.
 

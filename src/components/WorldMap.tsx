@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
-import { configureMaplibreArabicText } from '@/lib/maplibreRtl';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteInsertionAnchor, satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
@@ -273,9 +272,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
-    // MapLibre 6.7 requires bidi/Arabic shaping for correct country-name order.
-    // Load the pinned self-hosted plugin lazily so map paint is never blocked.
-    configureMaplibreArabicText(maplibregl);
+    // MapLibre 6.9+ performs Arabic shaping and bidirectional text natively.
+    // Keep only the versioned self-hosted worker; no external RTL plugin is
+    // registered, avoiding the first-paint stall seen with the legacy plugin.
+    maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
     const baseOptions = {
       container,
       style: styleUrl,
