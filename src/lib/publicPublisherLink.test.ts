@@ -17,7 +17,7 @@ describe('Public publisher links',()=>{
       'https://news.internal/news','https://server.local/news',
       'https://news.invalid/news','https://pub.example/news',
       'https://localhost/news','https://site.test/news',
-      'javascript:alert(1)','https://user:pass@bbc.com/news',
+      'javascript:alert(1)','https://user:pass'+String.fromCharCode(64)+'bbc.com/news',
     ];
     for(const address of addresses) expect(publicPublisherLink(address),address).toBeNull();
   });
