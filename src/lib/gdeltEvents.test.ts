@@ -30,6 +30,14 @@ describe('fetchGdeltEvents', () => {
       .toEqual(['mena','world1']);
   });
 
+  it('does not synthesize current freshness for malformed source dates',()=>{
+    const c=Array(61).fill('');
+    c[0]='bad-date';c[26]='190';c[28]='19';c[29]='4';c[31]='2';c[32]='1';c[33]='1';
+    c[52]='Riyadh';c[53]='SA';c[56]='24.7';c[57]='46.7';c[59]='not-a-date';
+    c[60]='https://example.com/bad-date';
+    expect(parseGdeltEventsCsv(c.join('\t')).events[0]?.date).toBe('');
+  });
+
   it('preserves source-coded public parties without exposing actor geo positions', () => {
     const columns=Array(61).fill('');
     columns[0]='public-report'; columns[6]='Sudanese Armed Forces'; columns[16]='Rapid Support Forces';

@@ -8,6 +8,7 @@ import {
   type FusionWindow,
 } from '@/lib/menaSignals';
 import type {GdeltHistoryView} from '@/lib/gdeltPublicHistory';
+import {isArabicNews} from '@/lib/newsLanguage';
 
 const PERIODS:{id:FusionWindow;label:string}[]=[
   {id:'h1',label:'ساعة'}, {id:'h6',label:'٦ ساعات'},
@@ -85,7 +86,7 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
   const radar=useMemo(()=>buildMenaFusionRadar(data,sourceTime,nowMs),[data,sourceTime,nowMs]);
   const visible=radar.events.filter(e=>e.ageMs!==null && e.ageMs<=FUSION_WINDOWS[period]);
   const publishedNews=radar.appNewsSignals.filter(n=>n.ageMs<=FUSION_WINDOWS[period]);
-  const arabicNews=publishedNews.filter(n=>/[\u0600-\u06FF]/.test(n.title));
+  const arabicNews=publishedNews.filter(n=>isArabicNews(n.language,n.title));
   const visibleNews=newsLanguage==='ar' ? arabicNews : publishedNews;
   const preliminary=visible.filter(e=>!e.multiplePublishers).length;
   const multiple=visible.length-preliminary;

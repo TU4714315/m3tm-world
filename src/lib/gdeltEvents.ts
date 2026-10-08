@@ -386,7 +386,9 @@ function parseGdeltDate(dateAdded: string, sqlDate: string): string {
   if (/^\d{8}$/.test(sqlDate)) {
     return `${sqlDate.slice(0, 4)}-${sqlDate.slice(4, 6)}-${sqlDate.slice(6, 8)}T00:00:00Z`;
   }
-  return new Date().toISOString();
+  // Unknown source time must stay unknown. Using the current clock here makes
+  // a malformed source row look like a fresh event in the MENA radar.
+  return '';
 }
 
 export interface FetchOptions {
