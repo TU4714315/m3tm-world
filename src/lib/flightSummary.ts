@@ -38,7 +38,7 @@ export function buildFlightSummary(data: any): FlightSummary {
     sourceStatus === 'degraded';
 
   return {
-    status: !stale && (sourceStatus === 'active' || publicTotal > 0) ? 'operational' : 'degraded',
+    status: !stale && sourceStatus === 'active' ? 'operational' : 'degraded',
     counts: {
       commercial,
       private: privateFlights,

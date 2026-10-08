@@ -55,4 +55,16 @@ describe('flight process-cache fallback',()=>{
     expect(out.military_activity).toHaveLength(0);
     expect(out.military_activity_meta.stale_fallback).toBe(true);
   });
+  it('does not call a sub-threshold live sample operational when the route marks it degraded',()=>{
+    const summary=buildFlightSummary({
+      source:'regional',
+      commercial_flights:Array.from({length:42},()=>({})),
+      private_flights:[],private_jets:[],
+      civilian_flight_activity:[],civilian_flight_activity_meta:{fallback_active:false},
+      military_activity:[],military_activity_meta:{stale_fallback:false},
+      flight_source_status:{status:'degraded'},
+    });
+    expect(summary.counts.public_total).toBe(42);
+    expect(summary.status).toBe('degraded');
+  });
 });

@@ -4,8 +4,19 @@ export type FlightFailureClass =
   | 'http_error'
   | 'public_total_zero'
   | 'live_provider_degraded'
+  | 'insufficient_live_sample'
   | 'probe_exception'
   | null;
+
+export function hasUsableCivilianFlightData(input: {
+  publicTotal: number | null;
+  fallbackActive: boolean;
+  minimumLiveTotal?: number;
+}): boolean {
+  const minimumLiveTotal = Math.max(1, Math.floor(input.minimumLiveTotal ?? 100));
+  const publicTotal = Number.isFinite(Number(input.publicTotal)) ? Number(input.publicTotal) : 0;
+  return input.fallbackActive || publicTotal >= minimumLiveTotal;
+}
 
 export function classifyFlightProviderHealth(input: {
   httpOk: boolean;
@@ -27,6 +38,9 @@ export function classifyFlightProviderHealth(input: {
   }
   if (input.publicTotal === 0) {
     return { reachability: 'degraded', failureClass: 'public_total_zero' };
+  }
+  if (input.status === 'degraded' && (input.publicTotal ?? 0) > 0) {
+    return { reachability: 'degraded', failureClass: 'insufficient_live_sample' };
   }
   return { reachability: 'unreachable', failureClass: 'probe_exception' };
 }

@@ -1,5 +1,7 @@
 export const PUBLIC_CIVILIAN_CELL_DEG = 2;
 export const PUBLIC_CIVILIAN_MIN_CACHE_TOTAL = 100;
+export const PUBLIC_CIVILIAN_MAX_CELLS = 600;
+const PUBLIC_CIVILIAN_MACRO_CELL_DEG = 10;
 
 export type CivilianFlightGroup = 'commercial' | 'private' | 'jets';
 
@@ -26,6 +28,57 @@ export interface PublicCivilianFlightSnapshot {
 const validCoordinate = (lat: number, lng: number) =>
   Number.isFinite(lat) && Number.isFinite(lng) &&
   lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
+const isMenaCoverageCell = (cell: Pick<PublicCivilianFlightCell, 'lat' | 'lng'>) =>
+  cell.lat >= -5 && cell.lat <= 45 && cell.lng >= -20 && cell.lng <= 75;
+
+/** Keep fallback storage bounded without turning it into a density-only sample.
+ * One cell per populated 10-degree macro region is selected per round before a
+ * second cell from the same region. MENA macro regions win ties so sparse
+ * regional corridors survive a global provider outage.
+ */
+export function boundCivilianFlightAggregate(
+  cells: PublicCivilianFlightCell[],
+  limit = PUBLIC_CIVILIAN_MAX_CELLS,
+): PublicCivilianFlightCell[] {
+  const safeLimit = Math.max(0, Math.floor(limit));
+  if (safeLimit === 0) return [];
+  if (cells.length <= safeLimit) return [...cells].sort((a, b) => b.total - a.total);
+
+  const macroBuckets = new Map<string, PublicCivilianFlightCell[]>();
+  for (const cell of cells) {
+    const latIndex = Math.floor((cell.lat + 90) / PUBLIC_CIVILIAN_MACRO_CELL_DEG);
+    const lngIndex = Math.floor((cell.lng + 180) / PUBLIC_CIVILIAN_MACRO_CELL_DEG);
+    const key = `${latIndex}:${lngIndex}`;
+    const bucket = macroBuckets.get(key) ?? [];
+    bucket.push(cell);
+    macroBuckets.set(key, bucket);
+  }
+
+  const groups = Array.from(macroBuckets.entries()).map(([key, bucket]) => ({
+    key,
+    mena: bucket.some(isMenaCoverageCell),
+    cells: bucket.sort((a, b) => b.total - a.total || a.id.localeCompare(b.id)),
+  })).sort((a, b) =>
+    Number(b.mena) - Number(a.mena) ||
+    (b.cells[0]?.total ?? 0) - (a.cells[0]?.total ?? 0) ||
+    a.key.localeCompare(b.key)
+  );
+
+  const selected: PublicCivilianFlightCell[] = [];
+  for (let depth = 0; selected.length < safeLimit; depth += 1) {
+    let added = false;
+    for (const group of groups) {
+      const cell = group.cells[depth];
+      if (!cell) continue;
+      selected.push(cell);
+      added = true;
+      if (selected.length >= safeLimit) break;
+    }
+    if (!added) break;
+  }
+  return selected;
+}
 
 export function buildCivilianFlightAggregate(
   groups: Record<CivilianFlightGroup, any[]>,
@@ -54,7 +107,7 @@ export function buildCivilianFlightAggregate(
   }
 
   const observedAt = new Date(observedAtMs).toISOString();
-  return Array.from(buckets.entries())
+  const cells = Array.from(buckets.entries())
     .map(([key, bucket]) => ({
       id: `civilian-flight-cell-${key}`,
       ...bucket,
@@ -63,9 +116,8 @@ export function buildCivilianFlightAggregate(
       data_state: 'live' as const,
       observed_at: observedAt,
       age_seconds: 0,
-    }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 600);
+    }));
+  return boundCivilianFlightAggregate(cells);
 }
 
 export function staleCivilianFlightAggregate(
@@ -84,10 +136,19 @@ export function staleCivilianFlightAggregate(
   }));
 }
 
-export function civilianFlightMapFeatures(cells: PublicCivilianFlightCell[] = []) {
+export function civilianFlightMapFeatures(
+  cells: PublicCivilianFlightCell[] = [],
+  visible: Partial<Record<CivilianFlightGroup, boolean>> = {},
+) {
+  const showCommercial = visible.commercial !== false;
+  const showPrivate = visible.private !== false;
+  const showJets = visible.jets !== false;
   return cells.flatMap(cell => {
     if (!validCoordinate(Number(cell?.lat), Number(cell?.lng))) return [];
-    const total = Number(cell.total);
+    const commercial = showCommercial ? Math.max(0, Math.round(Number(cell.commercial) || 0)) : 0;
+    const privateFlights = showPrivate ? Math.max(0, Math.round(Number(cell.private) || 0)) : 0;
+    const jets = showJets ? Math.max(0, Math.round(Number(cell.jets) || 0)) : 0;
+    const total = commercial + privateFlights + jets;
     if (!Number.isFinite(total) || total < 1) return [];
     return [{
       type: 'Feature' as const,
@@ -97,9 +158,9 @@ export function civilianFlightMapFeatures(cells: PublicCivilianFlightCell[] = []
       },
       properties: {
         total: Math.round(total),
-        commercial: Math.max(0, Math.round(Number(cell.commercial) || 0)),
-        private: Math.max(0, Math.round(Number(cell.private) || 0)),
-        jets: Math.max(0, Math.round(Number(cell.jets) || 0)),
+        commercial,
+        private: privateFlights,
+        jets,
         cell_degrees: PUBLIC_CIVILIAN_CELL_DEG,
         precision: 'coarse-2deg',
         data_state: cell.data_state === 'cached-stale' ? 'cached-stale' : 'live',

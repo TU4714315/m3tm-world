@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
+import { hasUsableCivilianFlightData } from '@/lib/flightReliability';
 import { fetchTaggedMilitaryFeed } from '@/lib/militaryTaggedFeed';
 import {
   buildCivilianFlightAggregate,
@@ -416,7 +417,13 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
 export async function GET(req: Request) {
   const now = Date.now();
 
-  if (cachedData && now - lastFetchTime < CACHE_TTL) {
+  const cachedSummary = cachedData ? buildFlightSummary(cachedData) : null;
+  const cachedCivilianUsable = cachedSummary ? hasUsableCivilianFlightData({
+    publicTotal: cachedSummary.counts.public_total,
+    fallbackActive: cachedSummary.civilian_activity.fallback_active,
+    minimumLiveTotal: PUBLIC_CIVILIAN_MIN_CACHE_TOTAL,
+  }) : false;
+  if (cachedData && cachedCivilianUsable && now - lastFetchTime < CACHE_TTL) {
     return respond(req, cachedData, 'public, s-maxage=30, stale-while-revalidate=60');
   }
 
@@ -692,9 +699,9 @@ export async function GET(req: Request) {
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
       },
       flight_source_status: {
-        status: civilianPublicTotal > 0
+        status: civilianPublicTotal >= PUBLIC_CIVILIAN_MIN_CACHE_TOTAL
           ? 'active'
-          : civilianFlightActivityStale || militaryActivityStale || militaryActivity.length > 0
+          : civilianPublicTotal > 0 || civilianFlightActivityStale || militaryActivityStale || militaryActivity.length > 0
             ? 'degraded'
             : 'empty',
         provider: source,
@@ -724,13 +731,25 @@ export async function GET(req: Request) {
 
   try {
     const data = await fetchPromise;
-    cachedData = data;
-    lastFetchTime = Date.now();
     fetchPromise = null;
+    const summary = buildFlightSummary(data);
+    const civilianUsable = hasUsableCivilianFlightData({
+      publicTotal: summary.counts.public_total,
+      fallbackActive: summary.civilian_activity.fallback_active,
+      minimumLiveTotal: PUBLIC_CIVILIAN_MIN_CACHE_TOTAL,
+    });
+    if (civilianUsable) {
+      cachedData = data;
+      lastFetchTime = Date.now();
+    } else if (cachedData) {
+      return respond(req, markCachedFlightDataStale(cachedData), 'no-store, max-age=0');
+    } else {
+      lastFetchTime = 0;
+    }
     return respond(
       req,
       data,
-      data.total < 100 ? 'no-store, max-age=0' : 'public, s-maxage=30, stale-while-revalidate=60',
+      civilianUsable ? 'public, s-maxage=30, stale-while-revalidate=60' : 'no-store, max-age=0',
     );
   } catch (error) {
     console.error('[OSIRIS] Flight fetch error:', error);
