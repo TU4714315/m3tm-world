@@ -47,7 +47,7 @@ export function buildIndependentFallbackNewsItem(article: {
   title?: string;
   description?: string;
   link?: string;
-  pubDate?: string;
+  pubDate: string;
   source?: string;
 }) {
   const riskScore = scoreRisk(article.description || article.title || '');
