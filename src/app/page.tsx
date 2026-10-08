@@ -902,24 +902,26 @@ export default function Dashboard() {
   }, [activeLayers.cctv]);
 
   useEffect(() => {
-    const flightRetryTimers: ReturnType<typeof setTimeout>[] = [];
-    const wantsFlights = activeLayers.flights || activeLayers.military ||
-      activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air;
 
-    // Flights
-    const loadFlights = (attempt = 0) => {
+    // Flights: only mark the one-shot load complete after usable data lands.
+    // Empty/failed provider responses get two bounded retries before normal polling.
+    let flightRetryCancelled = false;
+    const wantsFlights = activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air;
+    const loadFlights = async () => {
+      if (!wantsFlights || layerFetchedRef.current.has('flights')) return;
       layerFetchedRef.current.add('flights');
-      void fetchEndpoint('/api/flights').then(ok => {
+      for (let attempt = 0; attempt < 3 && !flightRetryCancelled; attempt += 1) {
+        const ok = await fetchEndpoint('/api/flights');
         const state = dataRef.current.flight_source_status?.status;
         if (ok && state !== 'empty') return;
         layerFetchedRef.current.delete('flights');
-        if (attempt < 2 && wantsFlights) {
-          const timer = setTimeout(() => loadFlights(attempt + 1), 5000 * (attempt + 1));
-          flightRetryTimers.push(timer);
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 5000 * (attempt + 1)));
+          if (!flightRetryCancelled) layerFetchedRef.current.add('flights');
         }
-      });
+      }
     };
-    if (wantsFlights && !layerFetchedRef.current.has('flights')) loadFlights();
+    void loadFlights();
     // Satellites (any satellite sub-layer triggers fetch)
     const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
     if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
@@ -1079,7 +1081,8 @@ export default function Dashboard() {
       }));
     }
 
-    return () => flightRetryTimers.forEach(clearTimeout);
+
+    return () => { flightRetryCancelled = true; };
   }, [activeLayers, fetchEndpoint]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
