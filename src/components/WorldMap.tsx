@@ -272,10 +272,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const styleUrl = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
     const container = containerRef.current;
-    // Arabic glyph plugin is held back: its initialization stalled the map
-    // canvas in production Chromium and WebKit after 2026-10-07 rollout.
-    // Keep geographic rendering functional while a compatible shaping path
-    // is verified in an isolated map/worker integration test.
+    // MapLibre 6.9+ performs Arabic shaping and bidirectional text natively.
+    // Keep only the versioned self-hosted worker; no external RTL plugin is
+    // registered, avoiding the first-paint stall seen with the legacy plugin.
     maplibregl.setWorkerUrl(`/vendor/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`);
     const baseOptions = {
       container,

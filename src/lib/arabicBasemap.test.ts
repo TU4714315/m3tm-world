@@ -10,6 +10,12 @@ describe('Arabic worldwide map labels without geometry changes',()=>{
    expect(str).toContain('"DE",');
    expect(str).toContain('name:ar');
  });
+ it('falls back to source Arabic/name when ISO code is missing or unmatched',()=>{
+   const expression=arabicCountryLabelExpression();
+   const match=expression[1] as unknown[];
+   expect(match.at(-1)).toBeNull();
+   expect(expression).toEqual(expect.arrayContaining([['get','name:ar'],['get','name']]));
+ });
  it('changes only vector text labels and does not mutate boundaries',()=>{
    const map={
      getStyle:()=>({layers:[
