@@ -6,6 +6,10 @@ export type FlightSummary = {
     jets: number;
     public_total: number;
   };
+  civilian_activity: {
+    cells: number;
+    fallback_active: boolean;
+  };
   military_activity: {
     cells: number;
     mode: string;
@@ -26,8 +30,12 @@ export function buildFlightSummary(data: any): FlightSummary {
   const publicTotal = commercial + privateFlights + jets;
   const sourceStatus = String(data?.flight_source_status?.status || '');
   const source = typeof data?.source === 'string' ? data.source : null;
+  const civilianMeta = data?.civilian_flight_activity_meta || {};
   const militaryMeta = data?.military_activity_meta || {};
-  const stale = Boolean(source && source.endsWith('+stale')) || militaryMeta.stale_fallback === true || sourceStatus === 'degraded';
+  const stale = Boolean(source && source.endsWith('+stale')) ||
+    civilianMeta.fallback_active === true ||
+    militaryMeta.stale_fallback === true ||
+    sourceStatus === 'degraded';
 
   return {
     status: !stale && (sourceStatus === 'active' || publicTotal > 0) ? 'operational' : 'degraded',
@@ -36,6 +44,10 @@ export function buildFlightSummary(data: any): FlightSummary {
       private: privateFlights,
       jets,
       public_total: publicTotal,
+    },
+    civilian_activity: {
+      cells: count(data?.civilian_flight_activity),
+      fallback_active: civilianMeta.fallback_active === true,
     },
     military_activity: {
       cells: count(data?.military_activity),
@@ -63,18 +75,29 @@ export function markCachedFlightDataStale<T extends Record<string, any>>(
   const origin = String(data.source || 'unknown');
   const source = origin.endsWith('+stale') ? origin : origin + '+stale';
   const cells = Array.isArray(data.military_activity) ? data.military_activity : [];
+  const civilianCells = Array.isArray(data.civilian_flight_activity) ? data.civilian_flight_activity : [];
+  const ageCell = (cell: Record<string, unknown>) => {
+    const observed = typeof cell.observed_at === 'string' ? Date.parse(cell.observed_at) : NaN;
+    const age_seconds = Number.isFinite(observed) && observed <= now
+      ? Math.floor((now - observed) / 1000)
+      : null;
+    return { ...cell, data_state: 'cached-stale', age_seconds };
+  };
   return {
     ...data,
     source,
+    civilian_flight_activity: civilianCells.map(ageCell),
+    civilian_flight_activity_meta: {
+      ...(data.civilian_flight_activity_meta || {}),
+      fallback_active: civilianCells.length > 0 || data.civilian_flight_activity_meta?.fallback_active === true,
+      data_state: 'cached-stale',
+    },
     // Preserve the original source timestamp and cell date; age the cells
     // rather than manufacturing a new sample timestamp.
-    military_activity: cells.map((cell: Record<string, unknown>) => {
-      const observed = typeof cell.observed_at === 'string' ? Date.parse(cell.observed_at) : NaN;
-      const age_seconds = Number.isFinite(observed) && observed <= now
-        ? Math.floor((now - observed) / 1000)
-        : null;
-      return { ...cell, data_state: 'cached-stale', trend: undefined, age_seconds };
-    }),
+    military_activity: cells.map((cell: Record<string, unknown>) => ({
+      ...ageCell(cell),
+      trend: undefined,
+    })),
     military_activity_meta: {
       ...(data.military_activity_meta || {}),
       stale_fallback: true,
