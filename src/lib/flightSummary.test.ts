@@ -8,7 +8,7 @@ describe('flight process-cache fallback',()=>{
       source:'opensky-anon',timestamp:'2026-10-05T03:50:00Z',
       commercial_flights:[],military_flights:[],
       civilian_flight_activity:[
-        {lat:24,lng:46,total:12,data_state:'live',observed_at:'2026-10-05T03:49:00Z',callsign:'never-public'},
+        {lat:24,lng:46,total:12,data_state:'live',observed_at:'2026-10-05T03:49:00Z',age_seconds:0,callsign:'never-public'},
       ],
       civilian_flight_activity_meta:{
         mode:'coarse-civilian-last-good',fallback_active:false,exact_tracks_exposed:false,identifiers_exposed:false,
