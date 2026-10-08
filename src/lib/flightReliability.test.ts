@@ -7,7 +7,7 @@ describe('flight reliability policy', () => {
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true);
-    const states = ['empty', 'empty', 'degraded'];
+    const states = ['empty', 'degraded'];
     const wait = vi.fn(async () => undefined);
 
     const usable = await retryFlightLayerLoad(
