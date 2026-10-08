@@ -207,6 +207,9 @@ export default function MenaPulse({data,stale,publishedAt,onFocus,onLocate}:{
     <div className="mt-2 rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-2">
       <strong className="flex items-center gap-1.5 text-xs text-white/90"><Plane className="h-3.5 w-3.5 text-amber-200"/>النشاط الجوي العسكري المجمّع</strong>
       <p className="mt-1 text-[11px] text-white/80">المنطقة: {radar.airObservation.regionalCells} · عالميًا: {globalAirCells}</p>
+      {radar.airObservation.regionalCells === 0 && globalAirCells > 0 && (
+        <p className="mt-1 text-[10px] leading-4 text-amber-100/75">لا توجد خلية إقليمية في العينة الحالية؛ هذا لا يعني غياب نشاط فعلي في المنطقة.</p>
+      )}
       <p className="mt-1 flex items-center gap-1 text-[10px] text-white/50"><Waves className="h-3 w-3"/>{radar.airObservation.staleFallback?'آخر لقطة محفوظة · ':''}تغطية عامة جزئية · بلا مسارات فردية.</p>
     </div>
   </section>;

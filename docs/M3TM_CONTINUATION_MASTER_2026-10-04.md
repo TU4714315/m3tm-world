@@ -1,6 +1,14 @@
 # M3TM — MASTER CONTINUATION / خريطة الاستكمال (2026-10-04)
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
+## CHECKPOINT — Public chrome cleanup after live QA (2026-10-08)
+**DONE:** PR #88 trims the remaining verbose public military-provider wording in `MenaPulse` and decodes common/numeric HTML entities in the M3TM.APP ticker. Reviewer follow-up preserves the explicit zero-region qualification and rejects invalid/out-of-range numeric entities instead of allowing a malformed upstream headline to throw during render.
+
+**VERIFY:** `git diff --check`, TypeScript, focused tests, full Vitest and Next production build must pass on the final #88 head; protected WORLD public-layer/privacy checks and Vercel Preview must be green before merge.
+
+**BLOCKERS:** No feature blocker. Do not interpret `المنطقة: 0` as proof of no real-world activity; the public military layer remains coarse, partial and identifier-free.
+
+**NEXT:** Resolve the three #88 review threads, merge on green protected checks, then continue current Arabic MapLibre shaping/news-freshness work from the resulting protected `main`.
 
 ## CHECKPOINT — One-click WORLD workspace persistence (2026-10-07)
 **DONE:** PR #82 adds validated local workspace persistence on top of current protected `main`: explicit **حفظ** control, Ctrl/Cmd+S, debounced autosave, and restoration of layers, projection, basemap style, theme, satellite visual preset, and full map center/zoom. Shared URL `layers` / `lat` / `lon` / `zoom` remain higher priority than the local snapshot. APP-embedded WORLD neither autosaves nor responds to the save shortcut, preserving host/standalone separation.

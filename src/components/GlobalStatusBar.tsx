@@ -95,9 +95,17 @@ function compactPublished(value: string): string {
 }
 
 function decodeHtmlText(value: string): string {
+  const decodeNumericEntity = (entity: string, digits: string, radix: 10 | 16): string => {
+    const codePoint = Number.parseInt(digits, radix);
+    if (!Number.isInteger(codePoint)
+      || codePoint < 0
+      || codePoint > 0x10ffff
+      || (codePoint >= 0xd800 && codePoint <= 0xdfff)) return entity;
+    return String.fromCodePoint(codePoint);
+  };
   return value
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number.parseInt(dec, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (entity, hex) => decodeNumericEntity(entity, hex, 16))
+    .replace(/&#(\d+);/g, (entity, dec) => decodeNumericEntity(entity, dec, 10))
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&')
