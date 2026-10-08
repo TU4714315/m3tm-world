@@ -66,6 +66,47 @@ const publicMilitaryActivityCells = (value: unknown) => list(value).flatMap((raw
   }];
 });
 
+const publicCivilianFlightActivityCells = (value: unknown) => list(value).flatMap((raw) => {
+  const cell = record(raw);
+  const lat = finite(cell.lat);
+  const lng = finite(cell.lng);
+  const total = finite(cell.total);
+  if (lat === null || lng === null || total === null || total < 1 ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180) return [];
+  return [{
+    id: stringOrNull(cell.id),
+    lat,
+    lng,
+    total,
+    commercial: Math.max(0, finite(cell.commercial) ?? 0),
+    private: Math.max(0, finite(cell.private) ?? 0),
+    jets: Math.max(0, finite(cell.jets) ?? 0),
+    cell_degrees: finite(cell.cell_degrees),
+    precision: stringOrNull(cell.precision),
+    data_state: stringOrNull(cell.data_state),
+    observed_at: stringOrNull(cell.observed_at),
+    age_seconds: finite(cell.age_seconds),
+  }];
+});
+
+const publicCivilianFlightActivityMeta = (value: unknown) => {
+  const meta = record(value);
+  return {
+    mode: stringOrNull(meta.mode),
+    cell_degrees: finite(meta.cell_degrees),
+    minimum_live_total_to_refresh_cache: finite(meta.minimum_live_total_to_refresh_cache),
+    fallback_active: meta.fallback_active === true,
+    data_state: stringOrNull(meta.data_state),
+    observed_at: stringOrNull(meta.observed_at),
+    public_total: finite(meta.public_total),
+    fallback_cells: finite(meta.fallback_cells),
+    cache_backend: stringOrNull(meta.cache_backend),
+    durable_cache_configured: meta.durable_cache_configured === true,
+    identifiers_exposed: meta.identifiers_exposed === true,
+    exact_tracks_exposed: meta.exact_tracks_exposed === true,
+  };
+};
+
 const publicNavalActivityCells = (value: unknown) => list(value).flatMap((raw) => {
   const cell = record(raw);
   const lat = finite(cell.lat);
@@ -155,6 +196,9 @@ const publicFlightSourceStatus = (value: unknown) => {
       opensky_auth: providers.opensky_auth === true,
       opensky_age_s: finite(providers.opensky_age_s),
     },
+    public_total: finite(status.public_total),
+    civilian_fallback_cells: finite(status.civilian_fallback_cells),
+    civilian_fallback_active: status.civilian_fallback_active === true,
     military_public_cells: finite(status.military_public_cells),
     exact_military_tracks_exposed: status.exact_military_tracks_exposed === true,
     timestamp: stringOrNull(status.timestamp),
@@ -285,6 +329,8 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     commercial_flights: list(data.commercial_flights),
     private_flights: list(data.private_flights),
     private_jets: list(data.private_jets),
+    civilian_flight_activity: publicCivilianFlightActivityCells(data.civilian_flight_activity),
+    civilian_flight_activity_meta: publicCivilianFlightActivityMeta(data.civilian_flight_activity_meta),
     // Only the server-side generalized regional activity aggregate belongs
     // here. Exact military_flights, military satellites and raw SDK entities
     // are deliberately absent.
