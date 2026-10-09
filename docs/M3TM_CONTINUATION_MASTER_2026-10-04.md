@@ -2,6 +2,16 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — iPhone black map / Render CARTO recovery (2026-10-09)
+**DONE:** User supplied genuine iPhone in-app screenshot: WORLD chrome and Arabic controls render while basemap area is black. Render currently serves WORLD main `1e4c6983f2a3ac02a73dc66c84db6254d5ecb735`; it has NOT deployed PR #101. PR #101 changes Render's CARTO tile/style/glyph requests from the Render Node /api/proxy-tiles to the browser's CARTO CDN; focused tests and WORLD GitHub validation/email checks passed. Real browser on the Render origin fetched CARTO style JSON (70431 bytes) and vector tile (374350 bytes) via CORS, both HTTP 200. Chromium painted the old map; iPhone WebGL output remains unverified after the candidate fix. APP PR #370 is already merged and its embedded iframe uses Render, but that cannot fix a broken WORLD canvas.
+
+**BLOCKERS:** WORLD main requires failing `Vercel` status even though Vercel team hosting is paused. Owner tried to replace that status with passing `verify-world` on GitHub branch protection; save triggered GitHub sudo reauthentication and the mobile challenge expired before approval. Therefore the rule change is **not verified saved**, PR #101 remains unmerged, and Render autoDeploy is OFF. New Codex review feedback requires this exact handoff update. Device may also be affected by independently reported MapLibre 6 / iOS 26-27 WebGL regressions; do not equate CDN mitigation with proof that iOS works.
+
+**NEXT:** Resolve the handoff review thread; obtain owner GitHub Mobile sudo confirmation in an interactive session; replace obsolete Vercel required check with actual `verify-world` without disabling protected PR/security checks; merge #101 after green CI; trigger exactly one manual Render deploy; collect real iPhone Safari and embedded APP public/internal screenshot, canvas paint / network diagnostics. If blank remains, develop a graceful WebGL-independent raster fallback for iOS (not a false READY status). Separately configure a checked custom hostname `world.m3tm.app` on Render + DNS/TLS only after safe map recovery.
+
+**VERIFY:** WORLD PR https://github.com/TU4714315/m3tm-world/pull/101 head before handoff `95ad2c413fee45e2bf82ae156a57d5c7f3555b3a`; live Render deploy `dep-db42slui0phs73ept1tg`, source `1e4c6983...`. Existing APP map iframe and message bridge are already redirected in merged APP PR #370. No exact military tracks, internal OSINT or new secrets were changed.
+
+---
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
 **DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 
