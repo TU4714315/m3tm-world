@@ -24,6 +24,22 @@ describe('durableCache', () => {
     expect(result.value).toEqual({ ok: true });
   });
 
+  it('does not retain a huge JSON snapshot in an instance with no Redis', async () => {
+    const large = 'x'.repeat(8 * 1024 * 1024);
+    expect(await durableSetJson('too-large', { payload: large }, 60)).toBe('not-stored');
+    expect(await durableGetJson('too-large')).toEqual({ value: null, backend: 'miss' });
+  });
+
+  it('evicts the oldest keys when encoded retained cache exceeds the byte budget', async () => {
+    const payload = 'x'.repeat(5 * 1024 * 1024);
+    await durableSetJson('first', { payload }, 60);
+    await durableSetJson('second', { payload }, 60);
+    await durableSetJson('third', { payload }, 60);
+    await durableSetJson('fourth', { payload }, 60);
+    expect(await durableGetJson('first')).toEqual({ value: null, backend: 'miss' });
+    expect((await durableGetJson<{ payload: string }>('fourth')).value?.payload.length).toBe(payload.length);
+  });
+
   it('never mixes a partial Upstash pair with KV credentials', async () => {
     process.env.UPSTASH_REDIS_REST_URL = 'https://partial-upstash.example.test';
     process.env.KV_REST_API_URL = 'https://kv.example.test';
