@@ -29,6 +29,10 @@ const memory = globalCache.__m3tmDurableCache ?? new Map<string, MemoryEntry>();
 globalCache.__m3tmDurableCache = memory;
 
 const MAX_MEMORY_ENTRIES = 256;
+// Entry-count bounds alone permit a few huge JSON snapshots to exhaust
+// Node's heap on small instances. Cap both payload size and retained bytes.
+const MAX_MEMORY_BYTES = 16 * 1024 * 1024;
+const MAX_MEMORY_ENTRY_BYTES = 8 * 1024 * 1024;
 
 function redisConfig(): { url: string; token: string } | null {
   const pairs = [
@@ -41,12 +45,16 @@ function redisConfig(): { url: string; token: string } | null {
 }
 
 function pruneMemory(now = Date.now()) {
+  let retainedBytes = 0;
   for (const [key, entry] of memory) {
     if (entry.expiresAt <= now) memory.delete(key);
+    else retainedBytes += Buffer.byteLength(entry.value, 'utf8');
   }
-  while (memory.size > MAX_MEMORY_ENTRIES) {
+  while (memory.size > MAX_MEMORY_ENTRIES || retainedBytes > MAX_MEMORY_BYTES) {
     const oldest = memory.keys().next().value as string | undefined;
-    if (!oldest) break;
+    if (oldest === undefined) break;
+    const entry = memory.get(oldest);
+    if (entry) retainedBytes -= Buffer.byteLength(entry.value, 'utf8');
     memory.delete(oldest);
   }
 }
@@ -104,19 +112,21 @@ export async function durableSetJson<T>(
   key: string,
   value: T,
   ttlSeconds: number,
-): Promise<CacheBackend> {
+): Promise<CacheBackend | 'not-stored'> {
   const ttl = Math.max(1, Math.floor(ttlSeconds));
   const encoded = JSON.stringify(value);
-  memory.set(key, { value: encoded, expiresAt: Date.now() + ttl * 1000 });
+  const storeInMemory = Buffer.byteLength(encoded, 'utf8') <= MAX_MEMORY_ENTRY_BYTES;
+  if (storeInMemory) memory.set(key, { value: encoded, expiresAt: Date.now() + ttl * 1000 });
+  else memory.delete(key); // Never retain a huge snapshot from a previous refresh.
   pruneMemory();
 
-  if (!redisConfig()) return 'memory';
+  if (!redisConfig()) return storeInMemory ? 'memory' : 'not-stored';
   try {
     await redisCommand(['SET', key, encoded, 'EX', ttl]);
     return 'redis';
   } catch (error) {
     console.warn('[M3TM.WORLD] durable cache SET degraded to memory:', error instanceof Error ? error.message : error);
-    return 'memory';
+    return storeInMemory ? 'memory' : 'not-stored';
   }
 }
 
