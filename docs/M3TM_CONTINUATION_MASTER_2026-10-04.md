@@ -2,6 +2,21 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Render exit 139 / Node V8 heap OOM (2026-10-09)
+
+**DONE:** At 2026-10-09 16:23:38 UTC (19:23 KSA), Render `m3tm-world-recovery` server failed with nonZeroExit=139; service_available at 16:23:41 UTC. Exact app logs at 16:23:36 UTC prove `FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`. V8 heap was ~256 MiB, GC near 247 MiB. Render telemetry showed instance RSS ~300 MB / limit 512 MB, so this is a V8 heap limit failure (not proven container OOM kill). Repeated upstream `ETIMEDOUT` and frontline snapshot errors were observed but are not proven to cause the native crash.
+
+**RUNTIME MITIGATION:** Changed only Render env `NODE_OPTIONS=--max-old-space-size=320` with merge semantics, leaving all other env vars and plan untouched. Render deployment `dep-db4hct5g1s2s739egvig` from WORLD main `1e4c6983...` succeeded at 16:30:03 UTC. This raises Node heap allowance while reserving headroom for the 512 MiB container; it does not yet validate memory stability over 12+ hours.
+
+**CODE CANDIDATE:** Fresh PR branch `fix/world-memory-budget-render-20261009` bounds `src/lib/durableCache.ts` to 16 MiB total retained UTF-8 JSON, 8 MiB max per entry, retaining FIFO oldest-first eviction and Redis writes. Oversize in-process snapshots report `not-stored` rather than claiming cached. Tests for large entries and aggregate eviction were added. This is preventive memory pressure hardening, not proof of the specific leak.
+
+**BLOCKERS:** WORLD `main` still protects on obsolete failing `Vercel` check. Owner sudo approval for switching to actual passing `verify-world` expired earlier. PR #101 CDN transport remains unmerged; iPhone Safari paint proof remains missing. Render autoDeploy is OFF. Do not bypass protection without replacing CI and retaining the review gates.
+
+**NEXT:** Confirm tests/build for cache fix; after GitHub sudo reauthorization, change only the obsolete required Vercel check to passing WORLD GitHub checks, merge verified PR(s), manually deploy Render and smoke `/api/health`, `/api/news`, and iPhone APP/WORLD canvas. Observe heap/RSS and crash count for at least 12–24 h. Investigate upstream request fanout separately if heap grows again.
+
+**VERIFY:** Render events `evt-db4ha2k9v7es73bb83jg` (failed), `evt-db4ha3flk1mc73cenj9g` (available); deploy `dep-db4hct5g1s2s739egvig` (live). No DNS, Supabase, host-agent/OSINT or military detail changes.
+
+---
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
 **DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 
