@@ -10,6 +10,11 @@ describe('CARTO tile transport for recovery hosting', () => {
     expect(cartoMapRequestUrl(style, 'm3tm-world-recovery.onrender.com', origin)).toBe(style);
     expect(cartoMapRequestUrl(tile, 'm3tm-world-recovery.onrender.com', origin)).toBe(tile);
   });
+  it('keeps the future reviewed short WORLD hostname CDN-direct too', () => {
+    const origin = 'https://world.m3tm.app';
+    expect(cartoMapRequestUrl(style, 'world.m3tm.app', origin)).toBe(style);
+    expect(cartoMapRequestUrl(tile, 'world.m3tm.app', origin)).toBe(tile);
+  });
   it('preserves the current Vercel same-origin tile proxy outside Render', () => {
     const origin = 'https://m3tm-world.vercel.app';
     expect(cartoMapRequestUrl(style, 'm3tm-world.vercel.app', origin))
