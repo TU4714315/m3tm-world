@@ -13,6 +13,7 @@ export function cartoMapRequestUrl(url: string, hostname: string, origin: string
   }
   if (host !== 'cartocdn.com' && !host.endsWith('.cartocdn.com')) return url;
   // Render recovery and its future fixed custom domain keep CARTO at the browser/CDN edge.
-  if (hostname.toLowerCase().replace(/\\.$/, '').endsWith('.onrender.com') || hostname.toLowerCase().replace(/\\.$/, '') === 'world.m3tm.app') return url;
+  const currentHost = hostname.toLowerCase().replace(/\.$/, '');
+  if (currentHost.endsWith('.onrender.com') || currentHost === 'world.m3tm.app') return url;
   return `${origin}/api/proxy-tiles?url=${encodeURIComponent(url)}`;
 }
