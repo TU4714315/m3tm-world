@@ -84,7 +84,7 @@ export async function GET(req: Request) {
       timestamp: new Date().toISOString(),
       data_state: 'live',
       durable_cache_configured: durableCacheConfigured(),
-      cache_backend: previous.backend,
+      cache_backend: previous.backend as Awaited<ReturnType<typeof durableSetJson>> | 'miss',
     };
     if (cacheKey && publicEvents.length > 0) payload.cache_backend = await durableSetJson(cacheKey, payload, 60 * 60);
 
