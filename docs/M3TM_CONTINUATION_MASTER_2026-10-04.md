@@ -2,6 +2,17 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Four-track zero-cost architecture council (2026-10-10)
+**DONE:** Compared current WORLD/APP runtime and verified Vercel project-level Fluid Active CPU 4h24m, Render Free autoDeploy disabled, PR #105 green but unmerged, and PR #100 Docker PR-build success without GHCR pull proof. OpenClaw local app was observed as Degraded; four independent agents have **not** been activated. Read and review [M3TM_ARCHITECTURE_COUNCIL_ZERO_COST_2026-10-10.md](M3TM_ARCHITECTURE_COUNCIL_ZERO_COST_2026-10-10.md).
+
+**DECISION:** Azure for Students requires annual signup/eligibility verification, so exclude it as a permanent production dependency. Preserve APP GitHub Pages + current WORLD Render recovery until true alternative browser smoke and cost guards. Cloudflare static frontend and light edge caching are candidates, **not already deployed**. Maintain all real public layers; forbid military exact tracks and internal OSINT exposure. No DNS, account billing, auth, APP, or deployment changes from this documentation.
+
+**VERIFY:** Confirm docs accurately state official 2026 free quotas and project SHAs. This docs-only PR still requires protected checks/review. Target evidence: WORLD painted map+Arabic labels+APP embed, first paint and latency baseline, source freshness/provenance, cache hit rate, GHCR SHA/anonymous pull, then nonproduction replacement soak test.
+
+**BLOCKERS:** Four independent agents not live; OpenClaw UI Degraded; no Cloudflare account/spend guard verification; GHCR published image and Azure test domain absent; no Vercel per-endpoint CPU history. Render Free sleeps and has autoDeploy disabled.
+
+**NEXT:** Keep PR #105 separate and gated; verify #100 immutable image/pull; instrument endpoint costs; prototype independent viewer/snapshot in nonproduction; only consider APP/DNS change after end-to-end evidence.
+
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
 **DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 
