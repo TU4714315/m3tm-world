@@ -58,7 +58,7 @@ export async function GET() {
   }
 }
 
-function parseCSV(csv: string): any[] {
+export function parseCSV(csv: string): any[] {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
 
@@ -72,11 +72,10 @@ function parseCSV(csv: string): any[] {
   const frpIdx = header.indexOf('frp');
 
   const fires: any[] = [];
-  // Sample the data if there are too many rows to avoid browser lag. Limit to ~2000 points globally.
+  // Filter to the owner's geographic scope BEFORE limiting output.
   const maxPoints = 2000;
-  const step = lines.length > maxPoints ? Math.ceil(lines.length / maxPoints) : 1;
 
-  for (let i = 1; i < lines.length; i += step) {
+  for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     const lat = parseFloat(cols[latIdx]);
     const lng = parseFloat(cols[lngIdx]);
@@ -92,6 +91,7 @@ function parseCSV(csv: string): any[] {
       frp: parseFloat(cols[frpIdx]) || 0,
       type: 'fire'
     });
+    if (fires.length >= maxPoints) break;
   }
 
   return fires;
