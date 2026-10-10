@@ -1,0 +1,34 @@
+# WORLD — Owner's display and daily reference policy (2026-10-10)
+
+## Binding acceptance
+1. Public panels show layer title, toggle, and **counts only**. Remove text such as 'sources public', provider status, failure explanations and detailed provenance from operational panels. The public MENA desk displays count totals by time range only; preserve *machine-level* source provenance in APIs and the legally necessary basemap/data attribution at their required placement. Do not strip licensing data or fabricate a real observed event count from inferred graphics.
+2. Cable reference geometry and commercial maritime/navigation reference route snapshots are shown immediately from an existing snapshot. **Opening/closing the layer is not an instruction to refresh upstream data**; 24h is the minimum freshness interval. The cable GeoJSON is a static versioned repository asset, so without a validated scheduled updater it does not automatically import newly laid cables every day.
+3. Earthquake and volcano layers disabled. USGS earthquake feed no longer fetched by WORLD startup/poll; restore URL/saved workspaces are clamped off. GDACS quake/volcano incidents are excluded; NASA EONET volcano fetch is removed from fire API.
+4. Fires enabled by default in WORLD/APP embed and restricted server-side to a broad Middle East / Gulf / Iran, African and two existing conflict-theatre bounding boxes (Ukraine/Myanmar). Hotspot detection is **not** evidence of a strike/attack.
+5. MENA / Yemen / Saudi / Iran published incidents retain fastest available source-backed reports with proof of time and geography server-side. No precise military tracks, inferences of bases, vessel identities, or tactical location from headlines.
+
+## Code and what actually changes
+- `src/components/LayerPanel.tsx`: removes public source/provenance/provider status/explanatory disclosures and per-layer descriptions in both mobile and desktop, keeps labels and counts. MapLibre attribution controls and internal source metadata remain.
+- `src/components/MenaPulse.tsx`: compact period-filtered event count overview. Removes extra public source-coverage `/api/source-coverage` and archive `/api/gdelt-history` polling used only for explanatory UI. Archive APIs and records remain available, unmodified.
+- `src/app/page.tsx`: deactivates USGS polling and quake UI; fires default on; static cable load uses force-cache; previously loaded cable and maritime layers do not invalidate cache after a toggle. Existing daily polling schedule comes from stacked PR #107.
+- `src/app/api/maritime/route.ts`: once-per-day server process aggregation and CDN shared response caching, rather than five-second snapshots. **The old AIS WebSocket receiver is still running if configured** and still independently consumes backend resources; this PR does not schedule or terminate it for fear of losing live-source connectivity before a durable daily ingestion system exists.
+- `src/app/api/fires/route.ts`: removes EONET volcano fetch and filters NASA FIRMS hotspots geographically *before* enforcing the output point limit, so worldwide sampling does not starve MENA/Africa results.
+- `src/app/api/gdelt/route.ts`: drops EQ/VO incidents and worldwide wildfire incidents outside approved bounds, does not change true MENA GDELT conflicts.
+- `src/lib/publicFireRegion.ts` plus tests protect broad regional boundaries.
+
+## Candidate external projects — verified 2026-10-10
+- **NoblerWorks-HQ/IRONSIGHT**, https://github.com/NoblerWorks-HQ/IRONSIGHT, MIT license, repository last pushed 2026-10-10 06:31 UTC, 663 stars at inspection. News RSS aggregation and region-based theater switching are relevant **ideas**, but it also contains granular operational military-tracking integrations incompatible with public M3TM safety. Inspect only permitted RSS source list and independent patterns. Reuse requires tests, correct rights, upstream permission/availability and no licensing removal. No code copied or upstream imported in this PR.
+- **nKOxxx/gulf-watch-v2**, https://github.com/nKOxxx/gulf-watch-v2, repository last pushed 2026-10-10 10:15 UTC. Gulf-specific official ministries/news aggregation, 44 feeds and GitHub Actions hourly snapshot are promising. **No explicit repository license** exposed by GitHub at verification, so no source code reuse until rights clarified. One-hour refresh does not beat M3TM's existing one-minute news view or GDELT 15-minute publication; useful **additional corroborative regional sources** only once each endpoint verified.
+- **jacko06v/conflict-terminal**, https://github.com/jacko06v/conflict-terminal, no explicit license detected and last pushed March 9, 2026: do not adopt as new active provider; its MapLibre/server-batched architecture can inform design only.
+- NASA FIRMS https://firms.modaps.eosdis.nasa.gov/api/ supports region-based active-fire data, but web service API requires a free MAP_KEY. Existing worldwide CSV endpoint should be live-tested; do **not** claim successful live ingestion without returned observations. NASA says Suomi NPP products cease Nov 1, 2026; validate NOAA20/21 feed replacement before that date.
+
+## Remaining actions before any merge/deployment
+- This PR is stacked on #107, which in turn is stacked on #105. Do not merge out of order. PR #107 originally failed `page.public-defaults.test.ts` because tests expected old `flights: true`; fixed that test in #107 and stacked branch.
+- Run protected Vitest, TypeScript, Next production build and public-email-privacy CI. Browser smoke on actual map (first painted frame, Arabic labels, APP embed), fire source response not empty when provider has data, quake/volcano absent, daily cached cable and maritime geometry still visible after toggles, no provider explanations in mobile/desktop layer panel.
+- Verify source/legal credits remain in their required separate place.
+- `/api/gdelt-history` archive remains server-side; avoid disabling its ingestion if needed for evidence audit.
+- Daily caching is not a 24/7 uptime SLA. If the CDN cache expires or backend restarts, upstream service may run; central scheduler and durable versioned snapshots still needed to guarantee **exactly one** ingestion per day across replicas.
+- Actual CPU savings cannot be established until before/after measurements.
+
+## Owner decision preserved
+No Azure Student dependency, no new paid plans, no DNS switch, no opening internal OSINT, no precise live military operational tracking. Only count UI; source-backed data integrity retained behind the interface.
