@@ -69,6 +69,31 @@ describe('progressive camera catalogue', () => {
     stop();
   });
 
+  it('retries a transient region-index outage and still loads worldwide regions', async () => {
+    let discoveryCalls = 0;
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes('catalog=regions')) {
+        discoveryCalls++;
+        if (discoveryCalls === 1) return new Response('temporary', { status: 503 });
+        return names([...CAMERA_INITIAL_REGIONS, 'florida']);
+      }
+      return json(requestedRegions(url).map(id => ({ id })));
+    });
+    vi.stubGlobal('fetch', fetcher);
+    let cameras: { id: string | number }[] = [];
+    const onError = vi.fn();
+    const stop = loadCameraCatalog(batch => { cameras = mergeCameraCatalog(cameras, batch); }, onError);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(discoveryCalls).toBe(1);
+    await vi.advanceTimersByTimeAsync(17_000);
+    expect(discoveryCalls).toBe(2);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(cameras.some(camera => camera.id === 'florida')).toBe(true);
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('catalog=regions'))
+      .every(([,options]) => options?.cache === 'no-store')).toBe(true);
+    stop();
+  });
+
   it('aborts background loading when the layer is disabled', async () => {
     const fetcher = vi.fn(async (url: string) =>
       url.includes('catalog=regions') ? names([...CAMERA_INITIAL_REGIONS, 'georgia']) : json([{ id: 'first' }]));
