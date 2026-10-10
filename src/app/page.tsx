@@ -875,8 +875,9 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
+  const dailyPollNextAtRef = useRef<Record<string, number>>({});
   useEffect(() => {
-    if (!(activeLayers as any).cyber_attacks) layerFetchedRef.current.delete('cyber_attacks');
+    // Keep successfully loaded daily cyber data across layer toggles.
     if (!(activeLayers.cables || activeLayers.sdk_sea)) layerFetchedRef.current.delete('cables');
     if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) layerFetchedRef.current.delete('maritime');
   }, [activeLayers.cyber_attacks, activeLayers.cables, activeLayers.sdk_sea, activeLayers.maritime, activeLayers.naval_activity]);
@@ -1000,11 +1001,7 @@ export default function Dashboard() {
 
     // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
 
-    // Live Cyber Attacks (animated arcs)
-    if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }));
-      layerFetchedRef.current.add('cyber_attacks');
-    }
+    // Daily cyber reference; no new request on re-enabling a loaded layer.
     /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
        release the mark if nothing landed — otherwise one failed request leaves
        the layer permanently empty. */
@@ -1012,9 +1009,21 @@ export default function Dashboard() {
       if (layerFetchedRef.current.has(key)) return;
       layerFetchedRef.current.add(key);
       fetchEndpoint(url, transform).then(ok => {
-        if (!ok) layerFetchedRef.current.delete(key);
+        if (!ok) {
+          layerFetchedRef.current.delete(key);
+          if (key === 'cyber_attacks' || key === 'frontlines')
+            dailyPollNextAtRef.current[key] = Date.now() + 5 * 60_000;
+        } else if (key === 'cyber_attacks' || key === 'frontlines') {
+          dailyPollNextAtRef.current[key] = Date.now() + PUBLIC_REFRESH_MS.cyberThreatSummary;
+        }
       });
     };
+    if ((activeLayers as any).cyber_attacks) {
+      loadLayerOnce('cyber_attacks', '/api/cyber-attacks', d => {
+        if (!Array.isArray(d?.attacks) || d.attacks.length === 0) throw new Error('empty cyber reference');
+        return { cyber_attacks: significantCyberIndicators(d.attacks) };
+      });
+    }
 
     // Static, non-operational global border reference from a vendored Natural Earth 1:110m dataset.
     if ((activeLayers as any).country_borders) {
@@ -1058,8 +1067,11 @@ export default function Dashboard() {
       }));
     }
     if ((activeLayers as any).frontlines) {
-      loadLayerOnce('frontlines', '/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+      loadLayerOnce('frontlines', '/api/frontlines', d => {
+        if (!Array.isArray(d?.frontlines?.features) || d.frontlines.features.length === 0)
+          throw new Error('empty frontline reference');
+        return {
+        frontlines: d.frontlines,
         frontlines_meta: {
           total: d.total ?? 0,
           status: d.status ?? 'unavailable',
@@ -1067,7 +1079,8 @@ export default function Dashboard() {
           sourceMode: d.sourceMode ?? 'published-snapshot',
           timestamp: d.timestamp ?? null,
         },
-      }));
+        };
+      });
     }
 
     // Network events — Cloudflare Radar when configured, otherwise factual public fallbacks.
@@ -1096,18 +1109,33 @@ export default function Dashboard() {
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
+    const pollOnceDaily = (key: string, period: number, run: () => Promise<boolean>) => {
+      if (!dailyPollNextAtRef.current[key]) dailyPollNextAtRef.current[key] = Date.now() + period;
+      // This timer only checks the local clock; no network until next due.
+      intervals.push(setInterval(() => {
+        if (document.hidden || Date.now() < dailyPollNextAtRef.current[key]) return;
+        dailyPollNextAtRef.current[key] = Date.now() + period;
+        void run().then(ok => {
+          if (!ok) dailyPollNextAtRef.current[key] = Date.now() + 5 * 60_000;
+        });
+      }, 60_000));
+    };
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
       const flightPollMs = activeLayers.military_activity ? PUBLIC_REFRESH_MS.militaryRegionalFlightAggregate : PUBLIC_REFRESH_MS.civilianFlightsOnDemand;
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
+      if (activeLayers.military_activity) {
+        intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
+      } else {
+        pollOnceDaily('civilian-flights', flightPollMs, () => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }));
+      }
     }
 
     if ((activeLayers as any).cyber_attacks) {
-      intervals.push(setInterval(() => {
-        layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }), undefined, { skipWhenHidden: true });
-        layerFetchedRef.current.add('cyber_attacks');
-      }, PUBLIC_REFRESH_MS.cyberThreatSummary)); // once daily while the layer is visible
+      pollOnceDaily('cyber_attacks', PUBLIC_REFRESH_MS.cyberThreatSummary, () =>
+        fetchEndpoint('/api/cyber-attacks', d => {
+          if (!Array.isArray(d?.attacks) || d.attacks.length === 0) throw new Error('empty cyber reference');
+          return { cyber_attacks: significantCyberIndicators(d.attacks) };
+        }, undefined, { skipWhenHidden: true }));
     }
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
@@ -1145,16 +1173,21 @@ export default function Dashboard() {
       }), undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
     }
     if ((activeLayers as any).frontlines) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
-        frontlines_meta: {
-          total: d.total ?? 0,
-          status: d.status ?? 'unavailable',
-          source: d.source ?? 'DeepStateMap.Live',
-          sourceMode: d.sourceMode ?? 'published-snapshot',
-          timestamp: d.timestamp ?? null,
-        },
-      }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.worldwidePublishedFrontlines));
+      pollOnceDaily('frontlines', PUBLIC_REFRESH_MS.worldwidePublishedFrontlines, () =>
+        fetchEndpoint('/api/frontlines', d => {
+          if (!Array.isArray(d?.frontlines?.features) || d.frontlines.features.length === 0)
+            throw new Error('empty frontline reference');
+          return {
+            frontlines: d.frontlines,
+            frontlines_meta: {
+              total: d.total ?? 0,
+              status: d.status ?? 'unavailable',
+              source: d.source ?? 'DeepStateMap.Live',
+              sourceMode: d.sourceMode ?? 'published-snapshot',
+              timestamp: d.timestamp ?? null,
+            },
+          };
+        }, undefined, { skipWhenHidden: true }));
     }
 
     // Network-event monitor: refresh source-backed public observations without
