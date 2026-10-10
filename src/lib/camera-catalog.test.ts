@@ -1,63 +1,98 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadCameraCatalog, mergeCameraCatalog } from './camera-catalog';
+import { CAMERA_INITIAL_REGIONS, loadCameraCatalog, mergeCameraCatalog } from './camera-catalog';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
-const json = (cameras: { id: string }[], pendingRegions: string[] = [], sources: Record<string, number> = {}) => Response.json({ cameras, pendingRegions, sources, timestamp: '2026-09-30T12:00:00Z' });
+
+const json = (cameras: { id: string }[], pendingRegions: string[] = [], sources: Record<string, number> = {}) =>
+  Response.json({ cameras, pendingRegions, sources, timestamp: '2026-10-10T08:00:00Z' });
+const names = (regions: string[]) => Response.json({ regions });
+
+const requestedRegions = (url: string) =>
+  new URL(url, 'https://example.com').searchParams.get('region')?.split(',') ?? [];
 
 describe('progressive camera catalogue', () => {
-  it('retries only missing regions, preserving cameras already loaded', async () => {
-    const fetcher = vi.fn().mockResolvedValueOnce(json([{ id: 'london' }], ['canada']))
-      .mockResolvedValueOnce(json([{ id: 'ottawa' }]));
+  it('loads MENA first, then all other public regions in groups of at most four', async () => {
+    const all = [...CAMERA_INITIAL_REGIONS, 'canada', 'florida', 'georgia', 'utah', 'japan'];
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes('catalog=regions')) return names(all);
+      const batch = requestedRegions(url);
+      return json(batch.map(id => ({ id })), [], { [batch[0]]: batch.length });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    let cameras: { id: string | number }[] = [];
+    const statuses: { pendingRegions: string[]; sourceNames: string[] }[] = [];
+    const stop = loadCameraCatalog(
+      batch => { cameras = mergeCameraCatalog(cameras, batch); },
+      vi.fn(),
+      status => statuses.push(status),
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetcher.mock.calls.slice(0, 2).map(([url]) => url)).toEqual([
+      '/api/cctv?region=middle-east%2Cwestasia%2Casia-live',
+      '/api/cctv?catalog=regions',
+    ]);
+    expect(cameras).toHaveLength(CAMERA_INITIAL_REGIONS.length);
+    expect(statuses.at(-1)?.pendingRegions).toEqual(['canada', 'florida', 'georgia', 'utah', 'japan']);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(cameras.map(camera => camera.id)).toEqual(all);
+    const batches = fetcher.mock.calls
+      .map(([url]) => requestedRegions(url))
+      .filter(regions => regions.length);
+    expect(batches.every(regions => regions.length <= 4)).toBe(true);
+    expect(fetcher.mock.calls.some(([url]) => url.includes('region=all'))).toBe(false);
+    expect(statuses.at(-1)?.pendingRegions).toEqual([]);
+    stop();
+  });
+
+  it('retries only failed regions while retaining already delivered cameras', async () => {
+    let westAsiaAttempts = 0;
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes('catalog=regions')) return names([...CAMERA_INITIAL_REGIONS]);
+      const batch = requestedRegions(url);
+      if (batch.length === 1 && batch[0] === 'westasia') {
+        westAsiaAttempts++;
+        return json([{ id: 'west-asia-camera' }]);
+      }
+      return json([{ id: 'middle-east-camera' }], ['westasia'], { MENA: 1 });
+    });
     vi.stubGlobal('fetch', fetcher);
     let cameras: { id: string | number }[] = [];
     const stop = loadCameraCatalog(batch => { cameras = mergeCameraCatalog(cameras, batch); }, vi.fn());
+
     await vi.advanceTimersByTimeAsync(0);
-    expect(cameras).toEqual([{ id: 'london' }]);
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(fetcher.mock.calls[1][0]).toBe('/api/cctv?region=canada');
-    expect(cameras).toEqual([{ id: 'london' }, { id: 'ottawa' }]);
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(cameras).toEqual([{ id: 'middle-east-camera' }]);
+    await vi.advanceTimersByTimeAsync(16_500);
+    expect(westAsiaAttempts).toBe(1);
+    expect(cameras).toEqual([{ id: 'middle-east-camera' }, { id: 'west-asia-camera' }]);
     stop();
   });
 
-  it('reports provider names and remaining regions without starting extra requests', async () => {
-    const fetcher = vi.fn().mockResolvedValue(json([{ id: 'tx-1' }], ['canada'], { TxDOT: 1, TfL: 20 }));
-    vi.stubGlobal('fetch', fetcher);
-    const statuses: any[] = [];
-    const stop = loadCameraCatalog(vi.fn(), vi.fn(), status => statuses.push(status));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(statuses[0]).toEqual({
-      sourceNames: ['TxDOT', 'TfL'],
-      pendingRegions: ['canada'],
-      lastResponseAt: '2026-09-30T12:00:00Z',
-      retriesRemaining: 2,
-    });
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    stop();
-  });
-
-  it('bounds retries of unavailable sources and retries failed initial requests', async () => {
-    const fetcher = vi.fn().mockRejectedValueOnce(new Error('network down'))
-      .mockImplementation(async () => json([], ['canada']));
-    vi.stubGlobal('fetch', fetcher);
-    const onError = vi.fn();
-    const stop = loadCameraCatalog(vi.fn(), onError);
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(fetcher).toHaveBeenCalledTimes(3);
-    expect(onError).toHaveBeenCalledTimes(1);
-    stop();
-  });
-
-  it('cancels queued retries when cameras are switched off', async () => {
-    const fetcher = vi.fn(async () => json([], ['canada']));
+  it('aborts background loading when the layer is disabled', async () => {
+    const fetcher = vi.fn(async (url: string) =>
+      url.includes('catalog=regions') ? names([...CAMERA_INITIAL_REGIONS, 'georgia']) : json([{ id: 'first' }]));
     vi.stubGlobal('fetch', fetcher);
     const stop = loadCameraCatalog(vi.fn(), vi.fn());
     await vi.advanceTimersByTimeAsync(0);
     stop();
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps provider outage retries bounded', async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes('catalog=regions')) return names([...CAMERA_INITIAL_REGIONS]);
+      throw new Error('provider offline');
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const onError = vi.fn();
+    const stop = loadCameraCatalog(vi.fn(), onError);
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(onError).toHaveBeenCalledTimes(3);
+    // initial request + catalogue index + only two retry requests.
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    stop();
   });
 
   it('updates duplicate camera IDs without duplicating dots', () => {
