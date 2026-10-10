@@ -45,7 +45,7 @@ const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, type DrawResult } from '@/lib/draw';
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
-import { PUBLIC_REFRESH_MS } from '@/lib/publicRefreshPolicy';
+import { PUBLIC_REFRESH_MS, significantCyberIndicators } from '@/lib/publicRefreshPolicy';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 
 const M3TM_APP_ORIGIN = 'https://m3tm.app';
