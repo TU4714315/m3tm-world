@@ -82,8 +82,10 @@ export async function GET() {
 
     const raw = await res.json();
     const entries = (Array.isArray(raw) ? raw : []).filter(
-      (e: any) => e.country && COUNTRY_COORDS[e.country]
-    );
+      (e: any) => e?.country && COUNTRY_COORDS[e.country]
+    ).sort((a: any, b: any) => (SEVERITY[b.malware] ?? 5) - (SEVERITY[a.malware] ?? 5));
+    // Work from the entire upstream response: significant indicators must not
+    // be lost behind the former arbitrary first-20-entry cap.
 
     // Ensure minimum 60 arcs for visual density — multiply entries with varied params
     const TARGET_ARCS = 15;
@@ -127,14 +129,18 @@ export async function GET() {
       attacks,
       total: attacks.length,
       timestamp: new Date().toISOString(),
-      source: 'abuse.ch Feodo Tracker (attributed)',
+      source: 'abuse.ch Feodo Tracker (malware infrastructure indicators; no attack attribution)',
     };
 
-    cachedAttacks = result;
-    cacheTime = now;
+    if (attacks.length > 0) {
+      cachedAttacks = result;
+      cacheTime = now;
+    }
 
     return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
+      headers: { 'Cache-Control': attacks.length > 0
+        ? 'public, s-maxage=86400, stale-while-revalidate=3600'
+        : 'no-store' },
     });
   } catch (error) {
     console.error('[OSIRIS] Cyber attack feed error:', error);
