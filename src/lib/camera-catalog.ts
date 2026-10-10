@@ -111,20 +111,28 @@ export function loadCameraCatalog(
     if (controller.signal.aborted) return;
 
     let allRegions: string[] = [];
-    try {
-      const response = await fetch('/api/cctv?catalog=regions', { signal: controller.signal, cache: 'force-cache' });
-      if (!response.ok) throw new Error(`Camera regions HTTP ${response.status}`);
-      const data = await response.json();
-      if (!Array.isArray(data.regions)) throw new Error('Camera regions unavailable');
-      allRegions = [...new Set<string>(
-        data.regions.filter((region: unknown): region is string =>
-          typeof region === 'string' && /^[a-z-]+$/.test(region)),
-      )];
-    } catch {
-      if (!controller.signal.aborted) onError();
-      return;
+    // Index failure is independent from individual CCTV providers. Give the
+    // tiny discovery endpoint three attempts with bounded backoff before
+    // abandoning this run. Do not pin browser-private cache across releases.
+    for (let discoveryAttempt = 0; discoveryAttempt < 3 && !controller.signal.aborted; discoveryAttempt++) {
+      try {
+        const response = await fetch('/api/cctv?catalog=regions', { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) throw new Error(`Camera regions HTTP ${response.status}`);
+        const data = await response.json();
+        if (!Array.isArray(data.regions) || data.regions.length === 0) throw new Error('Camera regions unavailable');
+        allRegions = [...new Set<string>(
+          data.regions.filter((region: unknown): region is string =>
+            typeof region === 'string' && /^[a-z-]+$/.test(region)),
+        )];
+        if (allRegions.length === 0) throw new Error('Camera regions invalid');
+        break;
+      } catch {
+        if (controller.signal.aborted) return;
+        onError();
+        if (discoveryAttempt < 2) await pause(CAMERA_RETRY_DELAY_MS * (discoveryAttempt + 1));
+      }
     }
-    if (controller.signal.aborted) return;
+    if (controller.signal.aborted || allRegions.length === 0) return;
 
     const initial = new Set<string>(CAMERA_INITIAL_REGIONS);
     const background = allRegions.filter(region => !initial.has(region));
