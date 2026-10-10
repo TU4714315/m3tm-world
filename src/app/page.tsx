@@ -953,7 +953,7 @@ export default function Dashboard() {
       fetchEndpoint('/api/maritime', d => ({
         maritime_ports: d.ports ?? [],
         maritime_chokepoints: d.chokepoints ?? [],
-        maritime_ships: d.ships ?? [],
+        maritime_ships: [] /* daily reference only; no stale live positions */,
         naval_activity: d.naval_activity ?? [],
         naval_activity_meta: d.naval_activity_meta ?? null,
         maritime_source_status: d.source_status ?? null,
@@ -1276,7 +1276,7 @@ export default function Dashboard() {
     const transformMaritime = (d: any) => ({
       maritime_ports: d.ports ?? [],
       maritime_chokepoints: d.chokepoints ?? [],
-      maritime_ships: d.ships ?? [],
+      maritime_ships: [] /* daily reference only; no stale live positions */,
         naval_activity: d.naval_activity ?? [],
         naval_activity_meta: d.naval_activity_meta ?? null,
         maritime_source_status: d.source_status ?? null,
