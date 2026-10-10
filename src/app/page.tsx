@@ -837,6 +837,7 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
+  const dailyFireNextAtRef = useRef(0);
   useEffect(() => {
     if (!(activeLayers as any).cyber_attacks) layerFetchedRef.current.delete('cyber_attacks');
     // Daily static reference layers remain cached when toggled off and back on.
@@ -906,8 +907,11 @@ export default function Dashboard() {
     }
     // Fires
     if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
       layerFetchedRef.current.add('fires');
+      void fetchEndpoint('/api/fires').then(ok => {
+        if (!ok) layerFetchedRef.current.delete('fires');
+        dailyFireNextAtRef.current = Date.now() + (ok ? 24 * 60 * 60_000 : 5 * 60_000);
+      });
     }
     // Maritime
     if ((activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
@@ -1204,6 +1208,25 @@ export default function Dashboard() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [activeLayers, fetchEndpoint]);
 
+
+  // Rolling 24-hour regional fire observations; no fetch on layer toggling.
+  useEffect(() => {
+    if (!activeLayers.fires) return;
+    if (!dailyFireNextAtRef.current) dailyFireNextAtRef.current = Date.now() + 24 * 60 * 60_000;
+    const timer = setInterval(() => {
+      if (document.hidden || Date.now() < dailyFireNextAtRef.current) return;
+      dailyFireNextAtRef.current = Date.now() + 24 * 60 * 60_000;
+      void fetchEndpoint('/api/fires', undefined, undefined, { skipWhenHidden: true }).then(ok => {
+        if (!ok) {
+          dailyFireNextAtRef.current = Date.now() + 5 * 60_000;
+          layerFetchedRef.current.delete('fires');
+        } else {
+          layerFetchedRef.current.add('fires');
+        }
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [activeLayers.fires, fetchEndpoint]);
 
   // Public maritime reference is updated daily instead of repeated vessel polling.
   // Layer toggling retains an initial on-demand load; no public exact naval tracks.
