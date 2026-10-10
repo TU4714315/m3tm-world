@@ -1199,7 +1199,8 @@ export default function Dashboard() {
     });
 
     const schedule = () => {
-      if (cancelled) return;      timer = setTimeout(async () => {
+      if (cancelled) return;
+      timer = setTimeout(async () => {
         await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
       }, PUBLIC_REFRESH_MS.commercialMaritime);
