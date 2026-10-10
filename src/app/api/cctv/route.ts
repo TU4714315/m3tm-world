@@ -719,6 +719,13 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    // Lightweight region discovery. The global map loads CCTV in bounded
+    // batches, avoiding dozens of concurrent upstreams during first paint.
+    if (searchParams.get('catalog') === 'regions') {
+      return NextResponse.json({ regions: Object.keys(REGION_FETCHERS) }, {
+        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' },
+      });
+    }
     const region = searchParams.get('region');
     const lat = parseFloat(searchParams.get('lat') || '0');
     const lng = parseFloat(searchParams.get('lng') || '0');

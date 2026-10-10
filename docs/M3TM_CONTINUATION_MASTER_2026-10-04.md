@@ -1,5 +1,16 @@
 # M3TM — MASTER CONTINUATION / خريطة الاستكمال (2026-10-04)
 
+## CHECKPOINT — Progressive CCTV load and Render first-paint reliability (2026-10-10)
+**TASK:** Restore stable WORLD/APP map startup on the single-instance Render host while retaining all public map layers.
+
+**DONE:** PR #104 stages CCTV startup by loading Middle East/West Asia first, discovering the public region index without upstream calls, then fetching all other regions in batches of up to four with cancellation and two bounded retry passes. This addresses observed initial request fan-out `/api/cctv?region=all`, repeated 12s regional timeouts and provider DNS failures during Render cold start. APP iframe health monitoring shipped separately in APP PR #371.
+
+**VERIFY:** PR https://github.com/TU4714315/m3tm-world/pull/104 ; updated head `667c737861f60eb7d655c92c0223f0e00b09ace1` passed WORLD public-layers validation (TypeScript, Vitest, Next build, Deno archive checks) and email-privacy CI. Validate final SHA after this doc update. Render production is still on WORLD `1e4c6983f2a3` pending merge/deploy.
+
+**BLOCKERS:** Repository still requires a Vercel status whose provider reports `Account is blocked`; cannot claim deployment on Render until WORLD main merge and explicit Render deployment. Visual map smoke on iPhone not yet collected.
+
+**NEXT:** Resolve obsolete Vercel protection using repo-authorized governance, merge PR #104 after final green checks, trigger explicit Render deploy (autoDeploy disabled), verify `/api/health`, `/api/cctv?catalog=regions`, APP embed 3D paint and MENA map markers.
+
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
