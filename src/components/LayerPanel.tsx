@@ -17,9 +17,6 @@ interface LayerPanelProps {
   isMobile?: boolean;
   theme?: 'core' | 'ghost';
   setTheme?: (theme: 'core' | 'ghost') => void;
-  /** Server-side capabilities, e.g. { cloudflare: true }. A missing capability
-   *  is presented as provider status only; it does not lock the public toggle. */
-  capabilities?: Record<string, boolean>;
   /** Optional public-embed allowlist: only expose non-operational layers. */
   allowedLayerKeys?: readonly string[];
   terrainStatus?: TerrainStatus;
@@ -210,7 +207,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -292,7 +289,6 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 const isLayerActive = activeLayers[layer.key];
                 const count = getCount(layer.dataKey, layer.catKey);
                 const dormant = !!layer.parent && !activeLayers[layer.parent];
-                const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
                 return (
                   <button
                     key={layer.key}
@@ -489,7 +485,6 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         const isLayerActive = activeLayers[layer.key];
                         const count = getCount(layer.dataKey, layer.catKey);
                         const dormant = !!layer.parent && !activeLayers[layer.parent];
-                        const capabilityUnavailable = !!layer.requires && capabilities[layer.requires] !== true;
 
                         return (
                           <button
