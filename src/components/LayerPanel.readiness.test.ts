@@ -22,7 +22,8 @@ describe('WORLD public layer controls', () => {
   });
 
   it('keeps provider diagnostics available in code without rendering them in the public layer list', () => {
-    expect(panel).toContain('function FeedSourceStatus(');
-    expect(panel).toContain('function MilitaryActivityStatus(');
+    expect(panel).not.toContain('function FeedSourceStatus(');
+    expect(panel).not.toContain('function MilitaryActivityStatus(');
+    expect(panel).not.toContain("key: 'earthquakes'");
   });
 });
