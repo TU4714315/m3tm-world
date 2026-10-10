@@ -1,11 +1,12 @@
 
 import { NextResponse } from 'next/server';
+import { isPublicFireRegion } from '@/lib/publicFireRegion';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * M3TM.WORLD — Active Fire & Wildfire Tracking
- * Multi-source: NASA FIRMS Open Data (primary for global fires), NASA EONET (volcanoes)
+ * Fire hotspots only: regional NASA FIRMS data. Volcanoes excluded by owner.
  */
 
 export async function GET() {
@@ -39,32 +40,7 @@ export async function GET() {
       } catch { continue; }
     }
 
-    // Source 2: Pull volcanoes from EONET for richer data
-    try {
-      const volcRes = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=volcanoes&limit=50', {
-        signal: AbortSignal.timeout(10000),
-      });
-      if (volcRes.ok) {
-        const volcData = await volcRes.json();
-        const volcanoes = (volcData.events || []).map((e: any) => {
-          const geo = e.geometry?.[e.geometry.length - 1];
-          if (!geo?.coordinates) return null;
-          return {
-            lat: geo.coordinates[1],
-            lng: geo.coordinates[0],
-            brightness: 500,
-            confidence: 'high',
-            date: geo.date?.split('T')[0] || '',
-            time: '',
-            frp: 100,
-            title: `[VOLCANO] ${e.title}`,
-            type: 'volcano',
-          };
-        }).filter(Boolean);
-        fires = [...fires, ...volcanoes];
-        if (!source) source = 'NASA-EONET';
-      }
-    } catch (e) { console.warn('[M3TM.WORLD] Suppressed EONET error:', e instanceof Error ? e.message : e); }
+    // No volcano/earthquake lookups: those categories are disabled.
 
     return NextResponse.json({
       fires,
@@ -104,7 +80,7 @@ function parseCSV(csv: string): any[] {
     const cols = lines[i].split(',');
     const lat = parseFloat(cols[latIdx]);
     const lng = parseFloat(cols[lngIdx]);
-    if (isNaN(lat) || isNaN(lng)) continue;
+    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng)) continue;
 
     fires.push({
       lat: Math.round(lat * 1000) / 1000,
