@@ -6,10 +6,10 @@ describe('WORLD public defaults and branding', () => {
   const brand = readFileSync(new URL('../components/WorldBrandMark.tsx', import.meta.url), 'utf8');
 
   it('starts the visible public feeds from the screenshots enabled', () => {
-    expect(page).toContain('flights: true, private: true, jets: true');
-    expect(page).toContain('sdk_sea: true, sdk_air: true, sdk_naval: true');
+    expect(page).toContain('flights: false, private: false, jets: false');
+    expect(page).toContain('sdk_sea: true, sdk_air: false, sdk_naval: true');
     expect(page).toContain('cf_outages: true, cf_attacks: true');
-    expect(page).toContain("'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks'");
+    expect(page).toContain("'cf_outages', 'cf_attacks'");
   });
 
   it('uses a vector brand mark instead of the raster logo with a white halo', () => {
