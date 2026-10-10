@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapPinned, Radio } from 'lucide-react';
 import { buildMenaFusionRadar, gdeltWindowTime, FUSION_WINDOWS, type FusionWindow } from '@/lib/menaSignals';
 
@@ -20,8 +20,14 @@ export default function MenaPulse({ data, publishedAt, onFocus }: {
   onLocate?: (lat: number, lng: number) => void;
 }) {
   const [period, setPeriod] = useState<FusionWindow>('h24');
+  // Age out expired windows locally even when the network is unavailable.
+  const [clockMinute, setClockMinute] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockMinute(n => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const sourceTime = publishedAt ?? gdeltWindowTime(data?.conflict_source_status?.gdelt?.window || '');
-  const radar = useMemo(() => buildMenaFusionRadar(data, sourceTime), [data, sourceTime]);
+  const radar = useMemo(() => buildMenaFusionRadar(data, sourceTime), [data, sourceTime, clockMinute]);
   const events = radar.events.filter(event =>
     event.ageMs !== null && event.ageMs <= FUSION_WINDOWS[period]);
   const aerial = events.filter(event => event.category === 'aerial_attack').length;
