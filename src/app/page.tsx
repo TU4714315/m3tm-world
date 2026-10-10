@@ -480,7 +480,7 @@ export default function Dashboard() {
     onTerrainRetry: () => setTerrainRetry(value => value + 1),
     onTerrainFocus: () => setTerrainFocus(value => value + 1),
   };
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
+
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -531,42 +531,7 @@ export default function Dashboard() {
 
       window.setTimeout(() => { workspaceAutoSaveReadyRef.current = true; }, 0);
     }
-    // Probe credential-gated feeds without exposing credentials. Provider
-    // readiness is status only and never overrides the user's layer selection.
-    fetch('/api/cloudflare-radar?probe=1', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(p => {
-        if (!p) return;
-        const configured = Boolean(p.configured);
-        const fallbackAvailable = Boolean(p.fallback_available);
-        setCapabilities(current => ({ ...current, cloudflare: configured || fallbackAvailable }));
-        dataRef.current = {
-          ...dataRef.current,
-          cloudflare_source_status: {
-            status: configured ? 'configured' : fallbackAvailable ? 'active_fallback' : 'not_configured',
-            configured,
-            fallback_active: !configured && fallbackAvailable,
-            fallback_sections: {
-              outages: !configured && fallbackAvailable,
-              attacks: !configured && fallbackAvailable,
-            },
-            provider: configured
-              ? String(p.source || 'Cloudflare Radar')
-              : String(p.fallback_source || 'GDELT 2.0 + abuse.ch Feodo Tracker'),
-            source_mode: configured ? 'cloudflare-radar' : fallbackAvailable ? 'public-fallback' : 'unavailable',
-            providers: {},
-            timestamp: new Date().toISOString(),
-          },
-        };
-        setDataVersion(v => v + 1);
-      })
-      .catch(() => {
-        dataRef.current = {
-          ...dataRef.current,
-          cloudflare_source_status: { status: 'unavailable', configured: false, provider: 'Cloudflare Radar', timestamp: new Date().toISOString() },
-        };
-        setDataVersion(v => v + 1);
-      });
+    // Provider status loads with its own active layer; no redundant probe.
     if (isEmbeddedFrame) return;
 
     // Once the user interacts, a late IP-location response must not steal the
@@ -1867,14 +1832,14 @@ export default function Dashboard() {
               <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
-                capabilities={capabilities} />
+                />
             </section>
           )}
         </div>
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
 
 
 
@@ -2200,7 +2165,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />
+                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>
