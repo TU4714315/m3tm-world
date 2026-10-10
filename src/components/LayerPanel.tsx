@@ -549,7 +549,15 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         })}
       </div>
 
-      {/* Subtle separator */}
+      {/* License attribution is legally required; outside operational count rows. */}
+      {activeLayers.military_activity && (
+        <div className="w-10 text-[8px] leading-snug text-white/45" aria-label="إسناد بيانات الطيران">
+          <a href="https://www.adsb.lol/" target="_blank" rel="noopener noreferrer" title="ADSB.lol">ADSB.lol</a>
+          {' · '}
+          <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer" title="Open Database License">ODbL</a>
+        </div>
+      )}
+            {/* Subtle separator */}
       <div className="w-5 h-px bg-white/[0.06] my-2" />
 
       {/* إعدادات المظهر */}
