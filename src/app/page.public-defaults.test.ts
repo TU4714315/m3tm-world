@@ -9,6 +9,7 @@ describe('WORLD public defaults and branding', () => {
     expect(page).toContain('flights: false, private: false, jets: false');
     expect(page).toContain('sdk_sea: true, sdk_air: false, sdk_naval: true');
     expect(page).toContain('cf_outages: true, cf_attacks: true');
+    expect(page).toContain('earthquakes: false, fires: true');
     expect(page).toContain("'cf_outages', 'cf_attacks'");
   });
 

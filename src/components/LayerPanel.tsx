@@ -8,7 +8,6 @@ import {
   Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
-import { publicMilitaryActivityOverview } from '@/lib/publicMilitaryActivityOverview';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
 
 interface LayerPanelProps {
@@ -110,7 +109,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'المخاطر الطبيعية',
     icon: CloudLightning,
     layers: [
-      { key: 'earthquakes', label: 'الزلازل', dataKey: 'earthquakes' },
       { key: 'fires', label: 'حرائق نشطة', dataKey: 'fires' },
       { key: 'weather', label: 'طقس شديد', dataKey: 'weather_events' },
     ],
@@ -212,244 +210,6 @@ function SubLayerStem() {
   );
 }
 
-const CONFLICT_COUNT_LABELS: Record<string, string> = {
-  aerial_attack: 'أسلحة جوية', heavy_weapons: 'أسلحة ثقيلة',
-  bombing: 'تفجيرات', armed_clash: 'اشتباكات', mass_violence: 'عنف جماعي',
-  assault: 'اعتداءات', other: 'أخرى',
-};
-
-function statusArabic(value: unknown): string {
-  switch (String(value || '')) {
-    case 'ok': case 'active': return 'نشط';
-    case 'configured': return 'مهيأ';
-    case 'connecting': return 'جارٍ الاتصال';
-    case 'configured_no_data': return 'مهيأ · لا توجد بيانات حاليًا';
-    case 'active_fallback': return 'نشط · مصدر عام بديل';
-    case 'not_configured': return 'غير مهيأ';
-    case 'unavailable': return 'غير متاح';
-    case 'empty': return 'لا بيانات';
-    case 'not_used': return 'غير مستخدم';
-    case 'partial': return 'جزئي';
-    default: return value ? String(value) : 'لم يُفحص';
-  }
-}
-
-function ConflictEvidenceStatus({ data }: { data: any }) {
-  const counts = data?.conflict_category_counts && typeof data.conflict_category_counts === 'object'
-    ? data.conflict_category_counts as Record<string, number> : {};
-  const entries = Object.entries(counts).filter(([, value]) => Number(value) > 0);
-  const gdelt = data?.conflict_source_status?.gdelt?.status;
-  const acled = data?.conflict_source_status?.acled?.status;
-  const frontlines = data?.frontlines_meta?.status;
-  const conflictState = String(data?.conflict_data_state || '');
-  const fieldAlertLabels: Record<string, string> = {
-    strike: 'ضربات/قصف', drone: 'مسيّرات', missile: 'صواريخ/قذائف',
-    air_defence: 'دفاع جوي', ground: 'قتال بري', maritime: 'أحداث بحرية', equipment: 'معدات/أسلحة',
-  };
-  const fieldCounts = (Array.isArray(data?.alert_pins) ? data.alert_pins : [])
-    .reduce((acc: Record<string, number>, item: any) => {
-      const key = String(item?.category || '');
-      if (key) acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-  const fieldEntries = Object.entries(fieldCounts).filter(([, value]) => Number(value) > 0);
-  const unrestCount = Array.isArray(data?.civil_unrest) ? data.civil_unrest.length : 0;
-  if (!entries.length && !fieldEntries.length && !unrestCount && !gdelt && !acled && !frontlines && !conflictState) return null;
-  return (
-    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/50">
-      {conflictState === 'cached-stale' && <div className="mb-1.5 rounded border border-amber-300/20 bg-amber-300/[0.04] px-1.5 py-1 text-amber-200/80">طبقة النزاع تعرض آخر لقطة مخزنة؛ المصدر الحي متعذر مؤقتًا.</div>}
-      <div className="mb-1.5 flex flex-wrap gap-x-2 gap-y-1">
-        {gdelt && <span>GDELT: <b className="text-white/70">{statusArabic(gdelt)}</b></span>}
-        {acled && <span>ACLED: <b className="text-white/70">{statusArabic(acled)}</b></span>}
-        {frontlines && <span>الجبهات: <b className="text-white/70">{statusArabic(frontlines)}</b></span>}
-      </div>
-      {entries.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {entries.map(([key, value]) => (
-            <span key={key} className="rounded border border-white/[0.08] px-1.5 py-0.5">
-              {CONFLICT_COUNT_LABELS[key] || key}: {Number(value).toLocaleString('ar-SA')}
-            </span>
-          ))}
-        </div>
-      )}
-      {fieldEntries.length > 0 && (
-        <div className="mt-1.5">
-          <div className="mb-1 text-white/45">M3TM.APP · تنبيهات ميدانية منشورة</div>
-          <div className="flex flex-wrap gap-1">
-            {fieldEntries.map(([key, value]) => (
-              <span key={key} className="rounded border border-cyan-300/10 bg-cyan-300/[0.025] px-1.5 py-0.5">
-                {fieldAlertLabels[key] || key}: {Number(value).toLocaleString('ar-SA')}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {unrestCount > 0 && <div className="mt-1.5 text-amber-200/70">احتجاجات/اضطرابات منشورة: {unrestCount.toLocaleString('ar-SA')}</div>}
-      {data?.conflict_summary?.timestamp && <div className="mt-1 text-white/30">آخر تحديث طبقة النزاع: {String(data.conflict_summary.timestamp)}</div>}
-      <div className="mt-1.5 text-white/30">التصنيف: بلاغات أحداث عامة حسب CAMEO ومصادر منشورة. طبقة M3TM.APP تستخدم إحداثيات الناشر بعد تعميمها 0.5°؛ لا تمثل تتبعًا لوحدة أو سلاح بعينه.</div>
-    </div>
-  );
-}
-
-function MilitaryActivityStatus({ data }: { data: any }) {
-  const cells = Array.isArray(data?.military_activity) ? data.military_activity.length : 0;
-  const meta = data?.military_activity_meta;
-  const source = data?.flight_source_status;
-  if (!meta && !source && !cells) return null;
-  const adsbFiCount = source?.providers?.adsbfi_mil;
-  const adsbFiHealthy = source?.providers?.adsbfi_mil_healthy;
-  const adsbLolCount = source?.providers?.adsblol_mil;
-  const adsbLolHealthy = source?.providers?.adsblol_mil_healthy;
-  const taggedSource = meta?.tagged_feed_provider || source?.providers?.tagged_feed_provider;
-  const backupState = meta?.backup_feed_state;
-  const openSky = Number(source?.providers?.opensky || 0);
-  const openSkyAge = source?.providers?.opensky_age_s;
-  const stale = meta?.stale_fallback === true;
-  const taggedUnhealthy = meta?.provider_healthy === false;
-  const overview = publicMilitaryActivityOverview(data?.military_activity, stale);
-  const reportedAt = typeof meta?.observed_at === 'string' && Number.isFinite(Date.parse(meta.observed_at))
-    ? meta.observed_at.slice(0, 16).replace('T', ' ') + ' UTC'
-    : null;
-  const share = (count: number) => overview.total > 0 ? `${(count / overview.total) * 100}%` : '0%';
-  return (
-    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      <div className="font-semibold text-white/70">مناطق النشاط الجوي العام: {cells.toLocaleString('ar-SA')} خلايا إقليمية</div>
-      <div className="mt-1 text-white/45">توزيع الكثافة عبر مساحات واسعة (كل خلية نحو 6°)، وليس مسارات طائرات.</div>
-      {overview.total > 0 && (
-        <div className="mt-2" role="group" aria-label="توزيع مستويات نشاط الطيران العام في الخلايا الإقليمية">
-          <div className="flex w-full h-2 overflow-hidden rounded bg-white/[0.06]">
-            <div style={{ width: share(overview.low) }} className="bg-amber-300/70" />
-            <div style={{ width: share(overview.medium) }} className="bg-orange-400/75" />
-            <div style={{ width: share(overview.high) }} className="bg-red-400/70" />
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-white/60">
-            <span>محدود: {overview.low.toLocaleString('ar-SA')}</span>
-            <span>متوسط: {overview.medium.toLocaleString('ar-SA')}</span>
-            <span>مرتفع: {overview.high.toLocaleString('ar-SA')}</span>
-          </div>
-          {!overview.stale && overview.compared >= 3 ? (
-            <div className="mt-1.5 text-white/50">
-              تغير كثافة المناطق القابلة للمقارنة فقط: ↑ {overview.increased.toLocaleString('ar-SA')} / ↓ {overview.decreased.toLocaleString('ar-SA')} / مستقر {overview.unchanged.toLocaleString('ar-SA')}
-            </div>
-          ) : (
-            <div className="mt-1.5 text-white/40">
-              {overview.stale ? 'تعذرت مقارنة الاتجاهات لأن اللقطة محفوظة أو قديمة.'
-                : 'لا توجد عينات إقليمية مقارنة كافية لإثبات اتجاه التغير.'}
-            </div>
-          )}
-        </div>
-      )}
-      {reportedAt && <div className="mt-1 text-white/45">وقت رصد الخلايا المُعلن: {reportedAt}</div>}
-      <div className={stale || taggedUnhealthy ? 'mt-1 text-amber-300/75' : 'mt-1 text-white/35'}>
-        البيانات: {stale ? 'آخر لقطة مخزنة · ليست رصدًا حيًا'
-          : taggedUnhealthy ? 'المصدر الموسوم عسكريًا متعذر؛ التصنيف الإقليمي العام ليس تأكيدًا عسكريًا'
-            : taggedSource === 'adsb.fi' ? 'مجمّع من مزوّد احتياطي مرخّص للاستخدام الحالي'
-              : 'مجمّع من ADSB.lol العام، ليس دليلًا على عملية عسكرية'}
-        {meta?.cache_backend ? ' · التخزين ' + String(meta.cache_backend) : ''}
-      </div>
-      {source && (
-        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-white/35">
-          <span>المصدر: <b className="text-white/55">{String(source.provider || 'غير محدد')}</b></span>
-          <span>ADSB.lol: <b className="text-white/55">{adsbLolHealthy === true ? Number(adsbLolCount).toLocaleString('ar-SA') : 'متعذر / لا رصد'}</b></span>
-          <span>ADSB.fi الاحتياطي: <b className="text-white/55">{backupState === 'not_requested' ? 'لم يُستخدم' : adsbFiHealthy === true ? Number(adsbFiCount).toLocaleString('ar-SA') : 'متعذر / لا رصد'}</b></span>
-          <span>OpenSky: <b className="text-white/55">{openSky.toLocaleString('ar-SA')}</b></span>
-          {typeof openSkyAge === 'number' && Number.isFinite(openSkyAge) && <span>عمر لقطة OpenSky: <b className="text-white/55">{Math.round(openSkyAge / 60)} د</b></span>}
-        </div>
-      )}
-      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
-      <div className="mt-1 text-white/30">
-        التصنيف عام وآلي وغير مؤكد عسكريًا؛ غياب الرصد لا يعني غياب طائرة، ولا تُعرض مسارات عسكرية دقيقة.
-        {' '}المصدر: <a className="underline" href="https://www.adsb.lol/" target="_blank" rel="noopener noreferrer">ADSB.lol</a>
-        {' '}· <a className="underline" href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL 1.0</a>.
-      </div>
-    </div>
-  );
-}
-
-function FeedSourceStatus({ data, kind }: { data: any; kind: 'maritime' | 'cloudflare' }) {
-  const source = kind === 'maritime'
-    ? data?.maritime_source_status?.ais
-    : data?.cloudflare_source_status;
-  if (!source) return null;
-  const provider = String(source.provider || (kind === 'maritime' ? 'AISStream.io' : 'Cloudflare Radar'));
-  const updated = source.latest_observed_at || source.timestamp || data?.maritime_timestamp || null;
-  const age = Number(source.latest_observation_age_s);
-  const navalCells = kind === 'maritime' && Array.isArray(data?.naval_activity) ? data.naval_activity.length : 0;
-  return (
-    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      <div className="flex flex-wrap gap-x-2 gap-y-1">
-        <span>المصدر: <b className="text-white/60">{provider}</b></span>
-        <span>الحالة: <b className="text-white/60">{statusArabic(source.status)}</b></span>
-        {Number.isFinite(age) && <span>عمر آخر رصد: <b className="text-white/60">{age < 60 ? `${Math.round(age)} ث` : `${Math.round(age / 60)} د`}</b></span>}
-        {kind === 'maritime' && <span>خلايا نشاط بحري عسكري عام: <b className="text-white/60">{navalCells.toLocaleString('ar-SA')}</b></span>}
-      </div>
-      {updated && <div className="mt-1 text-white/30">آخر تحديث/رصد: {String(updated)}</div>}
-      {kind === 'maritime' && <div className="mt-1 text-white/30">AIS حي فقط عند توفر الاعتماد واستمرار عملية الاستقبال؛ النشاط العسكري البحري يُعرض كتجميع إقليمي فقط، ولا توجد أسماء/MMSI/سرعة/اتجاه/مسارات دقيقة.</div>}
-      {kind === 'cloudflare' && source.source_mode === 'public-fallback' && (
-        <div className="mt-1 text-cyan-200/70">
-          Cloudflare Radar غير مهيأ؛ البديل العام يعمل بحسب حالة كل مصدر:
-          {' '}GDELT: {statusArabic(source.providers?.gdelt)} · abuse.ch: {statusArabic(source.providers?.abuse_ch)}.
-          {' '}بلاغات GDELT أحداث منشورة، ومؤشرات Feodo تمثل بنية C2 مرصودة لا بلد المهاجم.
-        </div>
-      )}
-      {kind === 'cloudflare' && source.source_mode === 'mixed' && (
-        <div className="mt-1 text-cyan-200/70">
-          Cloudflare Radar يعمل جزئيًا؛ يُستخدم البديل العام فقط للقسم المتعذر.
-          {' '}Radar/الأحداث: {statusArabic(source.providers?.cloudflare_outages)} · Radar/التهديدات: {statusArabic(source.providers?.cloudflare_attacks)}
-          {source.fallback_sections?.outages === true && <> · GDELT: {statusArabic(source.providers?.gdelt)}</>}
-          {source.fallback_sections?.attacks === true && <> · abuse.ch: {statusArabic(source.providers?.abuse_ch)}</>}.
-        </div>
-      )}
-      {kind === 'cloudflare' && source.configured === false && source.fallback_active !== true && (
-        <div className="mt-1 text-amber-300/75">غير مهيأ في هذا النشر؛ الطبقة متاحة وغير مقفلة، وستعرض البيانات تلقائيًا عند توفر اعتماد Radar: Read على الخادم.</div>
-      )}
-    </div>
-  );
-}
-
-function MilitarySatelliteActivityStatus({ data }: { data: any }) {
-  const cells = Array.isArray(data?.military_satellite_activity) ? data.military_satellite_activity.length : 0;
-  const summary = data?.military_satellite_summary;
-  const meta = data?.military_satellite_meta;
-  const source = data?.satellite_source_status;
-  if (!summary && !meta && !source && !cells) return null;
-  const catalog = Number(summary?.catalog_objects || source?.military_catalog_objects || 0);
-  const represented = Number(summary?.represented_objects || 0);
-  const withheld = Number(summary?.withheld_sparse_objects || 0);
-  return (
-    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      <div className="flex flex-wrap gap-x-2 gap-y-1">
-        <span>خلايا عسكرية/حكومية: <b className="text-white/60">{cells.toLocaleString('ar-SA')}</b></span>
-        <span>أجسام مصنفة في الكتالوج: <b className="text-white/60">{catalog.toLocaleString('ar-SA')}</b></span>
-        {represented > 0 && <span>ممثلة بالتجميع: <b className="text-white/60">{represented.toLocaleString('ar-SA')}</b></span>}
-        {withheld > 0 && <span>متفرقة غير معروضة: <b className="text-white/60">{withheld.toLocaleString('ar-SA')}</b></span>}
-      </div>
-      {source?.provider && <div className="mt-1 text-white/35">المصدر: {String(source.provider)} · الحالة: {statusArabic(source.status)}</div>}
-      {source?.timestamp && <div className="mt-1 text-white/30">آخر تحديث: {String(source.timestamp)}</div>}
-      <div className="mt-1 text-white/30">التصنيف: نشاط أقمار عسكرية/حكومية عام. المواضع تقدير SGP4 من TLE عامة بعد تجميع 20° وبحد أدنى 3 أجسام؛ لا تُعرض أسماء أو معرفات NORAD أو مسارات فردية.</div>
-    </div>
-  );
-}
-
-function CameraCatalogStatus({ data }: { data: any }) {
-  const status = data?.camera_catalog_status;
-  const failed = data?.camera_catalog_error === true;
-  if (!status && !failed) return null;
-  const sources = Array.isArray(status?.sourceNames) ? status.sourceNames.length : 0;
-  const pending = Array.isArray(status?.pendingRegions) ? status.pendingRegions.length : 0;
-  const cameras = Array.isArray(data?.cameras) ? data.cameras.length : 0;
-  return (
-    <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.025] p-2 text-[9px] font-mono text-white/45">
-      <p>{cameras.toLocaleString('ar-SA')} كاميرا مستلمة من {sources.toLocaleString('ar-SA')} جهات بيانات</p>
-      {status?.lastResponseAt && <p className="mt-1 text-white/30">آخر استجابة للفهرس: {String(status.lastResponseAt)}</p>}
-      <p className="mt-1 text-white/30">التصنيف: كاميرات طرق/مرور وبثوث عامة منشورة حسب المصدر.</p>
-      {pending > 0 && <p className="mt-1 text-amber-300/80">{pending.toLocaleString('ar-SA')} مناطق لم تكتمل بياناتها؛ لا تُعد الكاميرات الغائبة متوقفة بالضرورة.</p>}
-      {failed && <p className="mt-1 text-amber-300/80">فشل تحميل دفعة؛ ستُحاول الخدمة إعادة الجلب بحد أقصى.</p>}
-      {!pending && !failed && <p className="mt-1 text-white/30">اكتملت الدفعة المطلوبة؛ لا تعني هذه الحالة أن جميع البثوث الفردية تعمل الآن.</p>}
-    </div>
-  );
-}
-
 function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {}, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
@@ -518,48 +278,6 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     return found ? total : null;
   };
 
-  const getLayerStatus = (layer: LayerDef, isActive: boolean, count: number | null): string => {
-    if (!isActive) return 'متوقف';
-
-    if (layer.requires) {
-      const capability = capabilities[layer.requires];
-      if (capability === false) return 'غير مهيأ';
-      if (capability !== true) return 'يفحص';
-    }
-
-    if (['flights', 'private', 'jets', 'sdk_air'].includes(layer.key)) {
-      if (!data?.flight_source_status) return 'جارٍ التحميل';
-      if ((count ?? 0) === 0) return 'لا توجد بيانات';
-    }
-
-    if (layer.key === 'naval_activity') {
-      const ais = data?.maritime_source_status?.ais;
-      if (ais?.configured === false || ais?.status === 'not_configured') return 'غير مهيأ';
-      if (ais && (count ?? 0) === 0) return 'لا توجد بيانات';
-    }
-
-    if (layer.key === 'cf_outages' || layer.key === 'cf_attacks') {
-      const source = data?.cloudflare_source_status;
-      const isOutageLayer = layer.key === 'cf_outages';
-      const usesFallback = isOutageLayer
-        ? source?.fallback_sections?.outages === true
-        : source?.fallback_sections?.attacks === true;
-      const fallbackState = isOutageLayer ? source?.providers?.gdelt : source?.providers?.abuse_ch;
-      const cloudflareState = isOutageLayer ? source?.providers?.cloudflare_outages : source?.providers?.cloudflare_attacks;
-
-      if (usesFallback) {
-        if (fallbackState === 'unavailable') return 'غير متاح';
-        if (fallbackState === 'empty') return 'لا توجد بيانات';
-        return (count ?? 0) > 0 ? 'نشط · مصدر عام' : 'لا توجد بيانات';
-      }
-      if (cloudflareState === 'unavailable') return 'غير متاح';
-      if (source?.configured === false || source?.status === 'not_configured') return 'غير مهيأ';
-      if (source && (count ?? 0) === 0) return 'لا توجد بيانات';
-    }
-
-    return 'نشط';
-  };
-
   /* ── MOBILE ── */
   if (isMobile) {
     return (
@@ -581,18 +299,16 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     onClick={() => toggle(layer.key)}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
-                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : undefined}
+                    
                     className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
                     <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
                       {layer.label}
-                      {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                      
                     </span>
-                    <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                      {getLayerStatus(layer, !!isLayerActive, count)}
-                    </span>
+                    
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
                         {count.toLocaleString()}
@@ -601,13 +317,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   </button>
                 );
               })}
-              {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
-              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
-              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
-              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
-              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
-              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
-              {group.label === 'العرض' && terrainDetails}
+              
+              
+              
+              
+              
+              
+              
             </div>
           </div>
         ))}
@@ -781,7 +497,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             onClick={() => toggle(layer.key)}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
+                            
                             className={`relative w-full rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${group.label === 'شبكة وأحداث' ? 'flex flex-col items-stretch gap-1.5 p-2' : 'flex items-center gap-3 py-1.5'} ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {group.label === 'شبكة وأحداث' ? (
@@ -793,16 +509,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                   </span>
                                 </span>
                                 <span className="flex w-full items-center gap-2" dir="rtl">
-                                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] leading-4 ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/85' : 'text-white/30'}`}>
-                                    {getLayerStatus(layer, !!isLayerActive, count)}
-                                  </span>
+                                  
                                   {count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
                                 </span>
-                                {layer.description && (
-                                  <span dir="rtl" className="block w-full text-right text-[10px] font-normal normal-case leading-[1.65] tracking-normal text-white/50">
-                                    {layer.description}
-                                  </span>
-                                )}
+                                
                               </>
                             ) : (
                               <>
@@ -810,11 +520,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                 <ToggleSwitch active={!!isLayerActive} />
                                 <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
                                   {layer.label}
-                                  {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                                  
                                 </span>
-                                <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                                  {getLayerStatus(layer, !!isLayerActive, count)}
-                                </span>
+                                
                                 {count !== null && (
                                   <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
                                     {count.toLocaleString()}
@@ -825,13 +533,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                           </button>
                         );
                       })}
-                      {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
-              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
-              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
-              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
-              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
-              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
-              {group.label === 'العرض' && terrainDetails}
+                      
+              
+              
+              
+              
+              
+              
                     </div>
                   </motion.div>
                 )}

@@ -2,6 +2,12 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Daily maritime references, count-only panels and regional fires (2026-10-10)
+**DONE (draft branch):** Changed `LayerPanel` to names/toggles/counts only; simplified `MenaPulse` to time-filtered counts and removed its needless source-coverage and history refresh calls. Shut off USGS earthquake polling and volcanism feed, prevent restored earthquake toggle and GDACS EQ/VO events, enable NASA FIRMS fire layer in WORLD/APP embed only within MENA/Africa and existing conflict theaters. Cable and maritime layer reopens reuse downloaded snapshot. `/api/maritime` server/CDN response has 24h TTL. Verified independent external Gulf monitoring projects, recorded constraints/license and NASA FIRMS MAP_KEY/NPP retirement. See [WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md](WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md).
+**VERIFY:** No production delivery yet; required GitHub typecheck/Vitest/build/privacy and desktop/mobile APP/WORLD visual smoke, no empty fire claims without provider response.
+**BLOCKERS:** Stacked dependencies #105→#107→this PR. #107 failed one stale public-defaults snapshot assertion; fixed test in #107 and this branch. Existing AIS WebSocket collector runs independently of daily client/server cached output; no durable single-scheduler proof. Candidate feed endpoints not yet live-tested, so **no new external project integrated**.
+**NEXT:** Confirm CI and end-to-end smoke; evidence before merging; after strict source/license verification consider adding independent Gulf official RSS to existing MENA ingestion pipeline, with dedupe and no operational tracking.
+
 ## CHECKPOINT — Owner regional refresh tiers (2026-10-10)
 **DONE (branch only):** Added typed scheduling values and safety-filtered significant cyber overview in `src/lib/publicRefreshPolicy.ts`, tests, and targeted browser refresh reductions for maritime (daily), cyber threats (daily), frontline snapshots (daily), civilian-only flights (daily; regional military aggregate remains 5m). Inherits #105 no hidden-tab polling/static cable cache-bust. `/api/cyber-attacks` positive cache + CDN TTL set to 24h. Official requirements/remaining unimplemented portions: [WORLD_SOURCE_REFRESH_POLICY_2026-10-10.md](WORLD_SOURCE_REFRESH_POLICY_2026-10-10.md).
 

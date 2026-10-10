@@ -273,11 +273,10 @@ async function fetchVesselApiFallback() {
    multi-megabyte JSON.stringify. At ~30 req/s that whole job runs thirty
    times a second to produce a byte-identical answer.
 
-   Building it once per SNAPSHOT_TTL_MS and handing every caller the same
-   pre-serialised string makes the cost independent of how many people are
-   watching. The window sits well under the 10s the client polls at, so
-   nothing reaches the map staler than it already was. */
-const SNAPSHOT_TTL_MS = 5_000;
+   Build a public snapshot at most once daily per process and distribute it
+   via CDN cache. Opening the layer reads the current snapshot; no per-viewer
+   upstream vessel refresh. Source age must not be labeled real-time. */
+const SNAPSHOT_TTL_MS = 24 * 60 * 60_000; // Once-per-day published snapshot
 const PUBLIC_NAVAL_CELL_DEG = 6;
 const PUBLIC_NAVAL_MIN_GROUP = 2;
 const PUBLIC_NAVAL_TIME_BUCKET_MS = 30 * 60 * 1000;
