@@ -45,6 +45,7 @@ const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, type DrawResult } from '@/lib/draw';
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
+import { PUBLIC_REFRESH_MS, significantCyberIndicators } from '@/lib/publicRefreshPolicy';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 
 const M3TM_APP_ORIGIN = 'https://m3tm.app';
@@ -85,12 +86,12 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: true, private: true, jets: true, military: false, military_activity: true, maritime: true, naval_activity: true,
+  flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
   live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
-  cables: true, sdk_sea: true, sdk_air: true, sdk_naval: true, terrain_3d: false,
+  cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
 };
@@ -100,7 +101,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'flights', 'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -874,6 +875,11 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!(activeLayers as any).cyber_attacks) layerFetchedRef.current.delete('cyber_attacks');
+    if (!(activeLayers.cables || activeLayers.sdk_sea)) layerFetchedRef.current.delete('cables');
+    if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) layerFetchedRef.current.delete('maritime');
+  }, [activeLayers.cyber_attacks, activeLayers.cables, activeLayers.sdk_sea, activeLayers.maritime, activeLayers.naval_activity]);
   const flightLoadInFlightRef = useRef(false);
   useEffect(() => {
     if (!activeLayers.cctv) return;
@@ -996,7 +1002,7 @@ export default function Dashboard() {
 
     // Live Cyber Attacks (animated arcs)
     if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
+      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }));
       layerFetchedRef.current.add('cyber_attacks');
     }
     /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
@@ -1092,16 +1098,16 @@ export default function Dashboard() {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      const flightPollMs = activeLayers.military_activity ? 120000 : 300000;
+      const flightPollMs = activeLayers.military_activity ? PUBLIC_REFRESH_MS.militaryRegionalFlightAggregate : PUBLIC_REFRESH_MS.civilianFlightsOnDemand;
       intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
     }
 
     if ((activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => {
         layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }), undefined, { skipWhenHidden: true });
+        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }), undefined, { skipWhenHidden: true });
         layerFetchedRef.current.add('cyber_attacks');
-      }, 10000)); // 10s — rapid refresh
+      }, PUBLIC_REFRESH_MS.cyberThreatSummary)); // once daily while the layer is visible
     }
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
@@ -1148,7 +1154,7 @@ export default function Dashboard() {
           sourceMode: d.sourceMode ?? 'published-snapshot',
           timestamp: d.timestamp ?? null,
         },
-      })), 1800000));
+      }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.worldwidePublishedFrontlines));
     }
 
     // Network-event monitor: refresh source-backed public observations without
@@ -1227,8 +1233,8 @@ export default function Dashboard() {
   }, [activeLayers, fetchEndpoint]);
 
 
-  // Maritime earns a fast cadence only while live vessels are actually arriving.
-  // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
+  // Public maritime reference is updated daily instead of repeated vessel polling.
+  // Layer toggling retains an initial on-demand load; no public exact naval tracks.
   useEffect(() => {
     if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) return;
     let cancelled = false;
@@ -1247,12 +1253,10 @@ export default function Dashboard() {
 
     const schedule = () => {
       if (cancelled) return;
-      const liveShips = Array.isArray(dataRef.current.maritime_ships) ? dataRef.current.maritime_ships.length : 0;
-      const navalCells = Array.isArray(dataRef.current.naval_activity) ? dataRef.current.naval_activity.length : 0;
       timer = setTimeout(async () => {
         await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
-      }, liveShips > 0 ? 10_000 : navalCells > 0 ? 60_000 : 300_000);
+      }, PUBLIC_REFRESH_MS.commercialMaritime);
     };
     schedule();
 

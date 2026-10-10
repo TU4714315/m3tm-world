@@ -59,13 +59,13 @@ const ATTACK_VERBS = [
 
 let cachedAttacks: any = null;
 let cacheTime = 0;
-const CACHE_TTL = 10_000; // 10s — rapid refresh for live feel
+const CACHE_TTL = 24 * 60 * 60 * 1000; // Owner policy: significant cyber overview refreshes daily
 
 export async function GET() {
   const now = Date.now();
   if (cachedAttacks && now - cacheTime < CACHE_TTL) {
     return NextResponse.json(cachedAttacks, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
     });
   }
 
@@ -134,7 +134,7 @@ export async function GET() {
     cacheTime = now;
 
     return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
     });
   } catch (error) {
     console.error('[OSIRIS] Cyber attack feed error:', error);
