@@ -1180,6 +1180,56 @@ export default function Dashboard() {
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint, showMenaPulse]);
 
+  // Refresh time-sensitive, published MENA activity once when returning from a
+  // meaningful hidden period. Do not revive daily reference layers or duplicate
+  // requests for very short tab switches.
+  useEffect(() => {
+    let hiddenAt: number | null = document.hidden ? Date.now() : null;
+    const onVisibility = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt === null || Date.now() - hiddenAt < 60_000) { hiddenAt = null; return; }
+      hiddenAt = null;
+      if (activeLayers.flights || activeLayers.military_activity || activeLayers.military ||
+          activeLayers.private || activeLayers.jets || activeLayers.sdk_air) {
+        void fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.gdelt_events || activeLayers.reported_routes || activeLayers.civil_unrest) {
+        void fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
+          const events = Array.isArray(d.events) ? d.events : [];
+          return {
+            gdelt_events: events.filter((e: any) => e?.quad === 4 && e?.event_category !== 'civil_unrest'),
+            civil_unrest: events.filter((e: any) => e?.event_category === 'civil_unrest'),
+            reported_routes: d.reported_routes ?? [],
+            reported_routes_meta: d.reported_routes_meta ?? null,
+            gdelt_source_published_at: d.source_published_at ?? null,
+            gdelt_data_state: d.data_state ?? 'unknown',
+          };
+        }, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.conflict_zones || activeLayers.conflict_density) {
+        void fetchEndpoint('/api/conflicts', d => ({
+          conflict_zones: d.zones ?? [],
+          conflict_live_events: d.liveEvents ?? [],
+          conflict_source_status: d.sourceStatus ?? null,
+          conflict_category_counts: d.categoryCounts ?? {},
+          conflict_data_state: d.dataState ?? 'live',
+          conflict_served_at: d.servedAt ?? d.timestamp ?? null,
+          conflict_source_published_at: d.sourcePublishedAt ?? null,
+          conflict_summary: {
+            totalZones: d.totalZones ?? 0,
+            totalLiveEvents: d.totalLiveEvents ?? 0,
+            activeWarzones: d.activeWarzones ?? 0,
+            zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
+            timestamp: d.timestamp ?? null,
+          },
+        }), undefined, { skipWhenHidden: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [activeLayers, fetchEndpoint]);
+
+
   // Public maritime reference is updated daily instead of repeated vessel polling.
   // Layer toggling retains an initial on-demand load; no public exact naval tracks.
   useEffect(() => {
