@@ -81,7 +81,7 @@ export function loadCameraCatalog(
       if (data.cameras.length) onBatch(data.cameras);
       const outstanding = new Set<string>(
         Array.isArray(data.pendingRegions)
-          ? data.pendingRegions.filter((region: unknown): region is string => regions.includes(region))
+          ? data.pendingRegions.filter((region: unknown): region is string => typeof region === 'string' && regions.includes(region))
           : data.cameras.length ? [] : regions,
       );
       for (const region of regions) {
