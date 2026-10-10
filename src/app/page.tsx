@@ -512,7 +512,7 @@ export default function Dashboard() {
         && Number.isFinite(zoom) && zoom >= 0 && zoom <= 24;
 
       if (savedWorkspace) {
-        if (!explicitLayers) setActiveLayers(prev => ({ ...prev, ...savedWorkspace.activeLayers }));
+        if (!explicitLayers) setActiveLayers(prev => ({ ...prev, ...savedWorkspace.activeLayers, earthquakes: false }));
         setMapProjection(savedWorkspace.projection);
         setMapStyle(savedWorkspace.mapStyle);
         setWorldTheme(savedWorkspace.theme);
@@ -523,7 +523,7 @@ export default function Dashboard() {
         }
       }
 
-      if (explicitLayers) setActiveLayers(prev => restoreLayerState(prev, p));
+      if (explicitLayers) setActiveLayers(prev => ({ ...restoreLayerState(prev, p), earthquakes: false }));
       if (explicitView) {
         autoLocateCancelled.current = true;
         setFlyToLocation({ lat, lng, zoom, ts: Date.now() });
@@ -874,8 +874,8 @@ export default function Dashboard() {
   const layerFetchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!(activeLayers as any).cyber_attacks) layerFetchedRef.current.delete('cyber_attacks');
-    if (!(activeLayers.cables || activeLayers.sdk_sea)) layerFetchedRef.current.delete('cables');
-    if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) layerFetchedRef.current.delete('maritime');
+    // Daily static reference layers remain cached when toggled off and back on.
+    // Do not re-fetch /api/maritime when a user opens a previously viewed layer.
   }, [activeLayers.cyber_attacks, activeLayers.cables, activeLayers.sdk_sea, activeLayers.maritime, activeLayers.naval_activity]);
   const flightLoadInFlightRef = useRef(false);
   useEffect(() => {
@@ -983,7 +983,7 @@ export default function Dashboard() {
         if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
       (async () => {
         try {
-          const res = await fetch('/data/submarine-cables.json');
+          const res = await fetch('/data/submarine-cables.json', { cache: 'force-cache' });
           if (res.ok) {
              const cablesData = await res.json();
              dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
