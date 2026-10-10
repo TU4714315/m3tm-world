@@ -5,7 +5,7 @@ describe('LayerPanel provider-state UX', () => {
   it('keeps provider-gated public layers operable without public readiness explanations', () => {
     const source = readFileSync(new URL('./LayerPanel.tsx', import.meta.url), 'utf8');
 
-    expect(source).toContain("capabilities[layer.requires] !== true");
+    expect(source).not.toContain("capabilities[layer.requires] !== true");
     expect(source).not.toContain("{getLayerStatus(layer,");
     expect(source).not.toContain('<FeedSourceStatus data={data}');
     expect(source).not.toContain('disabled={capabilityUnavailable}');
@@ -17,6 +17,6 @@ describe('LayerPanel provider-state UX', () => {
     const pageSource = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
 
     expect(pageSource).not.toContain("if (!configured) setActiveLayers(prev => ({ ...prev, cf_outages: false, cf_attacks: false }))");
-    expect(pageSource).toContain("readiness is status only and never overrides the user's layer selection.");
+    expect(pageSource).not.toContain("/api/cloudflare-radar?probe=1");
   });
 });
