@@ -1190,6 +1190,9 @@ export default function Dashboard() {
           activeLayers.private || activeLayers.jets || activeLayers.sdk_air) {
         void fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true });
       }
+      if (activeLayers.global_incidents || activeLayers.sdk_naval) {
+        void fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true });
+      }
       if (activeLayers.gdelt_events || activeLayers.reported_routes || activeLayers.civil_unrest) {
         void fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
           const events = Array.isArray(d.events) ? d.events : [];
