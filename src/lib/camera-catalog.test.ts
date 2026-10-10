@@ -71,7 +71,7 @@ describe('progressive camera catalogue', () => {
 
   it('retries a transient region-index outage and still loads worldwide regions', async () => {
     let discoveryCalls = 0;
-    const fetcher = vi.fn(async (url: string) => {
+    const fetcher = vi.fn(async (url: string, _options?: RequestInit) => {
       if (url.includes('catalog=regions')) {
         discoveryCalls++;
         if (discoveryCalls === 1) return new Response('temporary', { status: 503 });
