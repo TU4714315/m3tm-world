@@ -77,14 +77,14 @@ function transientUpstreamError(error: unknown): boolean {
 function validBackupCamera(camera: unknown): camera is CctvCamera {
   if (!camera || typeof camera !== 'object') return false;
   const c = camera as Record<string, unknown>;
-  return typeof c.id === 'string' && /^odot-\\d+$/.test(c.id)
+  return typeof c.id === 'string' && /^odot-\d+$/.test(c.id)
     && c.country === 'US' && c.source === 'ODOT TripCheck'
     && typeof c.lat === 'number' && typeof c.lng === 'number'
     && Number.isFinite(c.lat) && Number.isFinite(c.lng)
     && c.lat >= OR_BOUNDS.minLat && c.lat <= OR_BOUNDS.maxLat
     && c.lng >= OR_BOUNDS.minLng && c.lng <= OR_BOUNDS.maxLng
     && typeof c.feed_url === 'string'
-    && /^https:\/\/tripcheck\\.com\/RoadCams\/cams\/[a-z0-9_.-]+$/i.test(c.feed_url)
+    && /^https:\/\/tripcheck\.com\/RoadCams\/cams\/[a-z0-9_.-]+$/i.test(c.feed_url)
     && typeof c.name === 'string' && typeof c.city === 'string';
 }
 
