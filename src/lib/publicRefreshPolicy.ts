@@ -13,3 +13,22 @@ export const PUBLIC_REFRESH_MS = {
   publicSatelliteCatalog: 24 * 60 * 60_000,
   cyberThreatSummary: 24 * 60 * 60_000,
 } as const;
+
+/**
+ * Severity is a provider-derived malware-family heuristic, NOT proof of an
+ * attack or attribution to a country. Display only the highest rated public
+ * infrastructure indicators, avoiding repeated synthetic arcs.
+ */
+export function significantCyberIndicators(
+  raw: unknown,
+  maximum = 10,
+): Array<Record<string, unknown>> {
+  if (!Array.isArray(raw) || !Number.isInteger(maximum) || maximum < 1) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> =>
+      item !== null && typeof item === 'object'
+      && Number.isFinite(Number((item as Record<string, unknown>).severity))
+      && Number((item as Record<string, unknown>).severity) >= 8)
+    .sort((a, b) => Number(b.severity) - Number(a.severity))
+    .slice(0, maximum);
+}
