@@ -581,18 +581,16 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     onClick={() => toggle(layer.key)}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
-                    title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : undefined}
+                    
                     className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
                     <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
                       {layer.label}
-                      {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                      
                     </span>
-                    <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                      {getLayerStatus(layer, !!isLayerActive, count)}
-                    </span>
+                    
                     {count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
                         {count.toLocaleString()}
@@ -601,13 +599,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   </button>
                 );
               })}
-              {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
-              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
-              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
-              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
-              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
-              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
-              {group.label === 'العرض' && terrainDetails}
+              
+              
+              
+              
+              
+              
+              
             </div>
           </div>
         ))}
@@ -781,7 +779,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             onClick={() => toggle(layer.key)}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
-                            title={capabilityUnavailable ? 'المصدر غير مهيأ في هذا النشر؛ يمكن إبقاء الطبقة مفعلة وستظهر البيانات عند توفر المزود' : dormant ? 'فعّل الطبقة الرئيسية أولًا لاستخدام هذه الطبقة' : undefined}
+                            
                             className={`relative w-full rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${group.label === 'شبكة وأحداث' ? 'flex flex-col items-stretch gap-1.5 p-2' : 'flex items-center gap-3 py-1.5'} ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {group.label === 'شبكة وأحداث' ? (
@@ -793,16 +791,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                   </span>
                                 </span>
                                 <span className="flex w-full items-center gap-2" dir="rtl">
-                                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] leading-4 ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/85' : 'text-white/30'}`}>
-                                    {getLayerStatus(layer, !!isLayerActive, count)}
-                                  </span>
+                                  
                                   {count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
                                 </span>
-                                {layer.description && (
-                                  <span dir="rtl" className="block w-full text-right text-[10px] font-normal normal-case leading-[1.65] tracking-normal text-white/50">
-                                    {layer.description}
-                                  </span>
-                                )}
+                                
                               </>
                             ) : (
                               <>
@@ -810,11 +802,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                 <ToggleSwitch active={!!isLayerActive} />
                                 <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
                                   {layer.label}
-                                  {layer.description && <span className="block mt-0.5 text-[9px] normal-case tracking-normal text-white/35">{layer.description}</span>}
+                                  
                                 </span>
-                                <span className={`rounded px-1 py-0.5 text-[8px] font-mono ${isLayerActive ? 'bg-cyan-400/10 text-cyan-200/80' : 'text-white/20'}`}>
-                                  {getLayerStatus(layer, !!isLayerActive, count)}
-                                </span>
+                                
                                 {count !== null && (
                                   <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
                                     {count.toLocaleString()}
@@ -825,13 +815,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                           </button>
                         );
                       })}
-                      {group.label === 'المراقبة' && <CameraCatalogStatus data={data} />}
-              {group.label === 'التهديدات' && <ConflictEvidenceStatus data={data} />}
-              {group.label === 'الطيران' && <MilitaryActivityStatus data={data} />}
-              {group.label === 'الفضاء' && <MilitarySatelliteActivityStatus data={data} />}
-              {group.label === 'البحرية' && <FeedSourceStatus data={data} kind="maritime" />}
-              {group.label === 'شبكة وأحداث' && <FeedSourceStatus data={data} kind="cloudflare" />}
-              {group.label === 'العرض' && terrainDetails}
+                      
+              
+              
+              
+              
+              
+              
                     </div>
                   </motion.div>
                 )}
