@@ -477,6 +477,20 @@ function buildSnapshot(now: number): string {
   });
 }
 
+/** A cold AIS receiver should not cache a falsely empty aggregate all day. */
+function snapshotTtlMs(body: string): number {
+  try {
+    const snapshot = JSON.parse(body) as {
+      total_ships?: number;
+      source_status?: { ais?: { configured?: boolean } };
+    };
+    return snapshot.source_status?.ais?.configured && !snapshot.total_ships
+      ? 5 * 60_000 : SNAPSHOT_TTL_MS;
+  } catch {
+    return 5 * 60_000;
+  }
+}
+
 /** Test seam — forces the next GET to rebuild. */
 export function clearMaritimeSnapshot(): void {
   delete globalForSnapshot.maritimeSnapshot;
@@ -490,7 +504,7 @@ export async function GET() {
   const now = Date.now();
   const cached = globalForSnapshot.maritimeSnapshot;
 
-  const snapshot = cached && now - cached.builtAt < SNAPSHOT_TTL_MS
+  const snapshot = cached && now - cached.builtAt < snapshotTtlMs(cached.body)
     ? cached
     : { body: buildSnapshot(now), builtAt: now };
   globalForSnapshot.maritimeSnapshot = snapshot;
@@ -518,7 +532,7 @@ export async function GET() {
     }
   }
 
-  const maxAgeSeconds = Math.floor(SNAPSHOT_TTL_MS / 1000);
+  const maxAgeSeconds = Math.floor(snapshotTtlMs(snapshot.body) / 1000);
 
   return new NextResponse(snapshot.body, {
     headers: {
