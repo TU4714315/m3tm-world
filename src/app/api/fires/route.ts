@@ -16,7 +16,7 @@ export async function GET() {
 
     // Source 1: NASA FIRMS Open Data (Global 24h CSV) - no API key needed
     const firmsSources = [
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
+      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv',
       'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_Global_24h.csv'
     ];
 
@@ -32,7 +32,7 @@ export async function GET() {
             const parsed = parseCSV(text);
             if (parsed.length > 0) {
               fires = parsed;
-              source = url.includes('SUOMI') ? 'NASA-FIRMS (VIIRS)' : 'NASA-FIRMS (MODIS)';
+              source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
               break;
             }
           }
