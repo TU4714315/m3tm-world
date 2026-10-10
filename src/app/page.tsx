@@ -979,23 +979,33 @@ export default function Dashboard() {
       layerFetchedRef.current.add('gdelt');
     }
 
-    // Submarine Cables — shared by `cables` layer AND `sdk_sea` SDK domain
-        if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
-      (async () => {
-        try {
-          const res = await fetch('/data/submarine-cables.json', { cache: 'force-cache' });
-          if (res.ok) {
-             const cablesData = await res.json();
-             dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
-             setDataVersion(v => v + 1);
-          }
-        } catch (e) { console.warn('Cables fetch failed'); }
-      })();
+    // Daily reference: layer toggles must not trigger re-ingestion. Failed
+    // initial loads release the marker and retry once with bounded backoff.
+    if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
       layerFetchedRef.current.add('cables');
+      void (async () => {
+        let loaded = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch('/data/submarine-cables.json', { cache: 'default' });
+            if (!res.ok) throw new Error('Cable reference HTTP ' + res.status);
+            const d = await res.json();
+            if (!Array.isArray(d?.features) || d.features.length === 0)
+              throw new Error('Cable reference is empty');
+            dataRef.current = { ...dataRef.current, submarine_cables: d.features };
+            setDataVersion(v => v + 1);
+            loaded = true;
+            break;
+          } catch {
+            if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        if (!loaded) layerFetchedRef.current.delete('cables');
+      })();
     }
 
 
-    // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
+        // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
 
     // Live Cyber Attacks (animated arcs)
     if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
