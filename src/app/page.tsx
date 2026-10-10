@@ -980,8 +980,7 @@ export default function Dashboard() {
         if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
       (async () => {
         try {
-          const ts = Date.now();
-      const res = await fetch(`/data/submarine-cables.json?v=${ts}`);
+          const res = await fetch('/data/submarine-cables.json');
           if (res.ok) {
              const cablesData = await res.json();
              dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
@@ -1094,19 +1093,19 @@ export default function Dashboard() {
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
       const flightPollMs = activeLayers.military_activity ? 120000 : 300000;
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), flightPollMs));
+      intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
     }
 
     if ((activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => {
         layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
+        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }), undefined, { skipWhenHidden: true });
         layerFetchedRef.current.add('cyber_attacks');
       }, 10000)); // 10s — rapid refresh
     }
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true }), 300000));
     }
     if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes || (activeLayers as any).civil_unrest) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
@@ -1174,6 +1173,59 @@ export default function Dashboard() {
     }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint, showMenaPulse]);
+
+  // Refresh time-sensitive, published MENA activity once when returning from a
+  // meaningful hidden period. Do not revive daily reference layers or duplicate
+  // requests for very short tab switches.
+  useEffect(() => {
+    let hiddenAt: number | null = document.hidden ? Date.now() : null;
+    const onVisibility = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt === null || Date.now() - hiddenAt < 60_000) { hiddenAt = null; return; }
+      hiddenAt = null;
+      if (activeLayers.flights || activeLayers.military_activity || activeLayers.military ||
+          activeLayers.private || activeLayers.jets || activeLayers.sdk_air) {
+        void fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.global_incidents || activeLayers.sdk_naval) {
+        void fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.gdelt_events || activeLayers.reported_routes || activeLayers.civil_unrest) {
+        void fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
+          const events = Array.isArray(d.events) ? d.events : [];
+          return {
+            gdelt_events: events.filter((e: any) => e?.quad === 4 && e?.event_category !== 'civil_unrest'),
+            civil_unrest: events.filter((e: any) => e?.event_category === 'civil_unrest'),
+            reported_routes: d.reported_routes ?? [],
+            reported_routes_meta: d.reported_routes_meta ?? null,
+            gdelt_source_published_at: d.source_published_at ?? null,
+            gdelt_data_state: d.data_state ?? 'unknown',
+          };
+        }, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.conflict_zones || activeLayers.conflict_density) {
+        void fetchEndpoint('/api/conflicts', d => ({
+          conflict_zones: d.zones ?? [],
+          conflict_live_events: d.liveEvents ?? [],
+          conflict_source_status: d.sourceStatus ?? null,
+          conflict_category_counts: d.categoryCounts ?? {},
+          conflict_data_state: d.dataState ?? 'live',
+          conflict_served_at: d.servedAt ?? d.timestamp ?? null,
+          conflict_source_published_at: d.sourcePublishedAt ?? null,
+          conflict_summary: {
+            totalZones: d.totalZones ?? 0,
+            totalLiveEvents: d.totalLiveEvents ?? 0,
+            activeWarzones: d.activeWarzones ?? 0,
+            zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
+            timestamp: d.timestamp ?? null,
+          },
+        }), undefined, { skipWhenHidden: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [activeLayers, fetchEndpoint]);
+
 
   // Maritime earns a fast cadence only while live vessels are actually arriving.
   // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
