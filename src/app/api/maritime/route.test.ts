@@ -134,7 +134,9 @@ describe('GET /api/maritime', () => {
     addShip(1, 1.26, 103.84);
     expect((await (await GET()).json()).total_ships).toBe(1);
 
-    vi.advanceTimersByTime(5_000);
+    vi.advanceTimersByTime(24 * 60 * 60_000);
+    // Raw observations expire well before 24h; insert fresh sightings.
+    addShip(1, 1.26, 103.84);
     addShip(2, 1.27, 103.85);
     expect((await (await GET()).json()).total_ships).toBe(2);
   });
@@ -143,8 +145,8 @@ describe('GET /api/maritime', () => {
     const res = await GET();
     const cc = res.headers.get('cache-control') ?? '';
 
-    expect(cc).toContain('s-maxage=5');
-    expect(cc).toContain('max-age=5');
+    expect(cc).toContain('s-maxage=86400');
+    expect(cc).toContain('max-age=86400');
     expect(cc).not.toContain('no-store');
     expect(res.headers.get('content-type')).toContain('application/json');
   });
