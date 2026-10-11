@@ -30,6 +30,12 @@ describe('durableCache', () => {
     expect(await durableGetJson('too-large')).toEqual({ value: null, backend: 'miss' });
   });
 
+  it('preserves the last-good small snapshot when an oversized replacement is rejected', async () => {
+    expect(await durableSetJson('conflicts', { payload: 'verified' }, 60)).toBe('memory');
+    expect(await durableSetJson('conflicts', { payload: 'x'.repeat(8 * 1024 * 1024) }, 60)).toBe('not-stored');
+    expect((await durableGetJson<{payload: string}>('conflicts')).value?.payload).toBe('verified');
+  });
+
   it('evicts the oldest keys when encoded retained cache exceeds the byte budget', async () => {
     const payload = 'x'.repeat(5 * 1024 * 1024);
     await durableSetJson('first', { payload }, 60);
