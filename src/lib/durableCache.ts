@@ -120,7 +120,14 @@ export async function durableSetJson<T>(
     memory.delete(key); // Refresh must become newest to survive byte-budget eviction.
     memory.set(key, { value: encoded, expiresAt: Date.now() + ttl * 1000 });
   }
-  else memory.delete(key); // Never retain a huge snapshot from a previous refresh.
+  else {
+    // Reject oversized new data without discarding a still-valid prior snapshot.
+    const previous = memory.get(key);
+    if (previous && (previous.expiresAt <= Date.now() ||
+        Buffer.byteLength(previous.value, 'utf8') > MAX_MEMORY_ENTRY_BYTES)) {
+      memory.delete(key);
+    }
+  }
   pruneMemory();
 
   if (!redisConfig()) return storeInMemory ? 'memory' : 'not-stored';
