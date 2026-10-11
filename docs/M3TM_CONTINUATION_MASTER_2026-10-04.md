@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — bounded process cache memory after Render V8 OOM (2026-10-11)
+**TASK:** Prevent repeat of proven Node V8 heap out-of-memory (Render exit 139) while retaining valid public cached event layers.
+**DONE (pending review):** A 16 MiB total limit and 8 MiB per JSON entry for fallback process memory; evict oldest keys by retained byte count; refreshed keys move to newest position; reject oversized memory entry while Redis path remains usable. Adapt public API cache-backend types and add regression tests. No paid backend, DNS or private OSINT changes.
+**VERIFY:** typecheck, Vitest including refreshed-key eviction, WORLD build and privacy checks, then active Render memory trend after production rollout. Distinguish runtime V8 heap from RSS limit and from platform CPU charges.
+**BLOCKER:** No live post-patch production memory data until merged and deployed. External Redis durability remains optional.
+**NEXT:** Review/merge this focused new PR after CCTV first-paint PR #110 and rebase if main changes; publish manually to Render and check memory/first-paint/APP iframe.
+
 ## CHECKPOINT — Oregon TripCheck DNS degradation and resilient fallback (2026-10-11)
 **TASK:** Render confirmed `EAI_AGAIN www.tripcheck.com` and a missing stale fallback while other CCTV sources succeeded. Preserve WORLD map/news availability without wasting retries.
 **DONE (PR #109):** Two bounded upstream attempts (4.5s each, 250ms delay), transient DNS/socket/HTTP-5xx classification; validated same-source local 7-day last-good camera index; atomic file replacement, partial-inventory protection, five-minute in-process cooldown without repeated empty fetches; strict source age, no fabricated cameras. Added targeted retry, backup, cooldown and partial-inventory tests. Production remains unchanged until merged and manually deployed.
