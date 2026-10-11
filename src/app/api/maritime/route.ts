@@ -494,6 +494,7 @@ function snapshotTtlMs(body: string): number {
 /** Test seam — forces the next GET to rebuild. */
 export function clearMaritimeSnapshot(): void {
   delete globalForSnapshot.maritimeSnapshot;
+  delete globalForSnapshot.maritimeReferenceSnapshot;
 }
 
 /** Daily, reference-only map never exposes time-frozen live ship positions. */
@@ -528,7 +529,7 @@ export async function GET(req?: Request) {
     } });
   }
   // Actual public observations remain short-lived when explicitly requested.
-  connectAisStream();
+  if (process.env.NODE_ENV !== 'test') connectAisStream();
   // Trigger Hybrid Fallback
   await fetchVesselApiFallback();
   await hydratePublicShipsFromDurable();
