@@ -1,7 +1,6 @@
 import type { CctvCamera } from './types';
 import { stealthFetch } from '@/lib/stealthFetch';
-import { cachedSource } from '@/lib/sourceCache';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -71,7 +70,7 @@ function transientUpstreamError(error: unknown): boolean {
   if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
   const root = (error as Error & { cause?: unknown }).cause;
   const code = (root as { code?: unknown } | null)?.code;
-  return ['EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH'].includes(String(code));
+  return ['EAI_AGAIN', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_SOCKET'].includes(String(code));
 }
 
 function validBackupCamera(camera: unknown): camera is CctvCamera {
@@ -88,26 +87,30 @@ function validBackupCamera(camera: unknown): camera is CctvCamera {
     && typeof c.name === 'string' && typeof c.city === 'string';
 }
 
-async function readLastGood(): Promise<CctvCamera[]> {
+async function readLastGood(): Promise<{ savedAt: number; cameras: CctvCamera[] } | null> {
   try {
     const raw = await readFile(BACKUP_FILE, 'utf8');
-    if (raw.length > 3_000_000) return [];
+    if (raw.length > 3_000_000) return null;
     const snapshot = JSON.parse(raw) as { savedAt?: unknown; cameras?: unknown };
     if (typeof snapshot.savedAt !== 'number' || !Number.isFinite(snapshot.savedAt)
       || snapshot.savedAt > Date.now() || Date.now() - snapshot.savedAt > MAX_BACKUP_AGE_MS
-      || !Array.isArray(snapshot.cameras) || snapshot.cameras.length > MAX_CAMERAS) return [];
+      || !Array.isArray(snapshot.cameras) || snapshot.cameras.length > MAX_CAMERAS) return null;
     const cameras = snapshot.cameras.filter(validBackupCamera);
     // Reject a partially corrupt backup rather than silently misrepresenting it.
-    return cameras.length === snapshot.cameras.length ? cameras : [];
-  } catch { return []; }
+    return cameras.length === snapshot.cameras.length && cameras.length > 0
+      ? { cameras, savedAt: snapshot.savedAt } : null;
+  } catch { return null; }
 }
 
 async function persistLastGood(cameras: CctvCamera[]): Promise<void> {
   if (cameras.length === 0 || cameras.length > MAX_CAMERAS) return;
+  const tempFile = BACKUP_FILE + '.tmp-' + process.pid;
   try {
-    await writeFile(BACKUP_FILE, JSON.stringify({ savedAt: Date.now(), cameras }), { mode: 0o600 });
+    await writeFile(tempFile, JSON.stringify({ savedAt: Date.now(), cameras }), { mode: 0o600 });
+    await rename(tempFile, BACKUP_FILE); // atomic replacement, preserve previous valid index
   } catch {
-    // Render's filesystem may be unavailable/read-only; the memory cache still works.
+    // Render filesystem may be ephemeral/read-only; do not damage last-good.
+    await rm(tempFile, { force: true }).catch(() => undefined);
   }
 }
 
@@ -144,6 +147,13 @@ export async function loadOregonCameras(): Promise<CctvCamera[]> {
         if (cams.length >= MAX_CAMERAS) break;
       }
       if (!cams.length) throw new Error('TripCheck inventory had no valid cameras');
+      const previous = await readLastGood();
+      // Retain the last complete inventory if a truncated upstream response arrives.
+      if (previous && previous.cameras.length >= 100 &&
+          cams.length < Math.ceil(previous.cameras.length * 0.5)) {
+        throw new Error('TripCheck inventory was unexpectedly partial');
+      }
+      lastSuccessAt = Date.now();
       await persistLastGood(cams);
       console.log(`[OSIRIS] Oregon cameras — ODOT TripCheck: ${cams.length}`);
       return cams;
@@ -158,11 +168,42 @@ export async function loadOregonCameras(): Promise<CctvCamera[]> {
   }
 
   const lastGood = await readLastGood();
-  if (lastGood.length) {
-    console.warn(`[OSIRIS] Oregon TripCheck unavailable — serving ${lastGood.length} last-good camera locations`);
-    return lastGood;
+  if (lastGood?.cameras.length) {
+    console.warn(`[OSIRIS] Oregon TripCheck unavailable — serving ${lastGood.cameras.length} last-good camera locations`);
+    lastSuccessAt = lastGood.savedAt;
+    return lastGood.cameras;
   }
   throw lastError instanceof Error ? lastError : new Error('TripCheck unavailable; no usable backup');
 }
 
-export const fetchOregonCameras = cachedSource('oregon', loadOregonCameras);
+// Timestamp is carried from the genuine source or disk snapshot, never renewed
+// by a failed refresh. The cache cannot extend a 7-day backup indefinitely.
+let lastSuccessAt = 0;
+let memoryCache: { cameras: CctvCamera[]; sourceAt: number; expiresAt: number } | null = null;
+let retryAfter = 0;
+let pending: Promise<CctvCamera[]> | null = null;
+export function clearOregonCache(): void { memoryCache = null; retryAfter = 0; pending = null; lastSuccessAt = 0; }
+
+export async function fetchOregonCameras(): Promise<CctvCamera[]> {
+  const now = Date.now();
+  const valid = memoryCache && now - memoryCache.sourceAt <= MAX_BACKUP_AGE_MS;
+  if (valid && now < memoryCache!.expiresAt) return memoryCache!.cameras;
+  if (now < retryAfter) return valid ? memoryCache!.cameras : [];
+  if (pending) return pending;
+  pending = (async () => {
+    try {
+      const cameras = await loadOregonCameras();
+      const sourceAt = lastSuccessAt || Date.now();
+      if (Date.now() - sourceAt > MAX_BACKUP_AGE_MS) throw new Error('Oregon snapshot expired');
+      memoryCache = { cameras, sourceAt, expiresAt: Date.now() + 30 * 60_000 };
+      return cameras;
+    } catch (error) {
+      retryAfter = Date.now() + 5 * 60_000;
+      const fallback = memoryCache && Date.now() - memoryCache.sourceAt <= MAX_BACKUP_AGE_MS
+        ? memoryCache.cameras : [];
+      console.warn('[OSIRIS] Oregon provider degraded; retry in 5 minutes');
+      return fallback;
+    } finally { pending = null; }
+  })();
+  return pending;
+}
