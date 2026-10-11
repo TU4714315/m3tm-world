@@ -8,8 +8,8 @@ type WorldBrandMarkProps = {
 };
 
 /**
- * Shares APP's APEX emblem geometry (viewBox 200x118, core + observation /
- * decision wings) rather than WORLD's previous incompatible compass glyph.
+ * Shares APP V5's layered metallic falcon emblem geometry (viewBox 200x118)
+ * rather than WORLD's earlier incompatible hexagon/compass signatures.
  * The approved high-resolution feathered falcon remains a separate artwork
  * handoff; this is the current shared vector fallback.
  */
@@ -21,7 +21,7 @@ export default function WorldBrandMark({ variant = 'header', className = '' }: W
   const cyan = `${id}-v5-cyan`;
   const gold = `${id}-v5-gold`;
   const glow = `${id}-v5-glow`;
-  const coreShell = 'M100 18 L134 38 L134 76 L100 98 L66 76 L66 38 Z';
+  const coreShell = 'M100 42 C109 42 122 54 124 65 C118 78 108 93 100 106 C92 93 82 78 76 65 C78 54 91 42 100 42 Z';
 
   return (
     <div dir="ltr" aria-label="M3TM.WORLD"
@@ -55,23 +55,27 @@ export default function WorldBrandMark({ variant = 'header', className = '' }: W
           </filter>
         </defs>
 
-        <path d="M14 34 H46 L70 46 V68 L46 80 H14 Z" fill={`url(#${cyan})`} opacity=".34" />
-        <path d="M186 34 H154 L130 46 V68 L154 80 H186 Z" fill={`url(#${gold})`} opacity=".3" />
-        <g fill="none" stroke="#76ceeb" strokeWidth="1.7" strokeLinecap="round" opacity=".82">
-          <path d="M12 30 H38 L58 42 M12 59 H50 L68 57 M12 88 H38 L58 72" />
-          <circle cx="22" cy="30" r="2.2" /><circle cx="30" cy="88" r="2.2" />
-        </g>
-        <g fill="none" stroke="#d4af6b" strokeWidth="1.7" strokeLinecap="round" opacity=".82">
-          <path d="M142 42 L162 30 H188 M132 57 H150 H188 M142 72 L162 88 H188" />
-          <circle cx="178" cy="30" r="2.2" /><circle cx="170" cy="88" r="2.2" />
-        </g>
-        <path d="M102 21 L136 41 L136 73 L102 95 L66 73 L66 41 Z" fill={`url(#${depth})`} />
+        {/* Same symmetrical five-feather falcon topology as APP's V5 mark. */}
+        {[false, true].map(mirrored => (
+          <g key={String(mirrored)} transform={mirrored ? 'translate(200 0) scale(-1 1)' : undefined}>
+            <path d="M99 65 C78 42 40 16 8 13 C15 42 44 72 81 84 L99 84 Z" fill={`url(#${cyan})`} opacity=".34" />
+            <path d="M97 58 C75 36 43 17 14 10 C17 29 37 46 65 59 Q83 68 99 73 Z" fill={`url(#${shell})`} opacity=".96" />
+            <path d="M96 67 C70 48 41 34 12 28 C18 46 37 59 65 71 L97 80 Z" fill={`url(#${gold})`} opacity=".98" />
+            <path d="M93 72 C66 58 39 47 15 42 C23 59 44 73 70 82 L99 83 Z" fill={`url(#${cyan})`} opacity=".98" />
+            <path d="M91 76 C70 68 46 61 25 58 C36 75 59 85 82 88 L99 84 Z" fill={`url(#${shell})`} opacity=".9" />
+            <path d="M95 82 C73 79 53 74 38 71 C52 87 73 92 91 91 L100 86 Z" fill={`url(#${gold})`} opacity=".91" />
+            <g fill="none" stroke="#D4AF6B" strokeWidth="1.15" strokeLinecap="round" opacity=".77">
+              <path d="M16 16 C42 26 67 44 95 65" />
+              <path d="M21 35 C43 44 67 57 94 73" />
+              <path d="M27 55 C49 63 72 74 97 82" />
+            </g>
+          </g>
+        ))}
+        <path d="M100 39 C112 42 125 54 126 66 C121 83 109 97 100 113 C91 97 79 83 74 66 C75 54 88 42 100 39 Z" fill={`url(#${depth})`} />
         <path d={coreShell} fill={`url(#${shell})`} stroke="#d7e7e9" strokeWidth="1.1" />
-        <path d="M100 30 L122 43 L122 71 L100 85 L78 71 L78 43 Z" fill="#0a1c22" stroke="#50727a" strokeWidth="1" />
-        <path d="M100 42 L115 57 L100 72 L85 57 Z" fill="#d4af6b" stroke="#071116" strokeWidth="1.15" filter={`url(#${glow})`} />
-        <path d="M12 59 H50 L70 57" fill="none" stroke="#76ceeb" strokeWidth="2.8" strokeLinecap="round" opacity=".55" />
-        <path d="M130 57 H150 H188" fill="none" stroke="#d4af6b" strokeWidth="2.8" strokeLinecap="round" opacity=".55" />
-        <path d="M10 108 H190" fill="none" stroke="#76ceeb" strokeWidth="1.5" strokeDasharray="18 120" opacity=".5" />
+        <path d="M100 49 C109 50 116 59 117 67 C110 76 104 84 100 95 C96 84 90 76 83 67 C84 59 91 50 100 49 Z" fill="#0a1c22" stroke="#50727a" strokeWidth="1" />
+        <path d="M100 53 L112 68 L100 99 L88 68 Z" fill="#d4af6b" stroke="#071116" strokeWidth="1.15" filter={`url(#${glow})`} />
+        <path d="M10 108 H190" fill="none" stroke="#76ceeb" strokeWidth="1.5" strokeDasharray="18 120" opacity=".18" />
       </svg>
 
       <div className="flex min-w-0 flex-col justify-center leading-none">
