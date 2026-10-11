@@ -210,7 +210,14 @@ export default function Dashboard() {
     const publicSurface = params.get('surface') === 'public';
     if (!embedded && !publicSurface) return;
 
+    // Public WORLD remains satellite by default. Only embedded APP frames
+    // accept a cosmetic basemap preference; this is NOT authorization.
+    const requestedBasemap = params.get('basemap');
+    const embeddedBasemap = embedded && !publicSurface && requestedBasemap === 'dark'
+      ? 'dark'
+      : null;
     const frameId = window.requestAnimationFrame(() => {
+      if (embeddedBasemap) setMapStyle(embeddedBasemap);
       setEmbedMode(embedded);
       setEmbedSurface(publicSurface ? 'public' : 'internal');
       setShowSplash(false);
