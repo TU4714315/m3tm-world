@@ -324,6 +324,15 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
           </div>
         ))}
 
+        {/* Legal attribution appears separately from layer counts on all surfaces. */}
+        {activeLayers.military_activity && (
+          <div className="px-1 text-[10px] text-white/45" aria-label="إسناد بيانات الطيران">
+            <a href="https://www.adsb.lol/" target="_blank" rel="noopener noreferrer">ADSB.lol</a>
+            {' · '}
+            <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener noreferrer">ODbL</a>
+          </div>
+        )}
+
         {/* MOBILE STYLE STUDIO */}
         <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/[0.06] px-1">
           <span className="text-[10px] font-mono tracking-[0.2em] text-white/25 uppercase">إعدادات المظهر</span>
