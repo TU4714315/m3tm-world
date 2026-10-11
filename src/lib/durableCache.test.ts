@@ -45,9 +45,12 @@ describe('durableCache', () => {
     await durableSetJson('first', { payload }, 60);
     await durableSetJson('second', { payload }, 60);
     await durableSetJson('third', { payload }, 60);
-    await durableSetJson('first', { payload: 'updated' }, 60);
+    // Refresh to a large value so the next write actually exceeds 16 MiB.
+    const refreshed = 'y'.repeat(5 * 1024 * 1024);
+    await durableSetJson('first', { payload: refreshed }, 60);
     await durableSetJson('fourth', { payload }, 60);
-    expect((await durableGetJson<{payload: string}>('first')).value?.payload).toBe('updated');
+    expect((await durableGetJson<{payload: string}>('first')).value?.payload).toBe(refreshed);
+    expect(await durableGetJson('second')).toEqual({ value: null, backend: 'miss' });
   });
 
   it('never mixes a partial Upstash pair with KV credentials', async () => {
