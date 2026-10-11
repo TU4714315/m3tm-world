@@ -256,7 +256,7 @@ function connectAisStream() {
 }
 
 // Start connection process asynchronously
-connectAisStream();
+// Start AIS only in live-response mode; reference readers never open streams.
 
 // --- SCM Integration: VesselAPI Hybrid Fallback (Satellite AIS) ---
 let lastVesselApiFetch = 0;
@@ -335,6 +335,7 @@ export function buildPublicNavalActivity(allShips: any[], now = Date.now()): Pub
 
 const globalForSnapshot = globalThis as unknown as {
   maritimeSnapshot?: { body: string; builtAt: number };
+  maritimeReferenceSnapshot?: { body: string; builtAt: number };
 };
 
 function buildSnapshot(now: number): string {
@@ -484,8 +485,7 @@ function snapshotTtlMs(body: string): number {
       total_ships?: number;
       source_status?: { ais?: { configured?: boolean } };
     };
-    return snapshot.source_status?.ais?.configured && !snapshot.total_ships
-      ? 5 * 60_000 : SNAPSHOT_TTL_MS;
+    return 5 * 60_000; // Never cache precise observed positions as live for a full day.
   } catch {
     return 5 * 60_000;
   }
@@ -496,7 +496,39 @@ export function clearMaritimeSnapshot(): void {
   delete globalForSnapshot.maritimeSnapshot;
 }
 
-export async function GET() {
+/** Daily, reference-only map never exposes time-frozen live ship positions. */
+export async function GET(req?: Request) {
+  const referenceOnly = req ? new URL(req.url).searchParams.get('reference') === '1' : false;
+  if (referenceOnly) {
+    const now = Date.now();
+    const cached = globalForSnapshot.maritimeReferenceSnapshot;
+    if (cached && now - cached.builtAt < SNAPSHOT_TTL_MS) {
+      return new NextResponse(cached.body, { headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+      } });
+    }
+    const ports = PORTS.filter(port => port.type !== 'naval');
+    const chokepoints = CHOKEPOINTS;
+    const body = JSON.stringify({
+      ports, chokepoints, ships: [], naval_activity: [],
+      total_ports: ports.length, total_chokepoints: chokepoints.length, total_ships: 0,
+      source: 'M3TM curated static commercial maritime reference',
+      source_status: {
+        ais: { status: 'not_in_reference', public_ships: 0, military_public_cells: 0 },
+        reference: { status: 'active', ports: ports.length, chokepoints: chokepoints.length },
+      },
+      timestamp: new Date(now).toISOString(),
+      refresh: 'daily_reference',
+    });
+    globalForSnapshot.maritimeReferenceSnapshot = { body, builtAt: now };
+    return new NextResponse(body, { headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+    } });
+  }
+  // Actual public observations remain short-lived when explicitly requested.
+  connectAisStream();
   // Trigger Hybrid Fallback
   await fetchVesselApiFallback();
   await hydratePublicShipsFromDurable();
