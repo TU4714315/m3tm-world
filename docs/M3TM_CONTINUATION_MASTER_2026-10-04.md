@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Progressive CCTV load / Render first paint (2026-10-11)
+**TASK:** Reduce the observed 40+ concurrent global CCTV fetches that cause 12-second timeouts during Render's cold map start.
+**DONE (review PR):** Load MENA camera catalog first, discover the region names through a zero-upstream catalog endpoint, then fetch remaining public CCTV regions in batches of four, with cancellation and bounded retry. Reused the reviewed PR #104 implementation on latest WORLD main without overlaying unrelated changes.
+**VERIFY:** WORLD targeted CCTV tests, complete verify-world and public-email-privacy CI, then Render + APP embed first-paint smoke.
+**BLOCKER:** DOM loaded WORLD but WebGL canvas first-paint on iPhone is not independently verified. Old Render still uses main SHA 565954 until this new PR merges and is deployed.
+**NEXT:** When checks/review pass, merge the new PR, manually deploy to Render, verify data freshness and published incidents. PR #101 CARTO direct-asset approach remains separate pending browser testing.
+
 ## CHECKPOINT — Oregon TripCheck DNS degradation and resilient fallback (2026-10-11)
 **TASK:** Render confirmed `EAI_AGAIN www.tripcheck.com` and a missing stale fallback while other CCTV sources succeeded. Preserve WORLD map/news availability without wasting retries.
 **DONE (PR #109):** Two bounded upstream attempts (4.5s each, 250ms delay), transient DNS/socket/HTTP-5xx classification; validated same-source local 7-day last-good camera index; atomic file replacement, partial-inventory protection, five-minute in-process cooldown without repeated empty fetches; strict source age, no fabricated cameras. Added targeted retry, backup, cooldown and partial-inventory tests. Production remains unchanged until merged and manually deployed.
