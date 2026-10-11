@@ -7,6 +7,18 @@ vi.mock('@/lib/stealthFetch', () => ({ stealthFetch: vi.fn(), stealthHeaders: vi
 beforeEach(() => { vi.useFakeTimers(); vi.resetAllMocks(); clearSourceCache(); clearCctvRegionBackoff(); });
 afterEach(() => vi.useRealTimers());
 
+describe('CCTV lightweight region discovery', () => {
+  it('returns the public region names without touching upstream providers', async () => {
+    const response = await GET(new Request('http://localhost/api/cctv?catalog=regions'));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.regions).toContain('middle-east');
+    expect(body.regions).toContain('westasia');
+    expect(body.regions).toContain('florida');
+    expect(vi.mocked(stealthFetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe('CCTV partial responses', () => {
   it('returns a completed region without scheduling unnecessary retries', async () => {
     vi.mocked(stealthFetch).mockResolvedValue(Response.json([
