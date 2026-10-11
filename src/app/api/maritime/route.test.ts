@@ -141,13 +141,25 @@ describe('GET /api/maritime', () => {
     expect((await (await GET()).json()).total_ships).toBe(2);
   });
 
-  it('lets the browser and any CDN reuse the response', async () => {
-    const res = await GET();
+  it('lets the browser and any CDN reuse the daily reference response', async () => {
+    addShip(55, 1.26, 103.84);
+    const res = await GET(new Request('http://localhost/api/maritime?reference=1'));
+    const body = await res.clone().json();
+    expect(body.ships).toEqual([]);
+    expect(body.naval_activity).toEqual([]);
+    expect(body.ports.some((p: { volume?: string }) => p.volume?.includes('LIVE:'))).toBe(false);
+    expect(body.refresh).toBe('daily_reference');
     const cc = res.headers.get('cache-control') ?? '';
 
     expect(cc).toContain('s-maxage=86400');
     expect(cc).toContain('max-age=86400');
     expect(cc).not.toContain('no-store');
     expect(res.headers.get('content-type')).toContain('application/json');
+  });
+
+  it('never caches precise live ship observations for 24 hours', async () => {
+    addShip(77, 1.26, 103.84);
+    const response = await GET();
+    expect(response.headers.get('cache-control')).toContain('s-maxage=300');
   });
 });
