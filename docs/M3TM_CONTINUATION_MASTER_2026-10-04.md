@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Oregon TripCheck DNS degradation and resilient fallback (2026-10-11)
+**TASK:** Render confirmed `EAI_AGAIN www.tripcheck.com` and a missing stale fallback while other CCTV sources succeeded. Preserve WORLD map/news availability without wasting retries.
+**DONE (PR #109):** Two bounded upstream attempts (4.5s each, 250ms delay), transient DNS/socket/HTTP-5xx classification; validated same-source local 7-day last-good camera index; atomic file replacement, partial-inventory protection, five-minute in-process cooldown without repeated empty fetches; strict source age, no fabricated cameras. Added targeted retry, backup, cooldown and partial-inventory tests. Production remains unchanged until merged and manually deployed.
+**LIMITS:** Render Free local disk is ephemeral and lost on new containers. Durable cross-deploy historical fallback is not implemented. Zero prior successful inventory on a new container means no fallback. No proof of camera availability from external HTTP probes when DNS tester fails.
+**VERIFY:** Required WORLD typecheck/Vitest/build/privacy CI, PR review resolution, Render deploy SHA and live health/camera smoke. The old Render deployment is still on `1e4c6983` until explicitly updated.
+**NEXT:** After #108 and #109 checks/merge, trigger Render manual deploy and verify `/api/health`, `/api/news`, APP iframe canvas and `/api/cctv` regional summary. External unresolved provider incidents remain low priority if main services work.
+
 ## CHECKPOINT — Daily maritime references, count-only panels and regional fires (2026-10-10)
 **DONE (draft branch):** Changed `LayerPanel` to names/toggles/counts only; simplified `MenaPulse` to time-filtered counts and removed its needless source-coverage and history refresh calls. Shut off USGS earthquake polling and volcanism feed, prevent restored earthquake toggle and GDACS EQ/VO events, enable NASA FIRMS fire layer in WORLD/APP embed only within MENA/Africa and existing conflict theaters. Cable and maritime layer reopens reuse downloaded snapshot. `/api/maritime` server/CDN response has 24h TTL. Verified independent external Gulf monitoring projects, recorded constraints/license and NASA FIRMS MAP_KEY/NPP retirement. See [WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md](WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md).
 **VERIFY:** No production delivery yet; required GitHub typecheck/Vitest/build/privacy and desktop/mobile APP/WORLD visual smoke, no empty fire claims without provider response.
