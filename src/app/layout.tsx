@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import "./globals.css";
+import "./world-v5.css";
 
 const SITE_URL = "https://m3tm-world.vercel.app";
 const SITE_NAME = "M3TM.WORLD";
