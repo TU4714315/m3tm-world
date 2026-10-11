@@ -418,7 +418,7 @@ export async function GET() {
       refreshInterval: 300,
       dataState: 'live',
       durableCacheConfigured: durableCacheConfigured(),
-      cacheBackend: previous.backend,
+      cacheBackend: previous.backend as Awaited<ReturnType<typeof durableSetJson>> | 'miss',
     };
 
     payload.cacheBackend = await durableSetJson(CONFLICT_CACHE_KEY, payload, CONFLICT_CACHE_TTL_SECONDS);

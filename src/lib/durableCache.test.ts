@@ -24,6 +24,41 @@ describe('durableCache', () => {
     expect(result.value).toEqual({ ok: true });
   });
 
+  it('does not retain a huge JSON snapshot in an instance with no Redis', async () => {
+    const large = 'x'.repeat(8 * 1024 * 1024);
+    expect(await durableSetJson('too-large', { payload: large }, 60)).toBe('not-stored');
+    expect(await durableGetJson('too-large')).toEqual({ value: null, backend: 'miss' });
+  });
+
+  it('preserves the last-good small snapshot when an oversized replacement is rejected', async () => {
+    expect(await durableSetJson('conflicts', { payload: 'verified' }, 60)).toBe('memory');
+    expect(await durableSetJson('conflicts', { payload: 'x'.repeat(8 * 1024 * 1024) }, 60)).toBe('not-stored');
+    expect((await durableGetJson<{payload: string}>('conflicts')).value?.payload).toBe('verified');
+  });
+
+  it('evicts the oldest keys when encoded retained cache exceeds the byte budget', async () => {
+    const payload = 'x'.repeat(5 * 1024 * 1024);
+    await durableSetJson('first', { payload }, 60);
+    await durableSetJson('second', { payload }, 60);
+    await durableSetJson('third', { payload }, 60);
+    await durableSetJson('fourth', { payload }, 60);
+    expect(await durableGetJson('first')).toEqual({ value: null, backend: 'miss' });
+    expect((await durableGetJson<{ payload: string }>('fourth')).value?.payload.length).toBe(payload.length);
+  });
+
+  it('preserves a refreshed key when memory eviction exceeds the byte budget', async () => {
+    const payload = 'x'.repeat(5 * 1024 * 1024);
+    await durableSetJson('first', { payload }, 60);
+    await durableSetJson('second', { payload }, 60);
+    await durableSetJson('third', { payload }, 60);
+    // Refresh to a large value so the next write actually exceeds 16 MiB.
+    const refreshed = 'y'.repeat(5 * 1024 * 1024);
+    await durableSetJson('first', { payload: refreshed }, 60);
+    await durableSetJson('fourth', { payload }, 60);
+    expect((await durableGetJson<{payload: string}>('first')).value?.payload).toBe(refreshed);
+    expect(await durableGetJson('second')).toEqual({ value: null, backend: 'miss' });
+  });
+
   it('never mixes a partial Upstash pair with KV credentials', async () => {
     process.env.UPSTASH_REDIS_REST_URL = 'https://partial-upstash.example.test';
     process.env.KV_REST_API_URL = 'https://kv.example.test';

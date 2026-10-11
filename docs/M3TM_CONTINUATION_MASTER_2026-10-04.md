@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — bounded process cache memory after Render V8 OOM (2026-10-11)
+**TASK:** Prevent repeat of proven Node V8 heap out-of-memory (Render exit 139) while retaining valid public cached event layers.
+**DONE (pending review):** A 16 MiB total limit and 8 MiB per JSON entry for fallback process memory; evict oldest keys by retained byte count; refreshed keys move to newest position; reject oversized memory entry while Redis path remains usable. Adapt public API cache-backend types and add regression tests. No paid backend, DNS or private OSINT changes.
+**VERIFY:** typecheck, Vitest including refreshed-key eviction, WORLD build and privacy checks, then active Render memory trend after production rollout. Distinguish runtime V8 heap from RSS limit and from platform CPU charges.
+**BLOCKER:** No live post-patch production memory data until merged and deployed. External Redis durability remains optional.
+**NEXT:** Review/merge this focused new PR after CCTV first-paint PR #110 and rebase if main changes; publish manually to Render and check memory/first-paint/APP iframe.
+
 ## CHECKPOINT — Progressive CCTV load / Render first paint (2026-10-11)
 **TASK:** Reduce the observed 40+ concurrent global CCTV fetches that cause 12-second timeouts during Render's cold map start.
 **DONE (review PR):** Load MENA camera catalog first, discover the region names through a zero-upstream catalog endpoint, then fetch remaining public CCTV regions in batches of four, with cancellation and bounded retry. Reused the reviewed PR #104 implementation on latest WORLD main without overlaying unrelated changes.
