@@ -915,7 +915,7 @@ export default function Dashboard() {
     }
     // Maritime
     if ((activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({
+      fetchEndpoint('/api/maritime?reference=1', d => ({
         maritime_ports: d.ports ?? [],
         maritime_chokepoints: d.chokepoints ?? [],
         maritime_ships: d.ships ?? [],
@@ -1249,7 +1249,7 @@ export default function Dashboard() {
     const schedule = () => {
       if (cancelled) return;
       timer = setTimeout(async () => {
-        await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
+        await fetchEndpoint('/api/maritime?reference=1', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
       }, PUBLIC_REFRESH_MS.commercialMaritime);
     };
