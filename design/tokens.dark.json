@@ -1,0 +1,25 @@
+{
+  "themeId": "dark",
+  "labelAr": "داكن فاخر",
+  "palette": {
+    "cosmicBlack": "#0A0E14",
+    "deepBlue": "#0F1B2D",
+    "spaceBlue": "#1E3A5F",
+    "gold": "#D4AF6B",
+    "lightGold": "#F6E3B2",
+    "silver": "#E5E8EF"
+  },
+  "semantic": {
+    "background": "#0A0E14",
+    "surface": "#0F1B2D",
+    "surfaceRaised": "#1E3A5F",
+    "text": "#E5E8EF",
+    "textStrong": "#F6E3B2",
+    "accent": "#D4AF6B",
+    "accentText": "#0A0E14",
+    "border": "#1E3A5F",
+    "focus": "#F6E3B2"
+  },
+  "_source": "M3TM approved image-board labels; eyedropper verification needed against raw identity master assets.",
+  "_status": "staging specification, not yet wired to application"
+}
