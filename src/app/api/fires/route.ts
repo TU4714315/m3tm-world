@@ -13,6 +13,7 @@ export async function GET() {
   try {
     let fires: any[] = [];
     let source = '';
+    let providerSucceeded = false;
 
     // Source 1: NASA FIRMS Open Data (Global 24h CSV) - no API key needed
     const firmsSources = [
@@ -28,19 +29,19 @@ export async function GET() {
         });
         if (res.ok) {
           const text = await res.text();
-          if (text && text.includes('latitude') && text.length > 200) {
-            const parsed = parseCSV(text);
-            if (parsed.length > 0) {
-              fires = parsed;
-              source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
-              break;
-            }
+          // Valid provider data can contain zero regional fires.
+          if (text && text.includes('latitude') && text.includes('longitude') && text.length > 200) {
+            fires = parseCSV(text);
+            source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
+            providerSucceeded = true;
+            break;
           }
         }
       } catch { continue; }
     }
 
     // No volcano/earthquake lookups: those categories are disabled.
+    if (!providerSucceeded) return NextResponse.json({ fires: [], error: 'fire_provider_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 
     return NextResponse.json({
       fires,
