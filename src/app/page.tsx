@@ -45,6 +45,7 @@ const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, type DrawResult } from '@/lib/draw';
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
+import { PUBLIC_REFRESH_MS, significantCyberIndicators } from '@/lib/publicRefreshPolicy';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 
 const M3TM_APP_ORIGIN = 'https://m3tm.app';
@@ -85,12 +86,12 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: true, private: true, jets: true, military: false, military_activity: true, maritime: true, naval_activity: true,
+  flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
   sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
-  live_news: true, earthquakes: true, fires: false, weather: false, radiation: false,
+  live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
-  cables: true, sdk_sea: true, sdk_air: true, sdk_naval: true, terrain_3d: false,
+  cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
 };
@@ -100,7 +101,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'earthquakes', 'flights', 'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -112,7 +113,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime', 'naval_activity',
   'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
-  'cctv', 'cctv_previews', 'live_news', 'earthquakes', 'fires', 'weather',
+  'cctv', 'cctv_previews', 'live_news', 'fires', 'weather',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'civil_unrest', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval',
@@ -479,7 +480,7 @@ export default function Dashboard() {
     onTerrainRetry: () => setTerrainRetry(value => value + 1),
     onTerrainFocus: () => setTerrainFocus(value => value + 1),
   };
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
+
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
@@ -511,7 +512,7 @@ export default function Dashboard() {
         && Number.isFinite(zoom) && zoom >= 0 && zoom <= 24;
 
       if (savedWorkspace) {
-        if (!explicitLayers) setActiveLayers(prev => ({ ...prev, ...savedWorkspace.activeLayers }));
+        if (!explicitLayers) setActiveLayers(prev => ({ ...prev, ...savedWorkspace.activeLayers, earthquakes: false }));
         setMapProjection(savedWorkspace.projection);
         setMapStyle(savedWorkspace.mapStyle);
         setWorldTheme(savedWorkspace.theme);
@@ -522,7 +523,7 @@ export default function Dashboard() {
         }
       }
 
-      if (explicitLayers) setActiveLayers(prev => restoreLayerState(prev, p));
+      if (explicitLayers) setActiveLayers(prev => ({ ...restoreLayerState(prev, p), earthquakes: false }));
       if (explicitView) {
         autoLocateCancelled.current = true;
         setFlyToLocation({ lat, lng, zoom, ts: Date.now() });
@@ -530,42 +531,7 @@ export default function Dashboard() {
 
       window.setTimeout(() => { workspaceAutoSaveReadyRef.current = true; }, 0);
     }
-    // Probe credential-gated feeds without exposing credentials. Provider
-    // readiness is status only and never overrides the user's layer selection.
-    fetch('/api/cloudflare-radar?probe=1', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(p => {
-        if (!p) return;
-        const configured = Boolean(p.configured);
-        const fallbackAvailable = Boolean(p.fallback_available);
-        setCapabilities(current => ({ ...current, cloudflare: configured || fallbackAvailable }));
-        dataRef.current = {
-          ...dataRef.current,
-          cloudflare_source_status: {
-            status: configured ? 'configured' : fallbackAvailable ? 'active_fallback' : 'not_configured',
-            configured,
-            fallback_active: !configured && fallbackAvailable,
-            fallback_sections: {
-              outages: !configured && fallbackAvailable,
-              attacks: !configured && fallbackAvailable,
-            },
-            provider: configured
-              ? String(p.source || 'Cloudflare Radar')
-              : String(p.fallback_source || 'GDELT 2.0 + abuse.ch Feodo Tracker'),
-            source_mode: configured ? 'cloudflare-radar' : fallbackAvailable ? 'public-fallback' : 'unavailable',
-            providers: {},
-            timestamp: new Date().toISOString(),
-          },
-        };
-        setDataVersion(v => v + 1);
-      })
-      .catch(() => {
-        dataRef.current = {
-          ...dataRef.current,
-          cloudflare_source_status: { status: 'unavailable', configured: false, provider: 'Cloudflare Radar', timestamp: new Date().toISOString() },
-        };
-        setDataVersion(v => v + 1);
-      });
+    // Provider status loads with its own active layer; no redundant probe.
     if (isEmbeddedFrame) return;
 
     // Once the user interacts, a late IP-location response must not steal the
@@ -834,9 +800,7 @@ export default function Dashboard() {
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
     // Priority 1: Core feeds (always needed for panels)
-    const eqUrl = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson';
-    const eqTransform = (data: any) => ({ earthquakes: (data.features || []).map((f: any) => ({ id: f.id, lat: f.geometry?.coordinates?.[1] || 0, lng: f.geometry?.coordinates?.[0] || 0, depth: f.geometry?.coordinates?.[2] || 0, magnitude: f.properties?.mag, place: f.properties?.place, time: f.properties?.time, url: f.properties?.url, tsunami: f.properties?.tsunami, type: f.properties?.type, felt: f.properties?.felt, alert: f.properties?.alert })) });
-    fetchEndpoint(eqUrl, eqTransform);
+    // Earthquake feed disabled by owner; do not fetch USGS on startup.
     fetchEndpoint('/api/news');
     /* A cold start can time out every upstream quote and return an all-empty
        feed. Waiting a full poll interval to find out leaves the panel blank for
@@ -860,7 +824,6 @@ export default function Dashboard() {
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
-      setInterval(() => fetchEndpoint(eqUrl, eqTransform, undefined, { skipWhenHidden: true }), 900000),  // 15 min (was 5)
       setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 60000),          // 1 min — shared by map panels and top-news ticker
       setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000), // 15 min (was 5)
     ];
@@ -874,6 +837,12 @@ export default function Dashboard() {
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
+  const dailyFireNextAtRef = useRef(0);
+  useEffect(() => {
+    if (!(activeLayers as any).cyber_attacks) layerFetchedRef.current.delete('cyber_attacks');
+    // Daily static reference layers remain cached when toggled off and back on.
+    // Do not re-fetch /api/maritime when a user opens a previously viewed layer.
+  }, [activeLayers.cyber_attacks, activeLayers.cables, activeLayers.sdk_sea, activeLayers.maritime, activeLayers.naval_activity]);
   const flightLoadInFlightRef = useRef(false);
   useEffect(() => {
     if (!activeLayers.cctv) return;
@@ -938,12 +907,15 @@ export default function Dashboard() {
     }
     // Fires
     if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
       layerFetchedRef.current.add('fires');
+      void fetchEndpoint('/api/fires').then(ok => {
+        if (!ok) layerFetchedRef.current.delete('fires');
+        dailyFireNextAtRef.current = Date.now() + (ok ? 24 * 60 * 60_000 : 5 * 60_000);
+      });
     }
     // Maritime
     if ((activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea) && !layerFetchedRef.current.has('maritime')) {
-      fetchEndpoint('/api/maritime', d => ({
+      fetchEndpoint('/api/maritime?reference=1', d => ({
         maritime_ports: d.ports ?? [],
         maritime_chokepoints: d.chokepoints ?? [],
         maritime_ships: d.ships ?? [],
@@ -976,28 +948,37 @@ export default function Dashboard() {
       layerFetchedRef.current.add('gdelt');
     }
 
-    // Submarine Cables — shared by `cables` layer AND `sdk_sea` SDK domain
-        if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
-      (async () => {
-        try {
-          const ts = Date.now();
-      const res = await fetch(`/data/submarine-cables.json?v=${ts}`);
-          if (res.ok) {
-             const cablesData = await res.json();
-             dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
-             setDataVersion(v => v + 1);
-          }
-        } catch (e) { console.warn('Cables fetch failed'); }
-      })();
+    // Daily reference: layer toggles must not trigger re-ingestion. Failed
+    // initial loads release the marker and retry once with bounded backoff.
+    if ((activeLayers.cables || activeLayers.sdk_sea) && !layerFetchedRef.current.has('cables')) {
       layerFetchedRef.current.add('cables');
+      void (async () => {
+        let loaded = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch('/data/submarine-cables.json', { cache: 'default' });
+            if (!res.ok) throw new Error('Cable reference HTTP ' + res.status);
+            const d = await res.json();
+            if (!Array.isArray(d?.features) || d.features.length === 0)
+              throw new Error('Cable reference is empty');
+            dataRef.current = { ...dataRef.current, submarine_cables: d.features };
+            setDataVersion(v => v + 1);
+            loaded = true;
+            break;
+          } catch {
+            if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        if (!loaded) layerFetchedRef.current.delete('cables');
+      })();
     }
 
 
-    // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
+        // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
 
     // Live Cyber Attacks (animated arcs)
     if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
+      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }));
       layerFetchedRef.current.add('cyber_attacks');
     }
     /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
@@ -1093,20 +1074,20 @@ export default function Dashboard() {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      const flightPollMs = activeLayers.military_activity ? 120000 : 300000;
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), flightPollMs));
+      const flightPollMs = activeLayers.military_activity ? PUBLIC_REFRESH_MS.militaryRegionalFlightAggregate : PUBLIC_REFRESH_MS.civilianFlightsOnDemand;
+      intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
     }
 
     if ((activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => {
         layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
+        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }), undefined, { skipWhenHidden: true });
         layerFetchedRef.current.add('cyber_attacks');
-      }, 10000)); // 10s — rapid refresh
+      }, PUBLIC_REFRESH_MS.cyberThreatSummary)); // once daily while the layer is visible
     }
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] })), 300000));
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true }), 300000));
     }
     if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes || (activeLayers as any).civil_unrest) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
@@ -1149,7 +1130,7 @@ export default function Dashboard() {
           sourceMode: d.sourceMode ?? 'published-snapshot',
           timestamp: d.timestamp ?? null,
         },
-      })), 1800000));
+      }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.worldwidePublishedFrontlines));
     }
 
     // Network-event monitor: refresh source-backed public observations without
@@ -1175,8 +1156,80 @@ export default function Dashboard() {
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint, showMenaPulse]);
 
-  // Maritime earns a fast cadence only while live vessels are actually arriving.
-  // With no live AIS rows, ports/chokepoints are static reference data and poll at 5m.
+  // Refresh time-sensitive, published MENA activity once when returning from a
+  // meaningful hidden period. Do not revive daily reference layers or duplicate
+  // requests for very short tab switches.
+  useEffect(() => {
+    let hiddenAt: number | null = document.hidden ? Date.now() : null;
+    const onVisibility = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt === null || Date.now() - hiddenAt < 60_000) { hiddenAt = null; return; }
+      hiddenAt = null;
+      if (activeLayers.flights || activeLayers.military_activity || activeLayers.military ||
+          activeLayers.private || activeLayers.jets || activeLayers.sdk_air) {
+        void fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.global_incidents || activeLayers.sdk_naval) {
+        void fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.gdelt_events || activeLayers.reported_routes || activeLayers.civil_unrest) {
+        void fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
+          const events = Array.isArray(d.events) ? d.events : [];
+          return {
+            gdelt_events: events.filter((e: any) => e?.quad === 4 && e?.event_category !== 'civil_unrest'),
+            civil_unrest: events.filter((e: any) => e?.event_category === 'civil_unrest'),
+            reported_routes: d.reported_routes ?? [],
+            reported_routes_meta: d.reported_routes_meta ?? null,
+            gdelt_source_published_at: d.source_published_at ?? null,
+            gdelt_data_state: d.data_state ?? 'unknown',
+          };
+        }, undefined, { skipWhenHidden: true });
+      }
+      if (activeLayers.conflict_zones || activeLayers.conflict_density) {
+        void fetchEndpoint('/api/conflicts', d => ({
+          conflict_zones: d.zones ?? [],
+          conflict_live_events: d.liveEvents ?? [],
+          conflict_source_status: d.sourceStatus ?? null,
+          conflict_category_counts: d.categoryCounts ?? {},
+          conflict_data_state: d.dataState ?? 'live',
+          conflict_served_at: d.servedAt ?? d.timestamp ?? null,
+          conflict_source_published_at: d.sourcePublishedAt ?? null,
+          conflict_summary: {
+            totalZones: d.totalZones ?? 0,
+            totalLiveEvents: d.totalLiveEvents ?? 0,
+            activeWarzones: d.activeWarzones ?? 0,
+            zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
+            timestamp: d.timestamp ?? null,
+          },
+        }), undefined, { skipWhenHidden: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [activeLayers, fetchEndpoint]);
+
+
+  // Rolling 24-hour regional fire observations; no fetch on layer toggling.
+  useEffect(() => {
+    if (!activeLayers.fires) return;
+    if (!dailyFireNextAtRef.current) dailyFireNextAtRef.current = Date.now() + 24 * 60 * 60_000;
+    const timer = setInterval(() => {
+      if (document.hidden || Date.now() < dailyFireNextAtRef.current) return;
+      dailyFireNextAtRef.current = Date.now() + 24 * 60 * 60_000;
+      void fetchEndpoint('/api/fires', undefined, undefined, { skipWhenHidden: true }).then(ok => {
+        if (!ok) {
+          dailyFireNextAtRef.current = Date.now() + 5 * 60_000;
+          layerFetchedRef.current.delete('fires');
+        } else {
+          layerFetchedRef.current.add('fires');
+        }
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [activeLayers.fires, fetchEndpoint]);
+
+  // Public maritime reference is updated daily instead of repeated vessel polling.
+  // Layer toggling retains an initial on-demand load; no public exact naval tracks.
   useEffect(() => {
     if (!(activeLayers.maritime || activeLayers.naval_activity || activeLayers.sdk_sea)) return;
     let cancelled = false;
@@ -1195,12 +1248,10 @@ export default function Dashboard() {
 
     const schedule = () => {
       if (cancelled) return;
-      const liveShips = Array.isArray(dataRef.current.maritime_ships) ? dataRef.current.maritime_ships.length : 0;
-      const navalCells = Array.isArray(dataRef.current.naval_activity) ? dataRef.current.naval_activity.length : 0;
       timer = setTimeout(async () => {
-        await fetchEndpoint('/api/maritime', transformMaritime, undefined, { skipWhenHidden: true });
+        await fetchEndpoint('/api/maritime?reference=1', transformMaritime, undefined, { skipWhenHidden: true });
         schedule();
-      }, liveShips > 0 ? 10_000 : navalCells > 0 ? 60_000 : 300_000);
+      }, PUBLIC_REFRESH_MS.commercialMaritime);
     };
     schedule();
 
@@ -1307,14 +1358,6 @@ export default function Dashboard() {
       entities.push({
         type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
         properties: { domain: 'SEA', name: s.name || `MMSI-${s.mmsi}`, source: 'AIS Stream' },
-      });
-    }
-    const landEqs = (data.earthquakes || []).filter((eq: any) => eq.lat && eq.lng);
-    for (const eq of landEqs) {
-      if (!eq.lat || !eq.lng) continue;
-      entities.push({
-        type: 'Feature', geometry: { type: 'Point', coordinates: [eq.lng, eq.lat] },
-        properties: { domain: 'LAND', name: `M${eq.magnitude} ${eq.place || ''}`, source: 'USGS' },
       });
     }
     const gdeltData = data.gdelt || [];
@@ -1812,14 +1855,14 @@ export default function Dashboard() {
               <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
-                capabilities={capabilities} />
+                />
             </section>
           )}
         </div>
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
 
 
 
@@ -2145,7 +2188,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} capabilities={capabilities} />
+                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>

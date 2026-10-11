@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
          max-age=0, which made every page load refetch half a megabyte before
          the map could start. Immutable is safe here precisely because the
          version is in the path. */
+      // Cable reference must be revalidated daily after future dataset updates.
+      {
+        source: '/data/submarine-cables.json',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, must-revalidate' }],
+      },
+
       {
         source: '/vendor/maplibre/:version/:file*',
         headers: [

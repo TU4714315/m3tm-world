@@ -256,7 +256,7 @@ function connectAisStream() {
 }
 
 // Start connection process asynchronously
-connectAisStream();
+// Start AIS only in live-response mode; reference readers never open streams.
 
 // --- SCM Integration: VesselAPI Hybrid Fallback (Satellite AIS) ---
 let lastVesselApiFetch = 0;
@@ -273,11 +273,10 @@ async function fetchVesselApiFallback() {
    multi-megabyte JSON.stringify. At ~30 req/s that whole job runs thirty
    times a second to produce a byte-identical answer.
 
-   Building it once per SNAPSHOT_TTL_MS and handing every caller the same
-   pre-serialised string makes the cost independent of how many people are
-   watching. The window sits well under the 10s the client polls at, so
-   nothing reaches the map staler than it already was. */
-const SNAPSHOT_TTL_MS = 5_000;
+   Build a public snapshot at most once daily per process and distribute it
+   via CDN cache. Opening the layer reads the current snapshot; no per-viewer
+   upstream vessel refresh. Source age must not be labeled real-time. */
+const SNAPSHOT_TTL_MS = 24 * 60 * 60_000; // Once-per-day published snapshot
 const PUBLIC_NAVAL_CELL_DEG = 6;
 const PUBLIC_NAVAL_MIN_GROUP = 2;
 const PUBLIC_NAVAL_TIME_BUCKET_MS = 30 * 60 * 1000;
@@ -336,6 +335,7 @@ export function buildPublicNavalActivity(allShips: any[], now = Date.now()): Pub
 
 const globalForSnapshot = globalThis as unknown as {
   maritimeSnapshot?: { body: string; builtAt: number };
+  maritimeReferenceSnapshot?: { body: string; builtAt: number };
 };
 
 function buildSnapshot(now: number): string {
@@ -478,12 +478,58 @@ function buildSnapshot(now: number): string {
   });
 }
 
+/** A cold AIS receiver should not cache a falsely empty aggregate all day. */
+function snapshotTtlMs(body: string): number {
+  try {
+    const snapshot = JSON.parse(body) as {
+      total_ships?: number;
+      source_status?: { ais?: { configured?: boolean } };
+    };
+    return 5 * 60_000; // Never cache precise observed positions as live for a full day.
+  } catch {
+    return 5 * 60_000;
+  }
+}
+
 /** Test seam — forces the next GET to rebuild. */
 export function clearMaritimeSnapshot(): void {
   delete globalForSnapshot.maritimeSnapshot;
+  delete globalForSnapshot.maritimeReferenceSnapshot;
 }
 
-export async function GET() {
+/** Daily, reference-only map never exposes time-frozen live ship positions. */
+export async function GET(req?: Request) {
+  const referenceOnly = req ? new URL(req.url).searchParams.get('reference') === '1' : false;
+  if (referenceOnly) {
+    const now = Date.now();
+    const cached = globalForSnapshot.maritimeReferenceSnapshot;
+    if (cached && now - cached.builtAt < SNAPSHOT_TTL_MS) {
+      return new NextResponse(cached.body, { headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+      } });
+    }
+    const ports = PORTS.filter(port => port.type !== 'naval');
+    const chokepoints = CHOKEPOINTS;
+    const body = JSON.stringify({
+      ports, chokepoints, ships: [], naval_activity: [],
+      total_ports: ports.length, total_chokepoints: chokepoints.length, total_ships: 0,
+      source: 'M3TM curated static commercial maritime reference',
+      source_status: {
+        ais: { status: 'not_in_reference', public_ships: 0, military_public_cells: 0 },
+        reference: { status: 'active', ports: ports.length, chokepoints: chokepoints.length },
+      },
+      timestamp: new Date(now).toISOString(),
+      refresh: 'daily_reference',
+    });
+    globalForSnapshot.maritimeReferenceSnapshot = { body, builtAt: now };
+    return new NextResponse(body, { headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+    } });
+  }
+  // Actual public observations remain short-lived when explicitly requested.
+  if (process.env.NODE_ENV !== 'test') connectAisStream();
   // Trigger Hybrid Fallback
   await fetchVesselApiFallback();
   await hydratePublicShipsFromDurable();
@@ -491,7 +537,7 @@ export async function GET() {
   const now = Date.now();
   const cached = globalForSnapshot.maritimeSnapshot;
 
-  const snapshot = cached && now - cached.builtAt < SNAPSHOT_TTL_MS
+  const snapshot = cached && now - cached.builtAt < snapshotTtlMs(cached.body)
     ? cached
     : { body: buildSnapshot(now), builtAt: now };
   globalForSnapshot.maritimeSnapshot = snapshot;
@@ -519,7 +565,7 @@ export async function GET() {
     }
   }
 
-  const maxAgeSeconds = Math.floor(SNAPSHOT_TTL_MS / 1000);
+  const maxAgeSeconds = Math.floor(snapshotTtlMs(snapshot.body) / 1000);
 
   return new NextResponse(snapshot.body, {
     headers: {

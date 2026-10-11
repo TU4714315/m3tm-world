@@ -9,6 +9,21 @@
 **VERIFY:** Required WORLD typecheck/Vitest/build/privacy CI, PR review resolution, Render deploy SHA and live health/camera smoke. The old Render deployment is still on `1e4c6983` until explicitly updated.
 **NEXT:** After #108 and #109 checks/merge, trigger Render manual deploy and verify `/api/health`, `/api/news`, APP iframe canvas and `/api/cctv` regional summary. External unresolved provider incidents remain low priority if main services work.
 
+## CHECKPOINT — Daily maritime references, count-only panels and regional fires (2026-10-10)
+**DONE (draft branch):** Changed `LayerPanel` to names/toggles/counts only; simplified `MenaPulse` to time-filtered counts and removed its needless source-coverage and history refresh calls. Shut off USGS earthquake polling and volcanism feed, prevent restored earthquake toggle and GDACS EQ/VO events, enable NASA FIRMS fire layer in WORLD/APP embed only within MENA/Africa and existing conflict theaters. Cable and maritime layer reopens reuse downloaded snapshot. `/api/maritime` server/CDN response has 24h TTL. Verified independent external Gulf monitoring projects, recorded constraints/license and NASA FIRMS MAP_KEY/NPP retirement. See [WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md](WORLD_DAILY_DISPLAY_AND_REGIONAL_FIRE_POLICY_2026-10-10.md).
+**VERIFY:** No production delivery yet; required GitHub typecheck/Vitest/build/privacy and desktop/mobile APP/WORLD visual smoke, no empty fire claims without provider response.
+**BLOCKERS:** Stacked dependencies #105→#107→this PR. #107 failed one stale public-defaults snapshot assertion; fixed test in #107 and this branch. Existing AIS WebSocket collector runs independently of daily client/server cached output; no durable single-scheduler proof. Candidate feed endpoints not yet live-tested, so **no new external project integrated**.
+**NEXT:** Confirm CI and end-to-end smoke; evidence before merging; after strict source/license verification consider adding independent Gulf official RSS to existing MENA ingestion pipeline, with dedupe and no operational tracking.
+
+## CHECKPOINT — Owner regional refresh tiers (2026-10-10)
+**DONE (branch only):** Added typed scheduling values and safety-filtered significant cyber overview in `src/lib/publicRefreshPolicy.ts`, tests, and targeted browser refresh reductions for maritime (daily), cyber threats (daily), frontline snapshots (daily), civilian-only flights (daily; regional military aggregate remains 5m). Inherits #105 no hidden-tab polling/static cable cache-bust. `/api/cyber-attacks` positive cache + CDN TTL set to 24h. Official requirements/remaining unimplemented portions: [WORLD_SOURCE_REFRESH_POLICY_2026-10-10.md](WORLD_SOURCE_REFRESH_POLICY_2026-10-10.md).
+
+**VERIFY:** Run `npx tsc --noEmit --incremental false`, `npx vitest run src/lib/publicRefreshPolicy.test.ts`, `npm test`, `npm run build`, source/privacy CI and browser smoke. **No production deployment yet.** Check API timings and before/after CPU once live.
+
+**BLOCKERS:** Global conflict/GDELT source is still shared; geographic MENA/Ukraine/Africa frequency partitioning needs backend source snapshots. Satellite endpoint refreshes mixed catalogue after one hour; AIS listener remains live; cyber illustrative origins not evidence of attacker attribution. Do not describe cadence declaration alone as upstream compute savings. APP/public map status not live browser-verified in this branch.
+
+**NEXT:** Finish green checks and resolve review; merge base PR #105 safely before retargeting this stacked PR; separate low-frequency regional archives from MENA published incident updates and confirm owner decisions on remaining layers.
+
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
 **DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 

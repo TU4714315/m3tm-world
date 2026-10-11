@@ -62,7 +62,7 @@ export async function GET() {
       sourceMode: 'published-snapshot',
       timestamp: new Date().toISOString(),
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' },
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
     });
   } catch (error) {
     console.warn('[M3TM.WORLD] Frontline snapshot unavailable:', error instanceof Error ? error.message : error);
