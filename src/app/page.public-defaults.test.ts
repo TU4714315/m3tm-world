@@ -21,7 +21,7 @@ describe('WORLD public defaults and branding', () => {
     expect(brand).toContain('bg-transparent');
     expect(brand).toContain('ذكاء واحد · عالم أوسع');
     expect(brand).toContain('{hero && (');
-    expect(brand).toContain('M100 18 L134 38 L134 76 L100 98');
+    expect(brand).toContain('M100 42 C109 42 122 54 124 65');
     expect(brand).toContain('const gold =');
     expect(brand).not.toContain('<img');
     expect(brand).not.toContain('<rect');
