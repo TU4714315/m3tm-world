@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import Image from 'next/image';
 
 type WorldBrandMarkProps = {
   variant?: 'hero' | 'header';
@@ -26,8 +27,9 @@ export default function WorldBrandMark({ variant = 'header', className = '' }: W
   return (
     <div dir="ltr" aria-label="M3TM.WORLD"
       className={`inline-flex items-center bg-transparent select-none ${hero ? 'gap-3.5' : 'gap-2.5'} ${className}`}>
+      <span className="relative inline-flex shrink-0">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 200 118"
-        className={`${hero ? 'w-[120px] h-[80px] md:w-[132px] md:h-[88px]' : 'w-[74px] h-[48px] md:w-[82px] md:h-[54px]'} shrink-0 overflow-visible`}>
+        className={`${hero ? 'w-[120px] h-[80px] md:w-[132px] md:h-[88px]' : 'w-[74px] h-[48px] md:w-[82px] md:h-[54px]'} shrink-0 overflow-visible opacity-0`}>
         <defs>
           <linearGradient id={shell} x1="0" y1="0" x2=".6" y2="1">
             <stop offset="0" stopColor="#dbe8eb" />
@@ -77,6 +79,16 @@ export default function WorldBrandMark({ variant = 'header', className = '' }: W
         <path d="M100 53 L112 68 L100 99 L88 68 Z" fill="#d4af6b" stroke="#071116" strokeWidth="1.15" filter={`url(#${glow})`} />
         <path d="M10 108 H190" fill="none" stroke="#76ceeb" strokeWidth="1.5" strokeDasharray="18 120" opacity=".18" />
       </svg>
+      <Image
+        src="/brand/m3tm-approved-falcon.png"
+        alt=""
+        aria-hidden="true"
+        unoptimized
+        width={143}
+        height={80}
+        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+      />
+      </span>
 
       <div className="flex min-w-0 flex-col justify-center leading-none">
         <div className={`${hero ? 'text-[34px] md:text-[42px]' : 'text-[17px] md:text-[21px]'} whitespace-nowrap font-bold tracking-[0.035em]`}
