@@ -105,6 +105,15 @@ describe('Oregon TripCheck bounded resilience', () => {
     await expect(loadOregonCameras()).rejects.toThrow('fetch failed');
   });
 
+  it('retries an Undici socket close once', async () => {
+    const error = new TypeError('fetch failed') as TypeError & { cause?: unknown };
+    error.cause = Object.assign(new Error('socket closed'), { code: 'UND_ERR_SOCKET' });
+    vi.mocked(stealthFetch).mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(response(200, { features: [row] }));
+    expect(await loadOregonCameras()).toHaveLength(1);
+    expect(stealthFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('cooldowns empty fetches so repeated requests do not hammer failed DNS', async () => {
     vi.mocked(stealthFetch).mockRejectedValue(dnsFailure());
     expect(await fetchOregonCameras()).toEqual([]);
