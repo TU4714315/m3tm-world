@@ -1,21 +1,23 @@
 
 import { NextResponse } from 'next/server';
+import { isPublicFireRegion } from '@/lib/publicFireRegion';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * M3TM.WORLD — Active Fire & Wildfire Tracking
- * Multi-source: NASA FIRMS Open Data (primary for global fires), NASA EONET (volcanoes)
+ * Fire hotspots only: regional NASA FIRMS data. Volcanoes excluded by owner.
  */
 
 export async function GET() {
   try {
     let fires: any[] = [];
     let source = '';
+    let providerSucceeded = false;
 
     // Source 1: NASA FIRMS Open Data (Global 24h CSV) - no API key needed
     const firmsSources = [
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/suomi-npp-viirs-c2/csv/SUOMI_VIIRS_C2_Global_24h.csv',
+      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv',
       'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_Global_24h.csv'
     ];
 
@@ -27,44 +29,19 @@ export async function GET() {
         });
         if (res.ok) {
           const text = await res.text();
-          if (text && text.includes('latitude') && text.length > 200) {
-            const parsed = parseCSV(text);
-            if (parsed.length > 0) {
-              fires = parsed;
-              source = url.includes('SUOMI') ? 'NASA-FIRMS (VIIRS)' : 'NASA-FIRMS (MODIS)';
-              break;
-            }
+          // Valid provider data can contain zero regional fires.
+          if (text && text.includes('latitude') && text.includes('longitude') && text.length > 200) {
+            fires = parseCSV(text);
+            source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
+            providerSucceeded = true;
+            break;
           }
         }
       } catch { continue; }
     }
 
-    // Source 2: Pull volcanoes from EONET for richer data
-    try {
-      const volcRes = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=volcanoes&limit=50', {
-        signal: AbortSignal.timeout(10000),
-      });
-      if (volcRes.ok) {
-        const volcData = await volcRes.json();
-        const volcanoes = (volcData.events || []).map((e: any) => {
-          const geo = e.geometry?.[e.geometry.length - 1];
-          if (!geo?.coordinates) return null;
-          return {
-            lat: geo.coordinates[1],
-            lng: geo.coordinates[0],
-            brightness: 500,
-            confidence: 'high',
-            date: geo.date?.split('T')[0] || '',
-            time: '',
-            frp: 100,
-            title: `[VOLCANO] ${e.title}`,
-            type: 'volcano',
-          };
-        }).filter(Boolean);
-        fires = [...fires, ...volcanoes];
-        if (!source) source = 'NASA-EONET';
-      }
-    } catch (e) { console.warn('[M3TM.WORLD] Suppressed EONET error:', e instanceof Error ? e.message : e); }
+    // No volcano/earthquake lookups: those categories are disabled.
+    if (!providerSucceeded) return NextResponse.json({ fires: [], error: 'fire_provider_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 
     return NextResponse.json({
       fires,
@@ -82,7 +59,7 @@ export async function GET() {
   }
 }
 
-function parseCSV(csv: string): any[] {
+export function parseCSV(csv: string): any[] {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
 
@@ -96,15 +73,14 @@ function parseCSV(csv: string): any[] {
   const frpIdx = header.indexOf('frp');
 
   const fires: any[] = [];
-  // Sample the data if there are too many rows to avoid browser lag. Limit to ~2000 points globally.
+  // Filter to the owner's geographic scope BEFORE limiting output.
   const maxPoints = 2000;
-  const step = lines.length > maxPoints ? Math.ceil(lines.length / maxPoints) : 1;
 
-  for (let i = 1; i < lines.length; i += step) {
+  for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
     const lat = parseFloat(cols[latIdx]);
     const lng = parseFloat(cols[lngIdx]);
-    if (isNaN(lat) || isNaN(lng)) continue;
+    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng)) continue;
 
     fires.push({
       lat: Math.round(lat * 1000) / 1000,
@@ -116,6 +92,7 @@ function parseCSV(csv: string): any[] {
       frp: parseFloat(cols[frpIdx]) || 0,
       type: 'fire'
     });
+    if (fires.length >= maxPoints) break;
   }
 
   return fires;

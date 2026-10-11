@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isPublicFireRegion } from '@/lib/publicFireRegion';
 import { stealthFetch } from '@/lib/stealthFetch';
 
 export const maxDuration = 60;
@@ -58,6 +59,8 @@ export async function GET() {
       const lat = parseFloat(latMatch[1]);
       const lng = parseFloat(lngMatch[1]);
       const eventType = typeMatch ? typeMatch[1] : 'UNK';
+      if (eventType === 'EQ' || eventType === 'VO') continue;
+      if (eventType === 'WF' && !isPublicFireRegion(lat, lng)) continue;
 
       // Map GDACS event types to Osiris types. WF and DR used to fall through
       // to the 'conflict' default, which is most of the feed — a live sample
