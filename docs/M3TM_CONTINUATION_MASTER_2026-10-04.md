@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Oregon TripCheck DNS degradation and resilient fallback (2026-10-11)
+**TASK:** Render confirmed `EAI_AGAIN www.tripcheck.com` and a missing stale fallback while other CCTV sources succeeded. Preserve WORLD map/news availability without wasting retries.
+**DONE (PR #109):** Two bounded upstream attempts (4.5s each, 250ms delay), transient DNS/socket/HTTP-5xx classification; validated same-source local 7-day last-good camera index; atomic file replacement, partial-inventory protection, five-minute in-process cooldown without repeated empty fetches; strict source age, no fabricated cameras. Added targeted retry, backup, cooldown and partial-inventory tests. Production remains unchanged until merged and manually deployed.
+**LIMITS:** Render Free local disk is ephemeral and lost on new containers. Durable cross-deploy historical fallback is not implemented. Zero prior successful inventory on a new container means no fallback. No proof of camera availability from external HTTP probes when DNS tester fails.
+**VERIFY:** Required WORLD typecheck/Vitest/build/privacy CI, PR review resolution, Render deploy SHA and live health/camera smoke. The old Render deployment is still on `1e4c6983` until explicitly updated.
+**NEXT:** After #108 and #109 checks/merge, trigger Render manual deploy and verify `/api/health`, `/api/news`, APP iframe canvas and `/api/cctv` regional summary. External unresolved provider incidents remain low priority if main services work.
+
 ## CHECKPOINT — Arabic MapLibre shaping and live-news audit (2026-10-08)
 **DONE:** Root cause of reversed/disconnected Arabic country names is confirmed: WORLD was pinned to MapLibre 6.7 after hotfix `0d97990` disabled the legacy RTL plugin because eager loading stalled first paint. The final repair upgrades to MapLibre 6.9, whose built-in implementation shapes Arabic and reorders bidirectional text without the deprecated plugin. The old plugin asset/helper are removed. Country-name fallback also changes the ISO match default from an empty string to `null`, so missing/unmatched ISO codes correctly fall through to `name:ar`/`name` instead of rendering blank/broken labels.
 
