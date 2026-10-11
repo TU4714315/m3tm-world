@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { stealthFetch } from '@/lib/stealthFetch';
-import { loadOregonCameras } from './oregon';
+import { loadOregonCameras, fetchOregonCameras, clearOregonCache } from './oregon';
 
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  rename: vi.fn(),
+  rm: vi.fn(),
 }));
 vi.mock('@/lib/stealthFetch', () => ({ stealthFetch: vi.fn() }));
 
@@ -48,6 +50,9 @@ describe('Oregon TripCheck bounded resilience', () => {
     vi.mocked(readFile).mockReset();
     vi.mocked(writeFile).mockReset();
     vi.mocked(writeFile).mockResolvedValue(undefined);
+    vi.mocked(rename).mockResolvedValue(undefined);
+    vi.mocked(rm).mockResolvedValue(undefined);
+    clearOregonCache();
     vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'));
   });
 
@@ -59,6 +64,7 @@ describe('Oregon TripCheck bounded resilience', () => {
     expect(cameras).toMatchObject([{ id: 'odot-277', country: 'US' }]);
     expect(stealthFetch).toHaveBeenCalledTimes(2);
     expect(writeFile).toHaveBeenCalledOnce();
+    expect(rename).toHaveBeenCalledOnce();
   });
 
   it('retries HTTP 503 once but never retries HTTP 404', async () => {
@@ -97,5 +103,24 @@ describe('Oregon TripCheck bounded resilience', () => {
       cameras: [{ ...snapshotCam, feed_url: 'https://attacker.example/cam' }],
     }));
     await expect(loadOregonCameras()).rejects.toThrow('fetch failed');
+  });
+
+  it('cooldowns empty fetches so repeated requests do not hammer failed DNS', async () => {
+    vi.mocked(stealthFetch).mockRejectedValue(dnsFailure());
+    expect(await fetchOregonCameras()).toEqual([]);
+    expect(stealthFetch).toHaveBeenCalledTimes(2);
+    expect(await fetchOregonCameras()).toEqual([]);
+    expect(stealthFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not overwrite the last complete backup with a partial response', async () => {
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify({
+      savedAt: Date.now() - 1000,
+      cameras: Array.from({ length: 100 }, (_, i) => ({ ...snapshotCam, id: 'odot-' + (1000 + i) })),
+    }));
+    vi.mocked(stealthFetch).mockResolvedValue(response(200, { features: [row] }));
+    const cameras = await loadOregonCameras();
+    expect(cameras).toHaveLength(100);
+    expect(writeFile).not.toHaveBeenCalled();
   });
 });
