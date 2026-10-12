@@ -1,0 +1,22 @@
+name: Verify Design Toolkit
+on:
+  pull_request:
+    paths:
+      - '.cursor/**'
+      - 'docs/DESIGN_TOOLKIT_V7.md'
+      - 'docs/third-party/**'
+      - 'tools/design-v7/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check tools/design-v7/verify.mjs
+      - run: node tools/design-v7/verify.mjs
