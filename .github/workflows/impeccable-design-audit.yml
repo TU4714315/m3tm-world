@@ -15,10 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
           sparse-checkout: |
             src
           sparse-checkout-cone-mode: true
+      - name: Remove checkout token before untrusted scanner
+        shell: bash
+        run: git config --local --unset-all 'http.https://github.com/.extraheader' || true
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
