@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildIndependentFallbackNewsItem } from './route';
+import { buildIndependentFallbackNewsItem, NEWS_CORS_HEADERS } from './route';
 
 describe('public news fallback location boundary', () => {
   it('does not turn place mentions into incident coordinates', () => {
@@ -16,5 +16,13 @@ describe('public news fallback location boundary', () => {
     expect(item.location_basis).toBe('none');
     expect(item.feed_origin).toBe('independent-fallback');
     expect(item.risk_score).toBeGreaterThan(1);
+  });
+});
+
+
+describe('public news CORS contract', () => {
+  it('allows only the first-party APP origin, including error responses', () => {
+    expect(NEWS_CORS_HEADERS['Access-Control-Allow-Origin']).toBe('https://m3tm.app');
+    expect(NEWS_CORS_HEADERS.Vary).toBe('Origin');
   });
 });
