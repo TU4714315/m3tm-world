@@ -1,0 +1,38 @@
+name: Impeccable Visual Design Audit
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - '.cursor/**'
+      - '.github/workflows/impeccable-design-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run deterministic design inspection without AI tokens
+        shell: bash
+        run: |
+          set +e
+          npx --yes impeccable@4.5.2 detect --json src/ > impeccable-design-audit.json 2> impeccable-audit-stderr.txt
+          status=$?
+          set -e
+          echo "Detector exit code: $status"
+          node -e "const fs=require('fs');JSON.parse(fs.readFileSync('impeccable-design-audit.json','utf8'));console.log('Design report is valid JSON')"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: impeccable-design-report
+          path: |
+            impeccable-design-audit.json
+            impeccable-audit-stderr.txt
+          retention-days: 7
