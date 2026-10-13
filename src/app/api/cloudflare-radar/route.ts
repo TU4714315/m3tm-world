@@ -12,6 +12,8 @@ type ProviderState = 'active' | 'empty' | 'unavailable' | 'not_used' | 'not_conf
 
 interface PublicNetworkEvent {
   id: string;
+  /** Same provider annotation ID across affected countries; never a physical network-link ID. */
+  annotation_id?: string;
   lat: number;
   lng: number;
   country: string;
@@ -102,6 +104,7 @@ function mapCloudflareOutages(result: RadarResult): PublicNetworkEvent[] {
       if (!c) continue;
       out.push({
         id: `${a?.id ?? 'outage'}-${code}`,
+        annotation_id: typeof a?.id === 'string' && a.id.trim() ? a.id : undefined,
         lng: c[0],
         lat: c[1],
         country: code,
