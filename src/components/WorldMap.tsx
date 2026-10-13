@@ -3193,6 +3193,28 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   }, [mapReady, data.conflict_zones, data.conflict_live_events, data.gdelt_events, data.civil_unrest, (activeLayers as any).gdelt_events, (activeLayers as any).civil_unrest, data.conflict_data_state, setGeo]);
 
 
+  // Low-cost status pulse: only a provider-reported ongoing cross-country
+  // outage annotation pulses. It does NOT mean the physical connection failed.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !(activeLayers as any).digital_clusters) return;
+    const map = mapRef.current;
+    let high = false;
+    const pulse = () => {
+      if (document.hidden || mapRef.current !== map || !map.getLayer('digital-shared-event-line')) return;
+      high = !high;
+      map.setPaintProperty('digital-shared-event-line', 'line-opacity',
+        ['case',['==',['get','reported_ongoing'],true], high ? 0.9 : 0.25, 0.35]);
+    };
+    const timer = window.setInterval(pulse, 1200);
+    return () => {
+      window.clearInterval(timer);
+      if (mapRef.current === map && map.getLayer('digital-shared-event-line')) {
+        map.setPaintProperty('digital-shared-event-line', 'line-opacity',
+          ['case',['==',['get','reported_ongoing'],true],0.82,0.35]);
+      }
+    };
+  }, [mapReady, (activeLayers as any).digital_clusters]);
+
   // Visibility
   useEffect(() => {
     if (!mapReady) return;
