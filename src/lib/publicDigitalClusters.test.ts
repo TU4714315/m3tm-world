@@ -4,6 +4,7 @@ import { countryDigitalReportClusters, sharedCountryOutageContexts } from './pub
 const NOW = Date.parse('2026-10-13T12:00:00Z');
 const outage = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
+  annotation_id: id,
   country: 'YE',
   lat: 14.5, lng: 40.5, // intentionally WRONG: never use an individual observation location
   source: 'Cloudflare Radar',
@@ -38,6 +39,22 @@ describe('countryDigitalReportClusters', () => {
       outage('f', { event_type: 'REPORTED_CYBER_EVENT' }),
     ];
     expect(countryDigitalReportClusters(data, NOW)).toEqual([]);
+  });
+  it('counts provider annotation IDs, not synthetic observation row IDs', () => {
+    expect(countryDigitalReportClusters([
+      outage('a-YE', { annotation_id: 'one' }),
+      outage('b-YE', { annotation_id: 'one' }),
+    ], NOW)).toEqual([]);
+    expect(countryDigitalReportClusters([
+      outage('a-YE', { annotation_id: null }),
+      outage('b-YE', { annotation_id: '' }),
+    ], NOW)).toEqual([]);
+  });
+  it('rejects traffic anomalies and reports from the future even if Cloudflare is the source', () => {
+    expect(countryDigitalReportClusters([
+      outage('a', { event_type: 'TRAFFIC_ANOMALY' }),
+      outage('b', { start: '2026-10-13T12:01:00Z' }),
+    ], NOW)).toEqual([]);
   });
   it('never guesses a country from raw coordinates when country field is absent', () => {
     expect(countryDigitalReportClusters([outage('a', { country: null }), outage('b', { country: null })], NOW)).toEqual([]);
@@ -98,6 +115,24 @@ describe('sharedCountryOutageContexts', () => {
       outage('e', {annotation_id:'old',country:'YE',start:'2026-10-10T00:00:00Z'}),
       outage('f', {annotation_id:'old',country:'OM',start:'2026-10-10T00:00:00Z'}),
     ],NOW)).toEqual([]);
+  });
+  it('quarantines a shared annotation ID after conflicting timestamps even if it reappears', () => {
+    expect(sharedCountryOutageContexts([
+      outage('a', { annotation_id: 'same', country: 'YE' }),
+      outage('b', { annotation_id: 'same', country: 'OM', start: '2026-10-12T15:00:00Z' }),
+      outage('c', { annotation_id: 'same', country: 'YE' }),
+      outage('d', { annotation_id: 'same', country: 'IQ' }),
+    ], NOW)).toEqual([]);
+  });
+  it('rejects malformed end times and future-dated shared events', () => {
+    expect(sharedCountryOutageContexts([
+      outage('a', { annotation_id: 'same', country: 'YE', end: 'invalid' }),
+      outage('b', { annotation_id: 'same', country: 'OM', end: 'invalid' }),
+    ], NOW)).toEqual([]);
+    expect(sharedCountryOutageContexts([
+      outage('c', { annotation_id: 'future', country: 'YE', start: '2026-10-13T12:01:00Z' }),
+      outage('d', { annotation_id: 'future', country: 'OM', start: '2026-10-13T12:01:00Z' }),
+    ], NOW)).toEqual([]);
   });
   it('derives reported duration only from event timestamps', () => {
     const links = sharedCountryOutageContexts([
