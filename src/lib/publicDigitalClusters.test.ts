@@ -56,6 +56,14 @@ describe('countryDigitalReportClusters', () => {
       outage('b', { start: '2026-10-13T12:01:00Z' }),
     ], NOW)).toEqual([]);
   });
+  it('ignores malformed, reversed or future event end timestamps in national counts', () => {
+    const bad = [
+      outage('bad', { end: 'nonsense' }),
+      outage('reversed', { end: '2026-10-12T12:00:00Z' }),
+      outage('future', { end: '2026-10-13T12:05:00Z' }),
+    ];
+    expect(countryDigitalReportClusters([outage('valid'), ...bad], NOW)).toEqual([]);
+  });
   it('never guesses a country from raw coordinates when country field is absent', () => {
     expect(countryDigitalReportClusters([outage('a', { country: null }), outage('b', { country: null })], NOW)).toEqual([]);
   });
