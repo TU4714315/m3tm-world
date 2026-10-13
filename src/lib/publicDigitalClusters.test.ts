@@ -22,6 +22,9 @@ describe('countryDigitalReportClusters', () => {
       label_ar: 'تجمع مؤشرات رقمية',
     }]);
   });
+  it('removes reports after the public 24-hour display period', () => {
+    expect(countryDigitalReportClusters([outage('a'), outage('b')], NOW + 25 * 60 * 60_000)).toEqual([]);
+  });
   it('does not convert one observation or duplicates into a cluster', () => {
     expect(countryDigitalReportClusters([outage('one'), outage('one')], NOW)).toEqual([]);
   });
