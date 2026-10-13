@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — CCTV delayed cache recovery (2026-10-13)
+**TASK:** Render logged a West Asia CCTV 12-second region timeout followed by a successfully completed OpenCCTV catalogue fetch about ten seconds later. The timed-out request placed the region in a 300-second cooldown that hid the newly cached cameras from subsequent requests.
+**DONE (PR #121, pending merge):** Clear the regional cooldown as soon as a late provider result returns non-empty data already retained by `sourceCache`. Keep the cooldown when a late result is empty, including the concurrent-request case where another request has not reached its own timeout yet. Added tests for both late success and overlapping late empty results. Scope is `src/app/api/cctv/route.ts` and its route tests; no map, camera-stream, or Shodan changes.
+**VERIFY:** GitHub Actions TypeScript, Vitest, production build, Deno/archive and privacy checks must pass on the final reviewed head; then confirm the merged SHA and manually coordinated Render deployment after PR #120. Re-check `/api/cctv?region=westasia` response `pendingRegions`, safe aggregate totals, server errors, and APP map first paint. Provider catalogue counts are not proof that individual videos play.
+**BLOCKERS:** Live successful playback and per-country camera availability remain unverified. Deployment is coordinated with PR #120 to avoid duplicate Render rebuilds; Vercel account-level deployment is blocked.
+**NEXT:** Resolve all review threads, merge with GitHub expected-head guard when protected checks pass, and coordinate one Render release with the release owner. Preserve public source attribution and restrictions on sensitive camera locations.
+
 ## CHECKPOINT — bounded process cache memory after Render V8 OOM (2026-10-11)
 **TASK:** Prevent repeat of proven Node V8 heap out-of-memory (Render exit 139) while retaining valid public cached event layers.
 **DONE (pending review):** A 16 MiB total limit and 8 MiB per JSON entry for fallback process memory; evict oldest keys by retained byte count; refreshed keys move to newest position; reject oversized memory entry while Redis path remains usable. Adapt public API cache-backend types and add regression tests. No paid backend, DNS or private OSINT changes.
