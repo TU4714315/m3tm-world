@@ -15,6 +15,9 @@ concurrency:
 
 jobs:
   smoke:
+    # This is an observational production-origin probe, NOT candidate release
+    # validation. Render's deployed commit must be checked separately before
+    # accepting any new build as published.
     name: Public health and source capability
     runs-on: ubuntu-latest
     timeout-minutes: 4
@@ -64,7 +67,7 @@ jobs:
           console.log(JSON.stringify(result,null,2));
           const table=['### WORLD Public source reachability','| Source | HTTP | Result |','|---|---|---|',
             ...output.map(x=>`| ${x.check} | ${x.http_status??'—'} | ${x.ok?'OK':'FAILED'} |`),
-            '', 'No private host data, paid searches, camera feed, or MapLibre canvas tested.', ''].join('\n');
+            '', 'Read-only probe of existing Render deployment, not PR candidate SHA. No private hosts, paid searches, camera feed or MapLibre paint tested.', ''].join('\n');
           await writeFile(process.env.GITHUB_STEP_SUMMARY,table,{flag:'a'});
           if(output.some(x=>!x.ok))process.exitCode=1;
           NODE
