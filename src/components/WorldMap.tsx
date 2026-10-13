@@ -24,6 +24,7 @@ import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
+import { countryDigitalReportClusters } from '@/lib/publicDigitalClusters';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
@@ -357,7 +358,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks', 'digital-observation-clusters'];
       // Clusters group only the *visual* symbol footprints. Public records
       // and source attribution are retained and expand on zoom.
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
@@ -872,6 +873,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['get','country_name'], 'text-size': 9, 'text-font': ['JetBrains Mono Bold', 'Open Sans Bold'],
         'text-offset': [0, 1.4], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FFB300', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.85 }});
+
+      // Source-backed country aggregates: group annotations, NOT devices/sites.
+      // Icon location is a country display centroid; never geolocate individual IPs.
+      map.addLayer({ id: 'digital-cluster-halo', type: 'circle', source: 'digital-observation-clusters', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'],1,22,5,31],
+        'circle-color':'#7DD3FC','circle-opacity':0.13,'circle-blur':0.65,
+      }});
+      map.addLayer({ id: 'digital-cluster-dots', type: 'circle', source: 'digital-observation-clusters', paint: {
+        'circle-radius':['step',['get','report_count'],9,5,12,15,15],
+        'circle-color':'#0284C7','circle-opacity':0.88,
+        'circle-stroke-width':2,'circle-stroke-color':'#BAE6FD',
+      }});
+      map.addLayer({ id: 'digital-cluster-label', type: 'symbol', source: 'digital-observation-clusters', minzoom: 2.5, layout: {
+        'text-field':['concat','تجمع رقمي · ',['to-string',['get','report_count']]],
+        'text-size':10,'text-font':['Open Sans Bold'],'text-offset':[0,1.65],
+        'text-allow-overlap':false,
+      }, paint: {'text-color':'#DFF8FF','text-halo-color':'#07131B','text-halo-width':1.7} });
 
       /* ── Cloudflare Radar — layer-3 attack origin share ── */
       map.addLayer({ id: 'cf-attack-dots', type: 'circle', source: 'cf-attacks', paint: {
@@ -1780,6 +1798,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
+    map.on('click', 'digital-cluster-dots', e => {
+      const f = e.features?.[0];
+      if (!f || f.geometry.type !== 'Point') return;
+      const p = f.properties || {};
+      const coords = f.geometry.coordinates as [number, number];
+      popup(coords, `<div dir="rtl" style="${pStyle}border:1px solid rgba(125,211,252,.42);">
+        <div style="color:#7DD3FC;font-size:12px;font-weight:700;margin-bottom:8px;">تجمع مؤشرات رقمية · ${htmlEsc(p.country || '—')}</div>
+        <div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">${htmlEsc(p.report_count || 0)} بلاغات اتصال متميزة في نطاق الدولة من ${htmlEsc(p.source || '—')}.</div>
+        <div style="font-size:10px;color:#B8C3CA;margin-bottom:7px;">آخر بلاغ: ${htmlEsc(p.latest_report_utc || 'غير معروف')}</div>
+        <div style="font-size:10px;color:#FFDB9F;line-height:1.6;">الرمز في مركز الدولة للعرض فقط؛ ليس موقع تجمع أجهزة أو محطة ارتباط. تعدد بلاغات مزود واحد ليس تأكيدًا مستقلًا.</div>
+      </div>`);
+    });
+
     // ── Public network events / Cloudflare Radar ──
     map.on('click', 'cf-outage-dots', e => {
       if (!e.features?.length) return;
@@ -2079,7 +2110,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots','digital-cluster-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2665,7 +2696,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         precision: o.precision || '',
       },
     })) : []);
-  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, setGeo]);
+    setGeo('digital-observation-clusters',
+      al.digital_clusters ? countryDigitalReportClusters(data.cf_outages).map(c => ({
+        type: 'Feature' as const,
+        geometry: {type:'Point' as const,coordinates:[c.lng,c.lat]},
+        properties: c,
+      })) : []);
+  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, (activeLayers as any).digital_clusters, setGeo]);
 
   /* ── Cloudflare Radar: attack origins ── */
   useEffect(() => {
@@ -3124,6 +3161,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters','civil-unrest-cluster-count'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
+    setVis(['digital-cluster-halo','digital-cluster-dots','digital-cluster-label'], (activeLayers as any).digital_clusters);
 
     setVis(['malware-glow','malware-dots','malware-label','malware-new-ring'], activeLayers.malware);
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
