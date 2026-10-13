@@ -1817,6 +1817,26 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
+    map.on('click', 'digital-shared-event-line', e => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const start = Date.parse(String(p.started_at || ''));
+      const end = p.ended_at ? Date.parse(String(p.ended_at)) : Date.now();
+      const elapsed = Number.isFinite(start) && Number.isFinite(end) && end >= start
+        ? Math.floor((end-start)/60000) : null;
+      const duration = elapsed === null ? 'غير محددة' : String(Math.floor(elapsed / 60)) + ' ساعة و' + String(elapsed % 60) + ' دقيقة';
+      const state = p.reported_ongoing ? 'بلاغ مستمر بحسب المصدر' : 'بلاغ انتهى بحسب المصدر';
+      const html = '<div dir="rtl" style="' + pStyle + 'border:1px solid rgba(125,211,252,.42);">'
+        + '<div style="font-size:12px;font-weight:700;color:#7DD3FC;margin-bottom:7px;">حدث اضطراب مشترك بين دولتين</div>'
+        + '<div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">' + htmlEsc(p.from_country || '—') + ' / ' + htmlEsc(p.to_country || '—') + '</div>'
+        + '<div style="font-size:10px;color:#E8E6E0;margin-bottom:6px;">' + htmlEsc(state) + ' · مدة البلاغ ' + htmlEsc(duration) + '</div>'
+        + '<div style="font-size:10px;color:#B8C3CA;margin-bottom:6px;">Cloudflare Radar · ' + htmlEsc(p.started_at || '—') + '</div>'
+        + '<div style="font-size:10px;color:#FFDB9F;line-height:1.6;">الخط تمثيل لدولتين في نفس بلاغ الانقطاع؛ لا يثبت اتصالًا مباشرًا أو كابلًا أو موقع عقدة أو مسارًا فعليًا.</div>'
+        + '</div>';
+      popup([e.lngLat.lng, e.lngLat.lat], html);
+    });
+
     map.on('click', 'digital-cluster-dots', e => {
       const f = e.features?.[0];
       if (!f || f.geometry.type !== 'Point') return;
