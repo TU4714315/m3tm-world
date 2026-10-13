@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
+import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteInsertionAnchor, satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
@@ -288,14 +289,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       // Source declarations alone are invisible when this control is disabled.
       attributionControl: MAP_ATTRIBUTION_OPTIONS,
       maxPitch: 85,
-      transformRequest: (url: string) => {
-        // Route all CARTO CDN requests through the internal Next.js proxy API
-        if (url.includes('cartocdn.com')) {
-          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-          return { url: `${baseUrl}/api/proxy-tiles?url=${encodeURIComponent(url)}` };
-        }
-        return { url };
-      },
+      transformRequest: (url: string) => ({
+        url: cartoMapRequestUrl(url, window.location.hostname, window.location.origin),
+      }),
     };
 
     // MapLibre asks for a high-performance WebGL2 context and throws outright if it
