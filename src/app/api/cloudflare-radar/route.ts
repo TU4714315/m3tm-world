@@ -110,7 +110,9 @@ function mapCloudflareOutages(result: RadarResult): PublicNetworkEvent[] {
         country: code,
         country_name: names[code] || code,
         scope: a?.scope || '',
-        event_type: a?.eventType || 'OUTAGE',
+        // The outages endpoint also documents anomalies. Missing eventType
+        // must never be inferred as a verified outage for country aggregates.
+        event_type: a?.eventType || 'UNKNOWN',
         cause: a?.outage?.outageCause || a?.outage?.outageType || '',
         description: a?.description || '',
         start: a?.startDate || '',
