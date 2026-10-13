@@ -1826,7 +1826,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const elapsed = Number.isFinite(start) && Number.isFinite(end) && end >= start
         ? Math.floor((end-start)/60000) : null;
       const duration = elapsed === null ? 'غير محددة' : String(Math.floor(elapsed / 60)) + ' ساعة و' + String(elapsed % 60) + ' دقيقة';
-      const state = p.reported_ongoing ? 'بلاغ مستمر بحسب المصدر' : 'بلاغ انتهى بحسب المصدر';
+      // GeoJSON/MapLibre can surface boolean properties as strings in query features.
+      const ongoing = p.reported_ongoing === true || p.reported_ongoing === 'true';
+      const state = ongoing ? 'بلاغ مستمر بحسب المصدر' : 'بلاغ انتهى بحسب المصدر';
       const html = '<div dir="rtl" style="' + pStyle + 'border:1px solid rgba(125,211,252,.42);">'
         + '<div style="font-size:12px;font-weight:700;color:#7DD3FC;margin-bottom:7px;">حدث اضطراب مشترك بين دولتين</div>'
         + '<div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">' + htmlEsc(p.from_country || '—') + ' / ' + htmlEsc(p.to_country || '—') + '</div>'
