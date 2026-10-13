@@ -23,6 +23,8 @@ export interface PublicDigitalCluster {
 type Row = Record<string, unknown>;
 const MAX_REPORT_AGE_MS = 24 * 60 * 60_000;
 const CLOCK_SKEW_MS = 5 * 60_000;
+// Owner-defined regional scope: Saudi Arabia explicitly excluded.
+const REGIONAL_CODES = new Set(['YE', 'IQ', 'OM', 'IR', 'AE', 'QA', 'BH', 'KW']);
 
 export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date.now()): PublicDigitalCluster[] {
   if (!Array.isArray(rows) || !Number.isFinite(nowMs)) return [];
@@ -39,7 +41,7 @@ export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date
     const observed = Date.parse(item.start);
     if (!Number.isFinite(observed) || observed > nowMs + CLOCK_SKEW_MS || nowMs - observed > MAX_REPORT_AGE_MS) continue;
     const code = typeof item.country === 'string' ? item.country.trim().toUpperCase() : '';
-    if (!/^[A-Z]{2}$/.test(code) || !centroidFor(code)) continue;
+    if (!REGIONAL_CODES.has(code) || !centroidFor(code)) continue;
     let group = groups.get(code);
     if (!group) {
       group = { ids: new Set<string>(), latest: 0 };
@@ -97,7 +99,7 @@ export function sharedCountryOutageContexts(rows: unknown, nowMs = Date.now()): 
     if (typeof r.annotation_id !== 'string' || !r.annotation_id.trim() || r.annotation_id.length > 180) continue;
     if (typeof r.country !== 'string') continue;
     const country = r.country.trim().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(country) || !centroidFor(country)) continue;
+    if (!REGIONAL_CODES.has(country) || !centroidFor(country)) continue;
     if (typeof r.start !== 'string') continue;
     const start = Date.parse(r.start);
     if (!Number.isFinite(start) || start > nowMs + CLOCK_SKEW_MS) continue;
