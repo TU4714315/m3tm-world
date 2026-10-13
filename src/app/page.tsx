@@ -94,7 +94,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
-  cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
+  cf_outages: true, cf_attacks: true, digital_clusters: true, app_news: true, alert_pins: true, country_borders: true,
 };
 
 const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
@@ -102,7 +102,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
-      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'digital_clusters', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
@@ -125,7 +125,7 @@ const PUBLIC_EMBED_LAYER_KEYS = [
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
   'reported_routes', 'global_incidents', 'gdelt_events', 'civil_unrest', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval',
-  'malware', 'cf_outages', 'cf_attacks', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
+  'malware', 'cf_outages', 'cf_attacks', 'digital_clusters', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
   'terrain_elevation', 'terrain_etopo_2022',
 ] as const;
 
@@ -1071,7 +1071,7 @@ export default function Dashboard() {
     }
 
     // Network events — Cloudflare Radar when configured, otherwise factual public fallbacks.
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
+    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks || (activeLayers as any).digital_clusters) {
       loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
@@ -1160,7 +1160,7 @@ export default function Dashboard() {
 
     // Network-event monitor: refresh source-backed public observations without
     // depending on a Cloudflare credential. Cloudflare remains preferred when configured.
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
+    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks || (activeLayers as any).digital_clusters) {
       intervals.push(setInterval(() => fetchEndpoint('/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
