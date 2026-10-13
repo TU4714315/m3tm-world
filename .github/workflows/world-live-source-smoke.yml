@@ -1,0 +1,37 @@
+name: WORLD public source reachability smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/world-live-source-smoke.yml'
+      - 'scripts/world-live-source-smoke.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-live-probe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Public health and source capability
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probe live read-only public endpoints
+        run: node scripts/world-live-source-smoke.mjs
+      - name: Preserve result without secrets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-live-source-smoke
+          path: world-live-source-smoke.json
+          retention-days: 3
