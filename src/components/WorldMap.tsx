@@ -24,7 +24,7 @@ import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
-import { countryDigitalReportClusters } from '@/lib/publicDigitalClusters';
+import { countryDigitalReportClusters, sharedCountryOutageContexts } from '@/lib/publicDigitalClusters';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
@@ -358,7 +358,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks', 'digital-observation-clusters'];
+      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks', 'digital-observation-clusters', 'digital-shared-events'];
       // Clusters group only the *visual* symbol footprints. Public records
       // and source attribution are retained and expand on zoom.
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
@@ -873,6 +873,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['get','country_name'], 'text-size': 9, 'text-font': ['JetBrains Mono Bold', 'Open Sans Bold'],
         'text-offset': [0, 1.4], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FFB300', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.85 }});
+
+      // Country-centroid lines indicate a SHARED published outage annotation;
+      // they do not indicate a physical/radio/BGP connection between countries.
+      map.addLayer({ id: 'digital-shared-event-line', type: 'line', source: 'digital-shared-events', layout: {
+        'line-cap':'round', 'line-join':'round',
+      }, paint: {
+        'line-color':'#7DD3FC','line-width':['interpolate',['linear'],['zoom'],1,1,4,2.2,7,2.8],
+        'line-opacity':['case',['==',['get','reported_ongoing'],true],0.82,0.35],
+        'line-dasharray':[2,3],
+      }});
+      // Heat visualizes annotations at NATIONAL scale only, not device density.
+      map.addLayer({ id: 'digital-cluster-heat', type: 'heatmap', source: 'digital-observation-clusters', maxzoom:6, paint: {
+        'heatmap-weight':['interpolate',['linear'],['get','report_count'],2,0.18,10,0.48,35,0.85],
+        'heatmap-intensity':['interpolate',['linear'],['zoom'],1,0.7,5,1.15],
+        'heatmap-radius':['interpolate',['linear'],['zoom'],1,28,5,62],
+        'heatmap-opacity':['interpolate',['linear'],['zoom'],1,0.68,5,0.35,6,0],
+        'heatmap-color':['interpolate',['linear'],['heatmap-density'],
+          0,'rgba(0,0,0,0)',0.25,'rgba(2,132,199,0.18)',0.5,'rgba(8,145,178,0.38)',0.8,'rgba(125,211,252,0.7)',1,'rgba(224,242,254,0.85)'],
+      }});
 
       // Source-backed country aggregates: group annotations, NOT devices/sites.
       // Icon location is a country display centroid; never geolocate individual IPs.
@@ -2110,7 +2129,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots','digital-cluster-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots','digital-cluster-dots','digital-shared-event-line'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2696,6 +2715,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         precision: o.precision || '',
       },
     })) : []);
+    setGeo('digital-shared-events', al.digital_clusters ? sharedCountryOutageContexts(data.cf_outages).map(c => ({
+      type: 'Feature' as const,
+      geometry: { type:'LineString' as const, coordinates:[c.from,c.to] },
+      properties: {
+        id:c.id, from_country:c.from_country, to_country:c.to_country,
+        started_at:c.started_at, ended_at:c.ended_at,
+        reported_ongoing:c.reported_ongoing, source:c.source, relation:c.relation,
+      },
+    })) : []);
     setGeo('digital-observation-clusters',
       al.digital_clusters ? countryDigitalReportClusters(data.cf_outages).map(c => ({
         type: 'Feature' as const,
@@ -3161,7 +3189,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters','civil-unrest-cluster-count'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
-    setVis(['digital-cluster-halo','digital-cluster-dots','digital-cluster-label'], (activeLayers as any).digital_clusters);
+    setVis(['digital-cluster-heat','digital-cluster-halo','digital-cluster-dots','digital-cluster-label','digital-shared-event-line'], (activeLayers as any).digital_clusters);
 
     setVis(['malware-glow','malware-dots','malware-label','malware-new-ring'], activeLayers.malware);
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
