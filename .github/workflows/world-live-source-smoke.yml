@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - '.github/workflows/world-live-source-smoke.yml'
-      - 'scripts/world-live-source-smoke.mjs'
   workflow_dispatch:
 
 permissions:
