@@ -21,7 +21,7 @@ export interface PublicDigitalCluster {
 }
 
 type Row = Record<string, unknown>;
-const MAX_REPORT_AGE_MS = 30 * 24 * 60 * 60_000;
+const MAX_REPORT_AGE_MS = 24 * 60 * 60_000;
 const CLOCK_SKEW_MS = 5 * 60_000;
 
 export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date.now()): PublicDigitalCluster[] {
@@ -64,4 +64,83 @@ export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date
       };
     })
     .sort((a, b) => b.report_count - a.report_count || a.country.localeCompare(b.country));
+}
+
+/**
+ * Display connections ONLY between country centroids that are explicitly
+ * mentioned in the *same* Cloudflare OUTAGE annotation. A line represents a
+ * shared cross-country REPORT, not an actual cable, BGP hop, radio link or
+ * operational relationship. Do not interpret it as a link failure.
+ */
+export interface DigitalSharedOutageContext {
+  id: string;
+  from_country: string;
+  to_country: string;
+  from: [number, number];
+  to: [number, number];
+  started_at: string;
+  ended_at: string | null;
+  reported_ongoing: boolean;
+  reported_duration_minutes: number;
+  source: 'Cloudflare Radar';
+  precision: 'country-centroid-display-only';
+  relation: 'shared-reported-outage-not-network-link';
+}
+
+export function sharedCountryOutageContexts(rows: unknown, nowMs = Date.now()): DigitalSharedOutageContext[] {
+  if (!Array.isArray(rows) || !Number.isFinite(nowMs)) return [];
+  const grouped = new Map<string, { start: number; end: number | null; countries: Set<string> }>();
+  for (const raw of rows.slice(0, 500)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const r = raw as Row;
+    if (r.source !== 'Cloudflare Radar' || r.event_type !== 'OUTAGE') continue;
+    if (typeof r.annotation_id !== 'string' || !r.annotation_id.trim() || r.annotation_id.length > 180) continue;
+    if (typeof r.country !== 'string') continue;
+    const country = r.country.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country) || !centroidFor(country)) continue;
+    if (typeof r.start !== 'string') continue;
+    const start = Date.parse(r.start);
+    if (!Number.isFinite(start) || start > nowMs + CLOCK_SKEW_MS) continue;
+    const end = typeof r.end === 'string' && r.end.trim() ? Date.parse(r.end) : null;
+    if (end !== null && (!Number.isFinite(end) || end < start || end > nowMs + CLOCK_SKEW_MS)) continue;
+    // Only annotate the last 24 hours on WORLD. A continuing event whose
+    // start was earlier can still be visible when source confirms ongoing.
+    if (end !== null && nowMs - end > MAX_REPORT_AGE_MS) continue;
+    if (end === null && nowMs - start > MAX_REPORT_AGE_MS) continue;
+    const id = r.annotation_id;
+    const group = grouped.get(id);
+    if (group) {
+      // A provider annotation ID with mismatched clocks is ambiguous.
+      if (group.start !== start || group.end !== end) {
+        grouped.delete(id);
+        continue;
+      }
+      group.countries.add(country);
+    } else {
+      grouped.set(id, { start, end, countries: new Set([country]) });
+    }
+  }
+  const result: DigitalSharedOutageContext[] = [];
+  for (const [id, event] of grouped.entries()) {
+    const codes = [...event.countries].sort();
+    if (codes.length < 2) continue;
+    const first = codes[0];
+    for (const to_country of codes.slice(1, 7)) {
+      result.push({
+        id: id + ':' + first + '-' + to_country,
+        from_country: first, to_country,
+        from: centroidFor(first)!,
+        to: centroidFor(to_country)!,
+        started_at: new Date(event.start).toISOString(),
+        ended_at: event.end === null ? null : new Date(event.end).toISOString(),
+        reported_ongoing: event.end === null,
+        reported_duration_minutes: Math.max(0, Math.floor(((event.end ?? nowMs) - event.start) / 60_000)),
+        source: 'Cloudflare Radar',
+        precision: 'country-centroid-display-only',
+        relation: 'shared-reported-outage-not-network-link',
+      });
+      if (result.length >= 60) return result;
+    }
+  }
+  return result;
 }
