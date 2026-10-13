@@ -72,6 +72,14 @@ describe('countryDigitalReportClusters', () => {
     )).toBe(false);
   });
 
+  it('restricts every new digital aggregate to exactly the eight owner-defined countries', () => {
+    const accepted = ['YE', 'IQ', 'OM', 'IR', 'AE', 'QA', 'BH', 'KW'];
+    const rows = [...accepted, 'SA', 'US', 'FR'].flatMap(country => [
+      outage(`a-${country}`, { country }), outage(`b-${country}`, { country }),
+    ]);
+    const countries = countryDigitalReportClusters(rows, NOW).map(c => c.country).sort();
+    expect(countries).toEqual([...accepted].sort());
+  });
   it('keeps distinct national aggregates separate without inferring a shared physical site', () => {
     const clusters = countryDigitalReportClusters([
       outage('a'), outage('b'),
