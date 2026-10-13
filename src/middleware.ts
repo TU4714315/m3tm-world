@@ -3,6 +3,26 @@ import type { NextRequest, NextFetchEvent } from 'next/server';
 
 export function middleware(request: NextRequest, event: NextFetchEvent) {
   const url = request.nextUrl.pathname;
+
+  /* Owner decision: public WORLD map is paused while graphics and upstream
+     source reliability are being corrected. This is an HTTP gate, not a
+     front-end overlay: direct Render/Vercel URLs must not bypass it.
+     Keep /api/health and /api/news reachable for operational checks and APP.
+     An explicit production environment switch is required to reopen it. */
+  if (url === '/' && process.env.M3TM_WORLD_PUBLIC_MAP_ENABLED !== 'true') {
+    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>M3TM | تحسين الخدمة</title><style>*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 15%,#302513,#080d19 52%,#03060c);font:16px system-ui,-apple-system,Segoe UI,sans-serif;color:#f3e7d1;text-align:center;padding:24px}main{max-width:600px}strong{display:block;font-size:clamp(40px,9vw,70px);letter-spacing:.22em;color:#f6d892}h1{font-size:clamp(21px,4vw,30px)}p{line-height:2;color:#ccd3dd}a{display:inline-block;margin-top:16px;border:1px solid #b39854;border-radius:8px;padding:12px 20px;color:#f6d892;text-decoration:none}</style></head><body><main><strong dir="ltr">M3TM</strong><h1>صيانة مؤقتة لتحسين خدمة الخريطة</h1><p>نعمل على تحسين السرعة والتحقق من تحديث البيانات قبل إعادة إتاحة الخريطة العامة.</p><a href="https://m3tm.app/news">الأخبار العامة</a></main></body></html>`;
+    return new NextResponse(html, {
+      status: 503,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0',
+        'Retry-After': '300',
+        'X-M3TM-Public-Map': 'maintenance',
+        'X-Robots-Tag': 'noindex, nofollow',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+      },
+    });
+  }
   
   const protectedOsint = url === '/api/scanner' || url.startsWith('/api/osint/') || url.startsWith('/api/tools/');
   if (protectedOsint) {

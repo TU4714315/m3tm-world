@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -11,17 +11,6 @@ interface NewsTickerItem {
   source: string;
   risk_score: number;
   language?: string;
-}
-
-interface SourceHealth {
-  status: 'operational' | 'degraded';
-  timestamp: string;
-  sources?: Record<string, {
-    status?: string;
-    configured?: boolean;
-    authMode?: string;
-    detail?: string;
-  }>;
 }
 
 const M3TM_APP_NEWS_URL = 'https://m3tm.app/news#news';
@@ -114,44 +103,8 @@ function decodeHtmlText(value: string): string {
 }
 
 export default function GlobalStatusBar({ news = [], embed = false }: { news?: NewsTickerItem[]; embed?: boolean }) {
-  const [sourceHealth, setSourceHealth] = useState<SourceHealth | null>(null);
   const tickerItems = useMemo(() => sortImportantNews(news), [news]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchSourceHealth = async () => {
-      try {
-        const res = await fetch('/api/health?deep=1', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`health HTTP ${res.status}`);
-        const health = await res.json();
-        if (!cancelled) setSourceHealth(health);
-      } catch {
-        if (!cancelled) {
-          setSourceHealth({
-            status: 'degraded',
-            timestamp: new Date().toISOString(),
-            sources: {},
-          });
-        }
-      }
-    };
-
-    void fetchSourceHealth();
-    const iv = window.setInterval(() => void fetchSourceHealth(), 300_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(iv);
-    };
-  }, []);
-
-  const sourceTitle = sourceHealth?.sources
-    ? Object.entries(sourceHealth.sources)
-        .map(([name, meta]) => `${name.toUpperCase()}: ${meta.status || 'unknown'}${meta.authMode ? ` (${meta.authMode})` : ''}`)
-        .join(' · ')
-    : 'جارٍ التحقق من المصادر';
-
-  const sourceStatus = sourceHealth?.status ?? 'operational';
   const hasTicker = tickerItems.length > 0;
 
   return (
@@ -230,19 +183,6 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
           )}
         </div>
 
-        {/* ── RIGHT: source health ── */}
-        <div className="flex-shrink-0 h-full flex items-center pointer-events-auto border-l border-white/[0.04]">
-          <div className="h-full px-3 flex items-center gap-1.5" title={sourceTitle}>
-            <div
-              className={`w-1.5 h-1.5 rounded-full animate-pulse ${sourceStatus === 'operational' ? 'bg-[#00E676]' : 'bg-[#FF9500]'}`}
-            />
-            <span className={`text-[9px] tracking-[0.12em] ${sourceStatus === 'operational' ? 'text-[#00E676]/70' : 'text-[#FF9500]/80'}`}>
-              {sourceHealth
-                ? (sourceStatus === 'operational' ? 'المصادر سليمة' : 'مصدر متدهور')
-                : 'فحص المصادر'}
-            </span>
-          </div>
-        </div>
       </div>
     </motion.div>
   );

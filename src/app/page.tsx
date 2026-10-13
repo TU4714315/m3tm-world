@@ -88,8 +88,8 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 
 const DEFAULT_ACTIVE_LAYERS = {
   flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
-  satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
-  sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
+  satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
+  sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
   live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
@@ -106,6 +106,13 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
+    ].includes(key) && ![
+      // Defer expensive catalogs, raster overlays and slower optional sources
+      // until the operator explicitly enables them. Keep MENA events, alerts,
+      // country borders and the public news signal on the first paint.
+      'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'fires', 'cf_outages', 'cf_attacks', 'reported_routes',
+      'conflict_density', 'frontlines',
     ].includes(key),
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
@@ -171,7 +178,7 @@ function ViewSegment({ active, onClick, title, icon: Icon, label, layoutId }: {
         <motion.span
           layoutId={layoutId}
           transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-          className="absolute inset-0 rounded-md border border-[var(--border-active)] bg-[var(--gold-primary)]/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_14px_var(--gold-glow)]"
+          className="absolute inset-0 rounded-md border border-[var(--border-active)] bg-transparent shadow-[inset_0_0_0_1px_var(--border-active)]"
         />
       )}
       <Icon className="w-3.5 h-3.5 relative z-10" />
@@ -406,7 +413,7 @@ export default function Dashboard() {
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
@@ -462,6 +469,10 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
+      // Embedded visitors should not pay for the satellite raster and globe
+      // projection before the simpler, source-backed map can first paint.
+      setMapStyle('dark');
+      setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
       setShowSpaceCam(false);
@@ -1038,12 +1049,13 @@ export default function Dashboard() {
     }
     if ((activeLayers as any).frontlines) {
       loadLayerOnce('frontlines', '/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines: d.status === 'ok' ? (d.frontlines ?? { type: 'FeatureCollection', features: [] }) : { type: 'FeatureCollection', features: [] },
         frontlines_meta: {
           total: d.total ?? 0,
           status: d.status ?? 'unavailable',
           source: d.source ?? 'DeepStateMap.Live',
           sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
           timestamp: d.timestamp ?? null,
         },
       }));
@@ -1125,12 +1137,13 @@ export default function Dashboard() {
     }
     if ((activeLayers as any).frontlines) {
       intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines: d.status === 'ok' ? (d.frontlines ?? { type: 'FeatureCollection', features: [] }) : { type: 'FeatureCollection', features: [] },
         frontlines_meta: {
           total: d.total ?? 0,
           status: d.status ?? 'unavailable',
           source: d.source ?? 'DeepStateMap.Live',
           sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
           timestamp: d.timestamp ?? null,
         },
       }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.worldwidePublishedFrontlines));
@@ -1159,7 +1172,32 @@ export default function Dashboard() {
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint, showMenaPulse]);
 
-  // Refresh time-sensitive, published MENA activity once when returning from a
+  // Frontline sources can fail after a successful HTTP 200 response. Unlike a
+  // daily published-area refresh, an unavailable/dated snapshot gets a bounded
+  // five-minute retry while the tab is visible. No stale polygons are rendered
+  // as current frontlines on the map.
+  useEffect(() => {
+    if (!activeLayers.frontlines) return;
+    const retry = window.setInterval(() => {
+      if (document.hidden || dataRef.current.frontlines_meta?.status === 'ok') return;
+      void fetchEndpoint('/api/frontlines', d => ({
+        frontlines: d.status === 'ok'
+          ? (d.frontlines ?? { type: 'FeatureCollection', features: [] })
+          : { type: 'FeatureCollection', features: [] },
+        frontlines_meta: {
+          total: d.total ?? 0,
+          status: d.status ?? 'unavailable',
+          source: d.source ?? 'DeepStateMap.Live',
+          sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
+          timestamp: d.timestamp ?? null,
+        },
+      }), undefined, { skipWhenHidden: true });
+    }, 5 * 60_000);
+    return () => window.clearInterval(retry);
+  }, [activeLayers.frontlines, fetchEndpoint]);
+
+    // Refresh time-sensitive, published MENA activity once when returning from a
   // meaningful hidden period. Do not revive daily reference layers or duplicate
   // requests for very short tab switches.
   useEffect(() => {
@@ -1742,7 +1780,7 @@ export default function Dashboard() {
         style={{ left: isMobile ? '12px' : '120px', right: isMobile ? '12px' : 'auto' }}
       >
         {/* Unified Control Strip */}
-        <div className="flex w-fit max-w-full items-center justify-center gap-[3px] p-[4px] pointer-events-auto rounded-2xl border border-[var(--border-primary)] bg-[rgba(7,9,16,0.88)] backdrop-blur-2xl shadow-[0_12px_36px_rgba(0,0,0,0.58),0_0_24px_rgba(var(--gold-rgb),0.05)]">
+        <div className="flex w-fit max-w-full items-center justify-center gap-[3px] p-[4px] pointer-events-auto rounded-2xl border border-white/20 bg-[rgba(7,9,16,0.16)] backdrop-blur-sm shadow-[0_5px_16px_rgba(0,0,0,0.2)]">
           <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} title="كرة ثلاثية الأبعاد" icon={Globe} label="3D" />
           <ViewSegment layoutId="view-projection" active={mapProjection === 'mercator'} onClick={selectFlatMap} title="خريطة ثنائية الأبعاد" icon={MapPinned} label="2D" />
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
@@ -1754,7 +1792,7 @@ export default function Dashboard() {
             onClick={saveWorkspaceNow}
             title="حفظ العرض الحالي الآن — الحفظ التلقائي يعمل أيضًا (Ctrl+S)"
             aria-label="حفظ العرض الحالي"
-            className={`flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[11px] font-semibold transition-colors ${saveConfirmed ? 'bg-emerald-400/20 text-emerald-200' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}
+            className={`flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[11px] font-semibold transition-colors ${saveConfirmed ? 'bg-transparent text-emerald-200' : 'bg-transparent text-white/80 hover:text-white'}`}
           >
             <Save className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{saveConfirmed ? 'تم الحفظ' : 'حفظ'}</span>
@@ -1763,13 +1801,13 @@ export default function Dashboard() {
 
 
         {/* One-touch regional operations layout, independent of source layers. */}
-        <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.90)] p-1.5 shadow-[0_8px_32px_rgba(0,0,0,.4)]" aria-label="عرض الرصد ووضوح القمر الصناعي">
+        <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
           <button type="button" onClick={() => {
               selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
               if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
             }}
-            className="rounded-md border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20 focus-visible:ring-2 focus-visible:ring-cyan-300"
+            className="rounded-md border border-cyan-300/45 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300"
             title="خريطة داكنة مسطّحة، تركيز الشرق الأوسط، موجز الأدلة المنشورة — لا يغيّر المصادر">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> مرصد الشرق الأوسط
           </button>
@@ -1779,14 +1817,14 @@ export default function Dashboard() {
               <button type="button" key={mode} onClick={() => setSatelliteVisual(mode)}
                 title={SATELLITE_VISUAL_PRESETS[mode].descriptionAr}
                 aria-pressed={satelliteVisual === mode}
-                className={`rounded-md px-2 py-1.5 text-[11px] focus-visible:ring-2 focus-visible:ring-cyan-300 ${satelliteVisual === mode ? 'bg-amber-300/25 font-bold text-amber-100 ring-1 ring-amber-300/60' : 'text-white/70 hover:bg-white/15'}`}>
+                className={`rounded-md px-2 py-1.5 text-[11px] focus-visible:ring-2 focus-visible:ring-cyan-300 ${satelliteVisual === mode ? 'bg-transparent font-bold text-amber-100 ring-1 ring-amber-300/60' : 'bg-transparent text-white/80 hover:text-white'}`}>
                 {SATELLITE_VISUAL_PRESETS[mode].labelAr}
               </button>
             ))}
           </>}
         </div>
         {(activeLayers.gdelt_events || activeLayers.civil_unrest) && <details dir="rtl"
-          className="pointer-events-auto max-w-[min(92vw,460px)] rounded-xl border border-white/12 bg-[#05080d]/48 px-2.5 py-1.5 text-[11px] leading-5 text-white/90 shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl" aria-label="دليل رموز الأحداث">
+          className="pointer-events-auto max-w-[min(92vw,460px)] rounded-xl border border-white/15 bg-[#05080d]/15 px-2.5 py-1.5 text-[11px] leading-5 text-white/90 shadow-sm backdrop-blur-sm" aria-label="دليل رموز الأحداث">
           <summary className="cursor-pointer list-none py-1 font-semibold text-amber-100">دليل الرموز ▾</summary>
           <div className="pt-1">
             <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
@@ -1836,7 +1874,7 @@ export default function Dashboard() {
           selector and event/border visibility without any privileged controls. */}
       {embedMode && embedSurface === 'public' && (
         <div dir="rtl" className="absolute top-2 right-2 z-[450] w-[min(96vw,600px)] max-w-full pointer-events-none">
-          <nav aria-label="أدوات الرصد العام" className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-amber-300/25 bg-[#060c16]/90 p-2 text-xs text-white shadow-xl backdrop-blur-xl">
+          <nav aria-label="أدوات الرصد العام" className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-amber-300/30 bg-[#060c16]/20 p-2 text-xs text-white shadow-md backdrop-blur-sm">
             <button type="button" aria-expanded={showMenaPulse}
               onClick={() => {
                 selectFlatMap();
@@ -1844,18 +1882,18 @@ export default function Dashboard() {
                 setShowMenaPulse(open => !open);
                 setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
               }}
-              className="min-h-10 rounded-lg border border-cyan-300/40 px-2.5 py-2 font-semibold text-cyan-100 hover:bg-cyan-300/15 focus-visible:ring-2 focus-visible:ring-cyan-300">
+              className="min-h-10 rounded-lg border border-cyan-300/40 bg-transparent px-2.5 py-2 font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300">
               مرصد الشرق الأوسط
             </button>
             <button type="button" aria-pressed={mapStyle === 'dark'}
               onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
-              className="min-h-10 rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              className="min-h-10 rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
               {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
             </button>
             <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
               title="حدود جغرافية مرجعية عامة؛ المناطق المتنازع عليها ليست حكمًا سياديًا"
               onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
-              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${activeLayers.country_borders ? 'border-amber-300/50 bg-amber-300/10 text-amber-100' : 'border-white/25 text-white/70'}`}>
+              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${activeLayers.country_borders ? 'border-amber-300/50 bg-transparent text-amber-100 ring-1 ring-amber-300/35' : 'border-white/25 bg-transparent text-white/80'}`}>
               الحدود
             </button>
             <button type="button" aria-pressed={publicEmbedQuiet}
@@ -1870,21 +1908,21 @@ export default function Dashboard() {
                 }
                 setPublicEmbedQuiet(quiet => !quiet);
               }}
-              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${publicEmbedQuiet ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100' : 'border-white/25 text-white/80'}`}>
+              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${publicEmbedQuiet ? 'border-cyan-300/50 bg-transparent text-cyan-100 ring-1 ring-cyan-300/35' : 'border-white/25 bg-transparent text-white/80'}`}>
               {publicEmbedQuiet ? 'إظهار التفاصيل' : 'تقليل ازدحام الأحداث'}
             </button>
             <button type="button" aria-expanded={showPublicEmbedLayers}
               onClick={() => setShowPublicEmbedLayers(open => !open)}
-              className="min-h-10 rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              className="min-h-10 rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
               الطبقات والتصفية
             </button>
             <a href="https://m3tm.app/news" target="_blank" rel="noopener noreferrer"
-              className="flex min-h-10 items-center rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              className="flex min-h-10 items-center rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
               الأخبار المنشورة
             </a>
           </nav>
           {showMenaPulse && (
-            <div className="pointer-events-auto mt-2 max-h-[min(62dvh,470px)] max-w-[440px] overflow-y-auto rounded-xl border border-cyan-300/20 bg-[#060c16]/95 p-2 shadow-xl backdrop-blur-xl">
+            <div className="pointer-events-auto mt-2 max-h-[min(62dvh,470px)] max-w-[440px] overflow-y-auto rounded-xl border border-cyan-300/20 bg-[#060c16]/20 p-2 shadow-md backdrop-blur-sm">
               <p className="px-1 pb-2 text-[11px] text-slate-300">تقارير منشورة وتصنيفات وصفية محايدة؛ لا إثبات مستقل للواقعة ولا استنتاج للنوايا. المواقع المعروضة مرجعية أو معممة.</p>
               <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
                 publishedAt={data.conflict_source_published_at}
@@ -2266,7 +2304,7 @@ export default function Dashboard() {
                       setFlyToLocation({lat,lng,zoom:6,ts:Date.now()});
                       setMobilePanel(null);
                     }}/>
-                    <details className="rounded-xl border border-cyan-300/25 bg-black/60 p-2">
+                    <details className="rounded-xl border border-cyan-300/25 bg-black/15 p-2 backdrop-blur-sm">
                       <summary className="cursor-pointer py-2 text-sm font-semibold text-cyan-100">
                         مرصد الشرق الأوسط · الاشتباكات والنزاعات والمواقع
                       </summary>
