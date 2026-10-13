@@ -127,6 +127,7 @@ describe('temporary public WORLD map suspension', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(response.headers.get('x-robots-tag')).toContain('noindex');
+    expect(response.headers.get('x-m3tm-public-map')).toBe('maintenance');
     expect(await response.text()).toContain('صيانة مؤقتة لتحسين خدمة الخريطة');
     expect(waitUntil).not.toHaveBeenCalled();
   });
