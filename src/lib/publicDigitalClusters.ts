@@ -41,6 +41,11 @@ export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date
     if (typeof item.start !== 'string' || !item.start.trim()) continue;
     const observed = Date.parse(item.start);
     if (!Number.isFinite(observed) || observed > nowMs || nowMs - observed > MAX_REPORT_AGE_MS) continue;
+    if (item.end !== null && item.end !== undefined) {
+      if (typeof item.end !== 'string' || !item.end.trim()) continue;
+      const ended = Date.parse(item.end);
+      if (!Number.isFinite(ended) || ended < observed || ended > nowMs) continue;
+    }
     const code = typeof item.country === 'string' ? item.country.trim().toUpperCase() : '';
     if (!REGIONAL_CODES.has(code) || !centroidFor(code)) continue;
     let group = groups.get(code);
@@ -108,8 +113,8 @@ export function sharedCountryOutageContexts(rows: unknown, nowMs = Date.now()): 
     if (r.end !== null && r.end !== undefined && (typeof r.end !== 'string' || !r.end.trim())) continue;
     const end = typeof r.end === 'string' ? Date.parse(r.end) : null;
     if (end !== null && (!Number.isFinite(end) || end < start || end > nowMs)) continue;
-    // Only annotate the last 24 hours on WORLD. A continuing event whose
-    // start was earlier can still be visible when source confirms ongoing.
+    // The display window is 24 hours from the end of an ended event,
+    // or from the start of an ongoing event; older data is never live.
     if (end !== null && nowMs - end > MAX_REPORT_AGE_MS) continue;
     if (end === null && nowMs - start > MAX_REPORT_AGE_MS) continue;
     const id = r.annotation_id;
