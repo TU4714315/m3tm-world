@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Pentagon, Radio, PenLine, Save } from 'lucide-react';
+import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, Eye, EyeOff, SlidersHorizontal, ChevronDown, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Pentagon, Radio, PenLine, Save } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
@@ -25,7 +25,7 @@ import SharePanel from '@/components/SharePanel';
 import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
-import { reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
+import { hidePublicMapMarkers, reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
 import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
@@ -441,8 +441,17 @@ export default function Dashboard() {
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
   const [showPublicEmbedLayers, setShowPublicEmbedLayers] = useState(false);
+  const [showPublicDisplayControls, setShowPublicDisplayControls] = useState(false);
+  const [showPublicMapMarkers, setShowPublicMapMarkers] = useState(true);
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
+  // This affects map rendering only, not source ingestion or the user's saved layer preferences.
+  const displayedMapLayers = useMemo(
+    () => embedMode && embedSurface === 'public'
+      ? hidePublicMapMarkers(activeLayers, showPublicMapMarkers)
+      : activeLayers,
+    [activeLayers, embedMode, embedSurface, showPublicMapMarkers],
+  );
   const workspaceAutoSaveReadyRef = useRef(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
 
@@ -1653,7 +1662,7 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={activeLayers}
+          activeLayers={displayedMapLayers}
           onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
@@ -1870,64 +1879,100 @@ export default function Dashboard() {
 
 
 
-      {/* Public-only embed controls: restore the MENA desk, visual basemap
-          selector and event/border visibility without any privileged controls. */}
+      {/* Compact public controls: mobile map remains usable with all panels collapsed. */}
       {embedMode && embedSurface === 'public' && (
-        <div dir="rtl" className="absolute top-2 right-2 z-[450] w-[min(96vw,600px)] max-w-full pointer-events-none">
-          <nav aria-label="أدوات الرصد العام" className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-amber-300/30 bg-[#060c16]/20 p-2 text-xs text-white shadow-md backdrop-blur-sm">
-            <button type="button" aria-expanded={showMenaPulse}
-              onClick={() => {
-                selectFlatMap();
-                setMapStyle('dark');
-                setShowMenaPulse(open => !open);
-                setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
-              }}
-              className="min-h-10 rounded-lg border border-cyan-300/40 bg-transparent px-2.5 py-2 font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300">
-              مرصد الشرق الأوسط
+        <div dir="rtl" className="absolute top-2 right-2 z-[450] w-[min(91vw,350px)] pointer-events-none">
+          <div className="pointer-events-auto flex justify-start">
+            <button type="button"
+              aria-expanded={showPublicDisplayControls}
+              aria-controls="m3tm-public-display-controls"
+              aria-label={showPublicDisplayControls ? 'إخفاء أدوات عرض الخريطة' : 'عرض أدوات الخريطة'}
+              onClick={() => setShowPublicDisplayControls(open => !open)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-cyan-300/40 bg-[#050b16]/40 px-3 text-xs font-semibold text-cyan-100 shadow-lg backdrop-blur-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              <span>العرض</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${showPublicDisplayControls ? 'rotate-180' : ''}`} aria-hidden="true"/>
             </button>
-            <button type="button" aria-pressed={mapStyle === 'dark'}
-              onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
-              className="min-h-10 rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
-              {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
-            </button>
-            <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
-              title="حدود جغرافية مرجعية عامة؛ المناطق المتنازع عليها ليست حكمًا سياديًا"
-              onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
-              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${activeLayers.country_borders ? 'border-amber-300/50 bg-transparent text-amber-100 ring-1 ring-amber-300/35' : 'border-white/25 bg-transparent text-white/80'}`}>
-              الحدود
-            </button>
-            <button type="button" aria-pressed={publicEmbedQuiet}
-              title="يخفي فقط الرموز والكثافة المتراكبة؛ لا يحذف تقارير النزاع ولا يؤثر في البيانات"
-              onClick={() => {
-                if (!publicEmbedQuiet) {
-                  quietPublicLayersBeforeRef.current = { ...activeLayers };
-                  setActiveLayers(reducePublicEventClutter(activeLayers));
-                } else if (quietPublicLayersBeforeRef.current) {
-                  setActiveLayers(restorePublicEventClutter(activeLayers, quietPublicLayersBeforeRef.current));
-                  quietPublicLayersBeforeRef.current = null;
-                }
-                setPublicEmbedQuiet(quiet => !quiet);
-              }}
-              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${publicEmbedQuiet ? 'border-cyan-300/50 bg-transparent text-cyan-100 ring-1 ring-cyan-300/35' : 'border-white/25 bg-transparent text-white/80'}`}>
-              {publicEmbedQuiet ? 'إظهار التفاصيل' : 'تقليل ازدحام الأحداث'}
-            </button>
-            <button type="button" aria-expanded={showPublicEmbedLayers}
-              onClick={() => setShowPublicEmbedLayers(open => !open)}
-              className="min-h-10 rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
-              الطبقات والتصفية
-            </button>
-            <a href="https://m3tm.app/news" target="_blank" rel="noopener noreferrer"
-              className="flex min-h-10 items-center rounded-lg border border-white/25 bg-transparent px-2.5 py-2 hover:border-white/55 focus-visible:ring-2">
-              الأخبار المنشورة
-            </a>
-          </nav>
+          </div>
+          {showPublicDisplayControls && (
+            <nav id="m3tm-public-display-controls" aria-label="أدوات عرض الخريطة العامة"
+              className="pointer-events-auto mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-cyan-300/30 bg-[#060c16]/85 p-2 text-xs text-white shadow-xl backdrop-blur-md"
+              onKeyDown={event => { if (event.key === 'Escape') setShowPublicDisplayControls(false); }}>
+              <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
+                title="إظهار أو إخفاء خطوط الحدود المرجعية دون تعديل بيانات الخريطة"
+                onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
+                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-amber-300 ${activeLayers.country_borders ? 'border-amber-300/55 text-amber-100' : 'border-white/25 text-white/75'}`}>
+                {activeLayers.country_borders ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                الحدود: {activeLayers.country_borders ? 'ظاهرة' : 'مخفية'}
+              </button>
+              <button type="button" aria-pressed={showPublicMapMarkers}
+                title="إظهار أو إخفاء رموز ومؤشرات الخريطة دون حذف الأخبار أو الأحداث"
+                onClick={() => setShowPublicMapMarkers(show => !show)}
+                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-cyan-300 ${showPublicMapMarkers ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/75'}`}>
+                {showPublicMapMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                الرموز: {showPublicMapMarkers ? 'ظاهرة' : 'مخفية'}
+              </button>
+              <button type="button" aria-expanded={showMenaPulse}
+                onClick={() => {
+                  selectFlatMap(); setMapStyle('dark');
+                  setShowMenaPulse(open => !open);
+                  setShowPublicDisplayControls(false);
+                  setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
+                }}
+                className="min-h-10 rounded-xl border border-cyan-300/30 bg-transparent px-2 text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                مرصد الشرق الأوسط
+              </button>
+              <button type="button" aria-pressed={mapStyle === 'satellite'}
+                onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
+                className="min-h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white/90 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
+              </button>
+              <button type="button" aria-pressed={publicEmbedQuiet}
+                title="تقليل كثافة طبقات البلاغات دون مسح بياناتها"
+                onClick={() => {
+                  if (!publicEmbedQuiet) {
+                    quietPublicLayersBeforeRef.current = { ...activeLayers };
+                    setActiveLayers(reducePublicEventClutter(activeLayers));
+                  } else if (quietPublicLayersBeforeRef.current) {
+                    setActiveLayers(restorePublicEventClutter(activeLayers, quietPublicLayersBeforeRef.current));
+                    quietPublicLayersBeforeRef.current = null;
+                  }
+                  setPublicEmbedQuiet(quiet => !quiet);
+                }}
+                className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${publicEmbedQuiet ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
+                {publicEmbedQuiet ? 'إظهار التفاصيل' : 'تقليل الازدحام'}
+              </button>
+              <button type="button" aria-expanded={showPublicEmbedLayers}
+                onClick={() => {
+                  setShowPublicEmbedLayers(open => !open);
+                  setShowPublicDisplayControls(false);
+                }}
+                className="min-h-10 rounded-xl border border-white/25 bg-transparent px-2 text-white/90 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                الطبقات والتصفية
+              </button>
+              <a href="https://m3tm.app/news" target="_blank" rel="noopener noreferrer"
+                className="col-span-2 flex min-h-9 items-center justify-center rounded-xl border border-white/15 bg-transparent text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                الأخبار المنشورة
+              </a>
+              <p className="col-span-2 px-1 text-center text-[10px] leading-4 text-slate-300">
+                مفاتيح العرض لا تحذف بيانات الأخبار أو الأحداث، وتبقى حدود الدول مرجعية غير سيادية.
+              </p>
+            </nav>
+          )}
           {showMenaPulse && (
-            <div className="pointer-events-auto mt-2 max-h-[min(62dvh,470px)] max-w-[440px] overflow-y-auto rounded-xl border border-cyan-300/20 bg-[#060c16]/20 p-2 shadow-md backdrop-blur-sm">
-              <p className="px-1 pb-2 text-[11px] text-slate-300">تقارير منشورة وتصنيفات وصفية محايدة؛ لا إثبات مستقل للواقعة ولا استنتاج للنوايا. المواقع المعروضة مرجعية أو معممة.</p>
+            <section aria-label="ملخص مرصد الشرق الأوسط" className="pointer-events-auto mt-2 max-h-[min(53dvh,360px)] overflow-y-auto rounded-xl border border-cyan-300/25 bg-[#060c16]/80 p-2 shadow-lg backdrop-blur-md">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-slate-200">تقارير منشورة ومحايدة؛ المواقع مرجعية أو معممة.</span>
+                <button type="button" aria-label="إخفاء مرصد الشرق الأوسط"
+                  onClick={() => setShowMenaPulse(false)}
+                  className="shrink-0 rounded-lg border border-white/20 bg-transparent p-2 text-white/80 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                  <X className="h-4 w-4"/>
+                </button>
+              </div>
               <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
                 publishedAt={data.conflict_source_published_at}
                 onFocus={() => setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() })} />
-            </div>
+            </section>
           )}
         </div>
       )}
