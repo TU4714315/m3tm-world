@@ -22,7 +22,6 @@ export interface PublicDigitalCluster {
 
 type Row = Record<string, unknown>;
 const MAX_REPORT_AGE_MS = 24 * 60 * 60_000;
-const CLOCK_SKEW_MS = 5 * 60_000;
 // Owner-defined regional scope: Saudi Arabia explicitly excluded.
 const REGIONAL_CODES = new Set(['YE', 'IQ', 'OM', 'IR', 'AE', 'QA', 'BH', 'KW']);
 
@@ -35,11 +34,13 @@ export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date
     const item = row as Row;
     // GDELT CAMEO 176 covers reported cyber events, not verified connectivity
     // incidents. Never silently count those as outages or physical clusters.
-    if (item.source !== 'Cloudflare Radar' || item.event_type === 'REPORTED_CYBER_EVENT') continue;
-    if (typeof item.id !== 'string' || !item.id.trim() || item.id.length > 180) continue;
+    if (item.source !== 'Cloudflare Radar' || item.event_type !== 'OUTAGE') continue;
+    // One annotation across countries still represents one source report per country.
+    // Reject generated row IDs when no provider annotation ID was supplied.
+    if (typeof item.annotation_id !== 'string' || !item.annotation_id.trim() || item.annotation_id.length > 180) continue;
     if (typeof item.start !== 'string' || !item.start.trim()) continue;
     const observed = Date.parse(item.start);
-    if (!Number.isFinite(observed) || observed > nowMs + CLOCK_SKEW_MS || nowMs - observed > MAX_REPORT_AGE_MS) continue;
+    if (!Number.isFinite(observed) || observed > nowMs || nowMs - observed > MAX_REPORT_AGE_MS) continue;
     const code = typeof item.country === 'string' ? item.country.trim().toUpperCase() : '';
     if (!REGIONAL_CODES.has(code) || !centroidFor(code)) continue;
     let group = groups.get(code);
@@ -47,7 +48,7 @@ export function countryDigitalReportClusters(rows: unknown, nowMs: number = Date
       group = { ids: new Set<string>(), latest: 0 };
       groups.set(code, group);
     }
-    group.ids.add(item.id);
+    group.ids.add(item.annotation_id);
     group.latest = Math.max(group.latest, observed);
   }
 
@@ -92,6 +93,7 @@ export interface DigitalSharedOutageContext {
 export function sharedCountryOutageContexts(rows: unknown, nowMs = Date.now()): DigitalSharedOutageContext[] {
   if (!Array.isArray(rows) || !Number.isFinite(nowMs)) return [];
   const grouped = new Map<string, { start: number; end: number | null; countries: Set<string> }>();
+  const ambiguousIds = new Set<string>();
   for (const raw of rows.slice(0, 500)) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
     const r = raw as Row;
@@ -102,19 +104,22 @@ export function sharedCountryOutageContexts(rows: unknown, nowMs = Date.now()): 
     if (!REGIONAL_CODES.has(country) || !centroidFor(country)) continue;
     if (typeof r.start !== 'string') continue;
     const start = Date.parse(r.start);
-    if (!Number.isFinite(start) || start > nowMs + CLOCK_SKEW_MS) continue;
-    const end = typeof r.end === 'string' && r.end.trim() ? Date.parse(r.end) : null;
-    if (end !== null && (!Number.isFinite(end) || end < start || end > nowMs + CLOCK_SKEW_MS)) continue;
+    if (!Number.isFinite(start) || start > nowMs) continue;
+    if (r.end !== null && r.end !== undefined && (typeof r.end !== 'string' || !r.end.trim())) continue;
+    const end = typeof r.end === 'string' ? Date.parse(r.end) : null;
+    if (end !== null && (!Number.isFinite(end) || end < start || end > nowMs)) continue;
     // Only annotate the last 24 hours on WORLD. A continuing event whose
     // start was earlier can still be visible when source confirms ongoing.
     if (end !== null && nowMs - end > MAX_REPORT_AGE_MS) continue;
     if (end === null && nowMs - start > MAX_REPORT_AGE_MS) continue;
     const id = r.annotation_id;
+    if (ambiguousIds.has(id)) continue;
     const group = grouped.get(id);
     if (group) {
       // A provider annotation ID with mismatched clocks is ambiguous.
       if (group.start !== start || group.end !== end) {
         grouped.delete(id);
+        ambiguousIds.add(id);
         continue;
       }
       group.countries.add(country);
