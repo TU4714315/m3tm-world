@@ -57,4 +57,52 @@ describe('CCTV partial responses', () => {
     expect((await second.json()).pendingRegions).toEqual(['uk']);
     expect(vi.mocked(stealthFetch)).toHaveBeenCalledTimes(1);
   });
+  it('serves cameras as soon as a timed-out fetch finishes in the background', async () => {
+    let completeFetch!: (response: Response) => void;
+    vi.mocked(stealthFetch).mockReturnValueOnce(new Promise<Response>(resolve => {
+      completeFetch = resolve;
+    }));
+
+    const first = GET(new Request('http://localhost/api/cctv?region=uk'));
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect((await (await first).json()).pendingRegions).toEqual(['uk']);
+
+    // Upstream finally responds after the 12s response budget; sourceCache
+    // has the cameras now, and a five-minute timeout cooldown must not hide them.
+    completeFetch(Response.json([
+      { id: 'JamCams_late', lat: 51.5, lon: -0.1, commonName: 'Late London' },
+    ]));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const second = await GET(new Request('http://localhost/api/cctv?region=uk'));
+    const body = await second.json();
+    expect(body.total).toBe(1);
+    expect(body.pendingRegions).toEqual([]);
+    expect(vi.mocked(stealthFetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves timeout cooldown for a concurrent request receiving the same late empty response', async () => {
+    let completeFetch!: (response: Response) => void;
+    vi.mocked(stealthFetch).mockReturnValueOnce(new Promise<Response>(resolve => {
+      completeFetch = resolve;
+    }));
+
+    const first = GET(new Request('http://localhost/api/cctv?region=uk'));
+    await vi.advanceTimersByTimeAsync(5_000);
+    // Shares the upstream request, but has a later response timeout.
+    const overlapping = GET(new Request('http://localhost/api/cctv?region=uk'));
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect((await (await first).json()).pendingRegions).toEqual(['uk']);
+
+    // The first request has already installed its cooldown; the still-active
+    // second request must not clear it when the shared upstream result is empty.
+    completeFetch(Response.json([]));
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await (await overlapping).json()).pendingRegions).toEqual(['uk']);
+
+    const third = await GET(new Request('http://localhost/api/cctv?region=uk'));
+    expect((await third.json()).pendingRegions).toEqual(['uk']);
+    expect(vi.mocked(stealthFetch)).toHaveBeenCalledTimes(1);
+  });
+
 });
