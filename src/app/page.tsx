@@ -88,8 +88,8 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 
 const DEFAULT_ACTIVE_LAYERS = {
   flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
-  satellites: false, sat_comms: false, sat_military: false, sat_navigation: true,
-  sat_earth: true, sat_science: true, balloons: false, cctv: true, cctv_previews: true,
+  satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
+  sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
   live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
@@ -106,6 +106,13 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders',
+    ].includes(key) && ![
+      // Defer expensive catalogs, raster overlays and slower optional sources
+      // until the operator explicitly enables them. Keep MENA events, alerts,
+      // country borders and the public news signal on the first paint.
+      'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'fires', 'cf_outages', 'cf_attacks', 'reported_routes',
+      'conflict_density', 'frontlines',
     ].includes(key),
   ]),
 ) as typeof DEFAULT_ACTIVE_LAYERS;
@@ -406,7 +413,7 @@ export default function Dashboard() {
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
@@ -462,6 +469,10 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
+      // Embedded visitors should not pay for the satellite raster and globe
+      // projection before the simpler, source-backed map can first paint.
+      setMapStyle('dark');
+      setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
       setShowSpaceCam(false);
