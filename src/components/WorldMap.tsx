@@ -1847,7 +1847,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       popup(coords, `<div dir="rtl" style="${pStyle}border:1px solid rgba(125,211,252,.42);">
         <div style="color:#7DD3FC;font-size:12px;font-weight:700;margin-bottom:8px;">تجمع مؤشرات رقمية · ${htmlEsc(p.country || '—')}</div>
         <div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">${htmlEsc(p.report_count || 0)} بلاغات اتصال متميزة في نطاق الدولة من ${htmlEsc(p.source || '—')}.</div>
-        <div style="font-size:10px;color:#B8C3CA;margin-bottom:7px;">آخر بلاغ: ${htmlEsc(p.latest_report_utc || 'غير معروف')}</div>
+        <div style="font-size:10px;color:#B8C3CA;margin-bottom:7px;">أحدث وقت بدء انقطاع: ${htmlEsc(p.latest_report_utc || 'غير معروف')}</div>
         <div style="font-size:10px;color:#FFDB9F;line-height:1.6;">الرمز في مركز الدولة للعرض فقط؛ ليس موقع تجمع أجهزة أو محطة ارتباط. تعدد بلاغات مزود واحد ليس تأكيدًا مستقلًا.</div>
       </div>`);
     });
@@ -2442,6 +2442,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     return () => clearInterval(iv);
   }, [mapReady, activeLayers.day_night]);
 
+  // Re-evaluate expiring public network annotations even when fetching fails.
+  // This timer runs only while the country-level signal layer is visible and
+  // never fetches/polls a provider or reads raw device/IP data.
+  const [digitalExpiryTick, setDigitalExpiryTick] = useState(0);
+  useEffect(() => {
+    if (!mapReady || !(activeLayers as any).digital_clusters) return;
+    const updateIfVisible = () => {
+      if (!document.hidden) setDigitalExpiryTick(x => x + 1);
+    };
+    const handleVisibility = () => updateIfVisible();
+    const interval = window.setInterval(updateIfVisible, 60_000);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [mapReady, (activeLayers as any).digital_clusters]);
+
   // Helper to set GeoJSON
   const setGeo = useCallback((source: string, features: any[]) => {
     const src = mapRef.current?.getSource(source) as any;
@@ -2752,7 +2770,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         geometry: {type:'Point' as const,coordinates:[c.lng,c.lat]},
         properties: c,
       })) : []);
-  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, (activeLayers as any).digital_clusters, setGeo]);
+  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, (activeLayers as any).digital_clusters, digitalExpiryTick, setGeo]);
 
   /* ── Cloudflare Radar: attack origins ── */
   useEffect(() => {
