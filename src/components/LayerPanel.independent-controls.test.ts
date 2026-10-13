@@ -16,7 +16,7 @@ describe('WORLD independent public layer controls', () => {
   it('does not let a disabled child layer become active without its parent', () => {
     expect(panel).toContain('if (layer?.parent && !activeLayers[layer.parent]) return;');
     expect(panel).toContain('if (layer?.parent && !prev[layer.parent]) return prev;');
-    expect(panel.match(/disabled=\{dormant\}/g)).toHaveLength(2);
+    expect(panel.match(/(?:^|\s)disabled=\{dormant\}/g)).toHaveLength(2);
     expect(panel.match(/aria-disabled=\{dormant\}/g)).toHaveLength(2);
   });
 
