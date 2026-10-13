@@ -1049,12 +1049,13 @@ export default function Dashboard() {
     }
     if ((activeLayers as any).frontlines) {
       loadLayerOnce('frontlines', '/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines: d.status === 'ok' ? (d.frontlines ?? { type: 'FeatureCollection', features: [] }) : { type: 'FeatureCollection', features: [] },
         frontlines_meta: {
           total: d.total ?? 0,
           status: d.status ?? 'unavailable',
           source: d.source ?? 'DeepStateMap.Live',
           sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
           timestamp: d.timestamp ?? null,
         },
       }));
@@ -1136,12 +1137,13 @@ export default function Dashboard() {
     }
     if ((activeLayers as any).frontlines) {
       intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
-        frontlines: d.frontlines ?? { type: 'FeatureCollection', features: [] },
+        frontlines: d.status === 'ok' ? (d.frontlines ?? { type: 'FeatureCollection', features: [] }) : { type: 'FeatureCollection', features: [] },
         frontlines_meta: {
           total: d.total ?? 0,
           status: d.status ?? 'unavailable',
           source: d.source ?? 'DeepStateMap.Live',
           sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
           timestamp: d.timestamp ?? null,
         },
       }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.worldwidePublishedFrontlines));
@@ -1170,7 +1172,32 @@ export default function Dashboard() {
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint, showMenaPulse]);
 
-  // Refresh time-sensitive, published MENA activity once when returning from a
+  // Frontline sources can fail after a successful HTTP 200 response. Unlike a
+  // daily published-area refresh, an unavailable/dated snapshot gets a bounded
+  // five-minute retry while the tab is visible. No stale polygons are rendered
+  // as current frontlines on the map.
+  useEffect(() => {
+    if (!activeLayers.frontlines) return;
+    const retry = window.setInterval(() => {
+      if (document.hidden || dataRef.current.frontlines_meta?.status === 'ok') return;
+      void fetchEndpoint('/api/frontlines', d => ({
+        frontlines: d.status === 'ok'
+          ? (d.frontlines ?? { type: 'FeatureCollection', features: [] })
+          : { type: 'FeatureCollection', features: [] },
+        frontlines_meta: {
+          total: d.total ?? 0,
+          status: d.status ?? 'unavailable',
+          source: d.source ?? 'DeepStateMap.Live',
+          sourceMode: d.sourceMode ?? 'published-snapshot',
+          sourceFetchedAt: d.sourceFetchedAt ?? null,
+          timestamp: d.timestamp ?? null,
+        },
+      }), undefined, { skipWhenHidden: true });
+    }, 5 * 60_000);
+    return () => window.clearInterval(retry);
+  }, [activeLayers.frontlines, fetchEndpoint]);
+
+    // Refresh time-sensitive, published MENA activity once when returning from a
   // meaningful hidden period. Do not revive daily reference layers or duplicate
   // requests for very short tab switches.
   useEffect(() => {
