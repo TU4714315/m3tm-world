@@ -58,7 +58,6 @@ on:
       - '.github/workflows/world-public-layers.yml'
       # Required verify-world branch protection also covers runtime-probe changes.
       - '.github/workflows/world-live-source-smoke.yml'
-      - 'scripts/world-live-source-smoke.mjs'
   workflow_dispatch:
 
 concurrency:
