@@ -583,7 +583,7 @@ function withBudget(region: string, fetcher: RegionFetcher): Promise<{ cameras: 
       // Its result is then cached, so clear the timeout backoff immediately:
       // otherwise later requests hide healthy cameras for five minutes.
       // Keep the backoff for late empty responses to avoid repeated cold fetches.
-      if (!timedOut || cameras.length > 0) regionBackoffUntil.delete(region);
+      if (cameras.length > 0) regionBackoffUntil.delete(region);
       return { cameras, pending: cameras.length === 0 };
     }).finally(() => clearTimeout(timer)),
     new Promise<{ cameras: Awaited<ReturnType<RegionFetcher>>; pending: boolean }>(resolve => {
