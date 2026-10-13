@@ -3,6 +3,9 @@
 ## Purpose
 Display **country-level clusters of public network-outage annotations**, not device clusters, physical communication platforms, covert installations, or geolocated IPs.
 
+## Owner-defined geographical scope
+- Digital observation clusters and shared-annotation lines: **YE, IQ, OM, IR, AE, QA, BH, KW only**. Saudi Arabia (`SA`) is excluded in the aggregation code, including cross-border event lines; no country centroid or marker for SA.
+
 ## Evidence gates
 - Input: `/api/cloudflare-radar` existing `outages` observations, *only* records explicitly sourced to `Cloudflare Radar`.
 - An eligible cluster requires at least **two distinct outage annotation IDs** in one ISO alpha-2 country in the preceding **24 hours**.
