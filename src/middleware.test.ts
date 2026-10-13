@@ -112,3 +112,28 @@ describe('public OSINT boundary', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
   });
 });
+
+describe('temporary public WORLD map suspension', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    'https://m3tm-world-recovery.onrender.com/',
+    'https://m3tm-world-recovery.onrender.com/?embed=1&surface=public',
+    'https://m3tm-world.vercel.app/',
+  ])('blocks the map HTML at %s without invoking the render or telemetry', async (url) => {
+    vi.stubEnv('M3TM_WORLD_PUBLIC_MAP_ENABLED', 'false');
+    const waitUntil = vi.fn();
+    const response = middleware(new NextRequest(url), { waitUntil } as never);
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(response.headers.get('x-robots-tag')).toContain('noindex');
+    expect(await response.text()).toContain('صيانة مؤقتة لتحسين خدمة الخريطة');
+    expect(waitUntil).not.toHaveBeenCalled();
+  });
+
+  it('keeps the health and public-news endpoints outside the maintenance matcher', () => {
+    const matches = (path: string) => config.matcher.some(m => new RegExp(`^${m}$`).test(path));
+    expect(matches('/api/health')).toBe(false);
+    expect(matches('/api/news')).toBe(false);
+  });
+});
