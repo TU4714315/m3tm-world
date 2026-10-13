@@ -1,0 +1,80 @@
+name: WORLD public source reachability smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/world-live-source-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-live-probe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    # This is an observational production-origin probe, NOT candidate release
+    # validation. Render's deployed commit must be checked separately before
+    # accepting any new build as published.
+    name: Public health and source capability
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      # The repository currently has an unrelated broken scratch/astra gitlink.
+      # This non-secret, public read-only probe runs independently of checkout.
+      - name: Probe public Render production from GitHub runner
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {writeFile} from 'node:fs/promises';
+          const base='https://m3tm-world-recovery.onrender.com';
+          const cases=[
+            {name:'world-home',path:'/',method:'HEAD'},
+            {name:'cloudflare-provider-probe',path:'/api/cloudflare-radar?probe=1',method:'GET'},
+            {name:'cctv-region-catalog',path:'/api/cctv?catalog=regions',method:'GET'},
+          ];
+          const output=[];
+          for(const item of cases){
+            const started=Date.now();
+            const c=new AbortController();
+            const timer=setTimeout(()=>c.abort(),24000);
+            try {
+              const response=await fetch(base+item.path,{method:item.method,signal:c.signal,redirect:'error'});
+              const x={check:item.name,http_status:response.status,ok:response.ok,elapsed_ms:Date.now()-started};
+              if(item.method==='GET'&&response.ok){
+                const json=await response.json();
+                if(item.name==='cloudflare-provider-probe'){
+                  x.cloudflare_configured=json.configured===true;
+                  x.fallback_available=json.fallback_available===true;
+                  x.ok=typeof json.configured==='boolean'&&typeof json.fallback_available==='boolean';
+                }
+                if(item.name==='cctv-region-catalog'){
+                  x.westasia_registered=Array.isArray(json.regions)&&json.regions.includes('westasia');
+                  x.region_count=Array.isArray(json.regions)?json.regions.length:0;
+                  x.ok=x.westasia_registered;
+                }
+              }
+              output.push(x);
+            }catch(e){
+              output.push({check:item.name,http_status:null,ok:false,
+                elapsed_ms:Date.now()-started,error:e?.name==='AbortError'?'timeout':'request_failed'});
+            }finally{clearTimeout(timer);}
+          }
+          const result={checked_at:new Date().toISOString(),base,scope:'read-only-no-key-no-camera-images',checks:output};
+          await writeFile('world-live-source-smoke.json',JSON.stringify(result,null,2)+'\n');
+          console.log(JSON.stringify(result,null,2));
+          const table=['### WORLD Public source reachability','| Source | HTTP | Result |','|---|---|---|',
+            ...output.map(x=>`| ${x.check} | ${x.http_status??'—'} | ${x.ok?'OK':'FAILED'} |`),
+            '', 'Read-only probe of existing Render deployment, not PR candidate SHA. No private hosts, paid searches, camera feed or MapLibre paint tested.', ''].join('\n');
+          await writeFile(process.env.GITHUB_STEP_SUMMARY,table,{flag:'a'});
+          if(output.some(x=>!x.ok))process.exitCode=1;
+          NODE
+      - name: Preserve non-secret probe result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-live-source-smoke
+          path: world-live-source-smoke.json
+          retention-days: 3
