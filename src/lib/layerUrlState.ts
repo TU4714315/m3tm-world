@@ -1,5 +1,5 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '4';
+export const LAYER_URL_SCHEMA = '5';
 
 /** Defaults added in earlier schemas must only be migrated for bookmarks that
  * predate that schema. A v3 bookmark can contain an intentional off-choice for a
@@ -15,6 +15,9 @@ const V4_DEFAULT_ON_LAYERS = new Set([
   'private', 'jets', 'sdk_air', 'cf_outages', 'cf_attacks',
 ]);
 
+// Fresh source-backed national signal clusters were introduced in v5.
+const V5_DEFAULT_ON_LAYERS = new Set(['digital_clusters']);
+
 export function restoreLayerState<T extends Record<string, boolean>>(
   defaults: T,
   params: URLSearchParams,
@@ -29,7 +32,8 @@ export function restoreLayerState<T extends Record<string, boolean>>(
   for (const key of Object.keys(defaults)) {
     const migratedDefault =
       (schema < 3 && V3_DEFAULT_ON_LAYERS.has(key) && defaults[key])
-      || (schema < 4 && V4_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
+      || (schema < 4 && V4_DEFAULT_ON_LAYERS.has(key) && defaults[key])
+      || (schema < 5 && V5_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
     (restored as Record<string, boolean>)[key] = active.has(key) || migratedDefault;
   }
   return restored;
