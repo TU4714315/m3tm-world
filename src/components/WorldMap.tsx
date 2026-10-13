@@ -3199,6 +3199,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   // outage annotation pulses. It does NOT mean the physical connection failed.
   useEffect(() => {
     if (!mapReady || !mapRef.current || !(activeLayers as any).digital_clusters) return;
+    // The toggle defaults on, but most feeds have no ongoing shared annotation.
+    // Avoid repainting an otherwise idle global map every 1.2 seconds.
+    if (!sharedCountryOutageContexts(data.cf_outages).some(c => c.reported_ongoing)) return;
     const map = mapRef.current;
     let high = false;
     const pulse = () => {
@@ -3215,7 +3218,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           ['case',['==',['get','reported_ongoing'],true],0.82,0.35]);
       }
     };
-  }, [mapReady, (activeLayers as any).digital_clusters]);
+  }, [mapReady, data.cf_outages, (activeLayers as any).digital_clusters]);
 
   // Visibility
   useEffect(() => {
