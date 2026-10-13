@@ -141,6 +141,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
+      { key: 'digital_clusters', label: 'تجمعات المؤشرات الرقمية', description: 'تجميع بلاغات اتصال متميزة على مستوى الدولة فقط؛ ليس تجمع أجهزة أو موقع منشأة أو إشارة اتصال ميدانية.', dataKey: '' },
       { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'Cloudflare Radar عند تهيئته؛ وإلا أحداث سيبرانية منشورة من GDELT CAMEO 176. لا يُفترض أن كل بلاغ يمثل انقطاعًا شاملاً.', dataKey: 'cf_outages', requires: 'cloudflare' },
       { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'Cloudflare Layer 3 عند تهيئته؛ وإلا تجميع بلدي لبنية C2 المرصودة من abuse.ch/Feodo. البلد هو موقع البنية المرصودة وليس إسنادًا لهوية المهاجم.', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
