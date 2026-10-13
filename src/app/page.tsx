@@ -25,6 +25,7 @@ import SharePanel from '@/components/SharePanel';
 import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
+import { reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
 import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
 import ArcGISPanel from '@/components/ArcGISPanel';
@@ -433,6 +434,8 @@ export default function Dashboard() {
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
   const [showPublicEmbedLayers, setShowPublicEmbedLayers] = useState(false);
+  const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
+  const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
   const workspaceAutoSaveReadyRef = useRef(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
 
@@ -1829,6 +1832,68 @@ export default function Dashboard() {
 
 
 
+      {/* Public-only embed controls: restore the MENA desk, visual basemap
+          selector and event/border visibility without any privileged controls. */}
+      {embedMode && embedSurface === 'public' && (
+        <div dir="rtl" className="absolute top-2 right-2 z-[450] w-[min(96vw,600px)] max-w-full pointer-events-none">
+          <nav aria-label="أدوات الرصد العام" className="pointer-events-auto flex flex-wrap items-center gap-1.5 rounded-xl border border-amber-300/25 bg-[#060c16]/90 p-2 text-xs text-white shadow-xl backdrop-blur-xl">
+            <button type="button" aria-expanded={showMenaPulse}
+              onClick={() => {
+                selectFlatMap();
+                setMapStyle('dark');
+                setShowMenaPulse(open => !open);
+                setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
+              }}
+              className="min-h-10 rounded-lg border border-cyan-300/40 px-2.5 py-2 font-semibold text-cyan-100 hover:bg-cyan-300/15 focus-visible:ring-2 focus-visible:ring-cyan-300">
+              مرصد الشرق الأوسط
+            </button>
+            <button type="button" aria-pressed={mapStyle === 'dark'}
+              onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
+              className="min-h-10 rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
+            </button>
+            <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
+              title="حدود جغرافية مرجعية عامة؛ المناطق المتنازع عليها ليست حكمًا سياديًا"
+              onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
+              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${activeLayers.country_borders ? 'border-amber-300/50 bg-amber-300/10 text-amber-100' : 'border-white/25 text-white/70'}`}>
+              الحدود
+            </button>
+            <button type="button" aria-pressed={publicEmbedQuiet}
+              title="يخفي فقط الرموز والكثافة المتراكبة؛ لا يحذف تقارير النزاع ولا يؤثر في البيانات"
+              onClick={() => {
+                if (!publicEmbedQuiet) {
+                  quietPublicLayersBeforeRef.current = { ...activeLayers };
+                  setActiveLayers(reducePublicEventClutter(activeLayers));
+                } else if (quietPublicLayersBeforeRef.current) {
+                  setActiveLayers(restorePublicEventClutter(activeLayers, quietPublicLayersBeforeRef.current));
+                  quietPublicLayersBeforeRef.current = null;
+                }
+                setPublicEmbedQuiet(quiet => !quiet);
+              }}
+              className={`min-h-10 rounded-lg border px-2.5 py-2 focus-visible:ring-2 ${publicEmbedQuiet ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100' : 'border-white/25 text-white/80'}`}>
+              {publicEmbedQuiet ? 'إظهار التفاصيل' : 'تقليل ازدحام الأحداث'}
+            </button>
+            <button type="button" aria-expanded={showPublicEmbedLayers}
+              onClick={() => setShowPublicEmbedLayers(open => !open)}
+              className="min-h-10 rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              الطبقات والتصفية
+            </button>
+            <a href="https://m3tm.app/news" target="_blank" rel="noopener noreferrer"
+              className="flex min-h-10 items-center rounded-lg border border-white/25 px-2.5 py-2 hover:bg-white/10 focus-visible:ring-2">
+              الأخبار المنشورة
+            </a>
+          </nav>
+          {showMenaPulse && (
+            <div className="pointer-events-auto mt-2 max-h-[min(62dvh,470px)] max-w-[440px] overflow-y-auto rounded-xl border border-cyan-300/20 bg-[#060c16]/95 p-2 shadow-xl backdrop-blur-xl">
+              <p className="px-1 pb-2 text-[11px] text-slate-300">تقارير منشورة وتصنيفات وصفية محايدة؛ لا إثبات مستقل للواقعة ولا استنتاج للنوايا. المواقع المعروضة مرجعية أو معممة.</p>
+              <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+                publishedAt={data.conflict_source_published_at}
+                onFocus={() => setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() })} />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Public APP iframe: allow users to operate the real public layers
           without exposing internal OSINT controls or altering the bridge. */}
       {embedMode && embedSurface === 'public' && (
@@ -2347,7 +2412,7 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      {!embedMode && <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} />}
+      {(!embedMode || embedSurface === 'public') && <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />}
 
       {/* Shortcut hint — more visible */}
       {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
