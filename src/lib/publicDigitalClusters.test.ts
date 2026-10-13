@@ -98,6 +98,22 @@ describe('countryDigitalReportClusters', () => {
   });
 });
 
+describe('public digital marker expiry', () => {
+  it('expires country heat markers from public source start-time after 24h even with stale cached rows', () => {
+    const rows = [outage('one'), outage('two')];
+    expect(countryDigitalReportClusters(rows, NOW)).toHaveLength(1);
+    expect(countryDigitalReportClusters(rows, NOW + 3 * 60 * 60_000)).toHaveLength(0);
+  });
+  it('expires shared-country annotation lines independently of refresh success', () => {
+    const rows = [
+      outage('one', { annotation_id: 'published-outage', country: 'YE' }),
+      outage('two', { annotation_id: 'published-outage', country: 'OM' }),
+    ];
+    expect(sharedCountryOutageContexts(rows, NOW)).toHaveLength(1);
+    expect(sharedCountryOutageContexts(rows, NOW + 3 * 60 * 60_000)).toHaveLength(0);
+  });
+});
+
 describe('sharedCountryOutageContexts', () => {
   it('connects national display centroids ONLY for one verified provider outage ID', () => {
     const reports = [
