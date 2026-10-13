@@ -2,6 +2,13 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — public country-level digital-observation clusters (2026-10-13)
+**TASK:** Explicitly label aggregated digital reports as clusters on WORLD without making physical/operational site assertions.
+**DONE (isolated PR branch, not deployed):** Add `digital_clusters` map toggle and MapLibre bubble + evidence popup. Build country-level groups only from two or more distinct, recent Cloudflare Radar outage annotations; ignore IP/device positions, GDELT CAMEO 176 cyber reports and invalid data. Reuse existing `/api/cloudflare-radar`, add URL schema v5 migration and focused tests. The count is **reports**, never devices or independent sources. Source may legitimately have zero clusters.
+**POLICY:** [WORLD_PUBLIC_DIGITAL_CLUSTER_POLICY_2026-10-13.md](WORLD_PUBLIC_DIGITAL_CLUSTER_POLICY_2026-10-13.md). Shodan is NOT connected, no site localization and no new subscription.
+**VERIFY/BLOCKER:** Run TypeScript, Vitest, Next build and CI; preview/browser paint and production source data not yet proven. Workspace Core shell is unavailable (`Tool exec_command not found`). No production mutation until verified green release gates.
+**NEXT:** Open focused PR, review tests/preview, then merge/deploy only with evidence and current production health.
+
 ## CHECKPOINT — bounded process cache memory after Render V8 OOM (2026-10-11)
 **TASK:** Prevent repeat of proven Node V8 heap out-of-memory (Render exit 139) while retaining valid public cached event layers.
 **DONE (pending review):** A 16 MiB total limit and 8 MiB per JSON entry for fallback process memory; evict oldest keys by retained byte count; refreshed keys move to newest position; reject oversized memory entry while Redis path remains usable. Adapt public API cache-backend types and add regression tests. No paid backend, DNS or private OSINT changes.
