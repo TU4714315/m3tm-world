@@ -17,6 +17,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store, max-age=0',
         'Retry-After': '300',
+        'X-M3TM-Public-Map': 'maintenance',
         'X-Robots-Tag': 'noindex, nofollow',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
       },
