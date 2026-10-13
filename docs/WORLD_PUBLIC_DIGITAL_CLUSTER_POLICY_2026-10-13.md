@@ -19,6 +19,13 @@ Display **country-level clusters of public network-outage annotations**, not dev
 - The popup says clearly that one provider's repeated reports do not independently corroborate the cause or establish a physical site.
 - A user-visible layer toggle and URL v5 migration preserve both new defaults and later explicit opt-outs.
 - The layer reuses an existing data response; no scans, secrets, background polling or new paid endpoints.
+- When `cloudflare_source_status.providers.cloudflare_outages` is `not_configured` or `unavailable`, the map remains empty for this layer and controls explain its source state quietly. GDELT and Feodo fallback events remain available to their established layers but are never treated as Cloudflare outage annotations.
+
+## Live source validation (2026-10-13)
+- Independent [PR #122](https://github.com/TU4714315/m3tm-world/pull/122) read-only GitHub Actions smoke run [`38417672454`](https://github.com/TU4714315/m3tm-world/actions/runs/38417672454) at `2026-10-13T14:56:22Z` reported Render `GET /api/cloudflare-radar?probe=1` HTTP 200 with `configured=false` and `fallback_available=true`.
+- The same probe reported `HEAD /` HTTP 200 and CCTV region catalog available (`westasia=true`, 56 regions). These checks establish transport and public catalog availability, not active webcam streams or MapLibre WebGL paint.
+- Thus the deployed Render environment at that observation **cannot** supply eligible Cloudflare digital clusters. Do not manufacture symbols from GDELT cyber events or infer a Yemen cluster. A server-only `CLOUDFLARE_API_TOKEN` configuration, verified Cloudflare API response and at least two eligible fresh distinct outage IDs in an allowed country are all necessary before any national marker appears.
+- Render production is still pinned to baseline commit `9bdc7237` with autoDeploy off; this PR remains a draft pending visual and source verification. Do not expose credentials in logs, UI or Git.
 
 ## Scope limitations
 - Shodan/Censys device index searches are **not** wired into this layer and must not be presented as active.
