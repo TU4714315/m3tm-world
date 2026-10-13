@@ -53,7 +53,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Network,
     layers: [
       { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'كابلات ثابتة؛ السفن حسب توفر AIS' },
-      { key: 'sdk_air', label: 'الرصد الجوي العام', dataKey: 'commercial_flights', description: 'مشاهدات طيران مدنية دورية' },
       { key: 'sdk_naval', label: 'رصد الأحداث', dataKey: 'gdelt', description: 'أحداث عامة محددة الموقع' },
     ],
   },
@@ -62,6 +61,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الطيران',
     icon: Plane,
     layers: [
+      { key: 'sdk_air', label: 'الطيران المدني الإضافي', dataKey: 'commercial_flights', description: 'مشاهدات طيران مدنية دورية؛ يفعّل العرض الجوي فقط' },
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
       { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع؛ عدم الظهور لا يعني عدم وجود طائرة، ولا تُستنتج مواقع غير مرصودة' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
@@ -225,8 +225,23 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   }, [pinnedGroup]);
 
   const toggle = (key: string) => {
+    // Sub-layers cannot become active independently of their parent, even
+    // during rapid clicks while React is applying queued state updates.
+    const definitions = LAYER_GROUPS.flatMap(group => group.layers);
+    const layer = definitions.find(item => item.key === key);
+    if (layer?.parent && !activeLayers[layer.parent]) return;
     if ((key === 'terrain_elevation' || key === 'terrain_3d') && !activeLayers[key]) on3DModeSelected?.();
-    setActiveLayers((prev: any) => ({ ...prev, [key]: !prev[key] }));
+    setActiveLayers((prev: any) => {
+      if (layer?.parent && !prev[layer.parent]) return prev;
+      const next = { ...prev, [key]: !prev[key] };
+      // Turning off a parent also turns off its dependent display switches.
+      if (!next[key]) {
+        for (const child of definitions) {
+          if (child.parent === key) next[child.key] = false;
+        }
+      }
+      return next;
+    });
   };
   const terrainDetails = activeLayers.terrain_elevation ? (
     <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-[10px] text-white/60">
@@ -292,7 +307,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 return (
                   <button
                     key={layer.key}
+                    type="button"
                     onClick={() => toggle(layer.key)}
+                    disabled={dormant}
+                    aria-disabled={dormant}
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
                     
@@ -498,7 +516,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         return (
                           <button
                             key={layer.key}
+                            type="button"
                             onClick={() => toggle(layer.key)}
+                            disabled={dormant}
+                            aria-disabled={dormant}
                             aria-pressed={!!isLayerActive}
                             aria-label={layer.label}
                             
