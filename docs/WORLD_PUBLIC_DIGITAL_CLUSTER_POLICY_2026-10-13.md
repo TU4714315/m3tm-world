@@ -11,7 +11,10 @@ Display **country-level clusters of public network-outage annotations**, not dev
 - An eligible cluster requires at least **two distinct outage annotation IDs** in one ISO alpha-2 country in the preceding **24 hours**.
 - Invalid timestamps, future observations, unknown countries, empty IDs, duplicates and GDELT CAMEO 176 cyber *reports* are rejected.
 - All input latitude/longitude values are ignored. Country centroid from `countryCentroids.ts` is used **only for display**. Zoom must never progressively disclose an alleged device or relay location.
-- Heatmap intensity is a country-centroid visualization of **report counts**, visible only at low zoom. It does not imply a measured hotspot or a rural cluster.\n- The bubble count is a count of distinct **source annotations**, NOT devices, hosts, entities, independent witnesses, or probabilities.
+- Heatmap intensity is a country-centroid visualization of **report counts**, visible only at low zoom. It does not imply a measured hotspot or a rural cluster.
+- The bubble count is a count of distinct **source annotations**, NOT devices, hosts, entities, independent witnesses, or probabilities.
+- Cloudflare's `/annotations/outages` endpoint includes outages **and anomalies**. A row contributes only when its original provider `annotation_id` exists and `event_type` is exactly `OUTAGE`; do not infer `OUTAGE` for missing classification.
+- Future-dated rows, malformed end timestamps, or contradictory timestamps under a shared annotation ID are excluded from the corresponding visualization.
 - A country with 0 or 1 eligible annotations displays no cluster. Empty results are valid and are not replaced by synthetic markers.
 - The popup says clearly that one provider's repeated reports do not independently corroborate the cause or establish a physical site.
 - A user-visible layer toggle and URL v5 migration preserve both new defaults and later explicit opt-outs.
