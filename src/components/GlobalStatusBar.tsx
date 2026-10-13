@@ -113,7 +113,7 @@ function decodeHtmlText(value: string): string {
     .replace(/&gt;/g, '>');
 }
 
-export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[] }) {
+export default function GlobalStatusBar({ news = [], embed = false }: { news?: NewsTickerItem[]; embed?: boolean }) {
   const [sourceHealth, setSourceHealth] = useState<SourceHealth | null>(null);
   const tickerItems = useMemo(() => sortImportantNews(news), [news]);
 
@@ -159,7 +159,7 @@ export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[]
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3, duration: 0.6 }}
-      className="hidden md:block absolute bottom-0 left-0 right-0 z-[210] pointer-events-none"
+      className={`${embed ? 'block' : 'hidden md:block'} absolute bottom-0 left-0 right-0 z-[210] pointer-events-none`}
     >
       <div className="h-[28px] overflow-hidden bg-[#0a0a0f]/95 border-t border-white/[0.06] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-xl relative">
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--cyan-primary)]/30 to-transparent" style={{ animation: 'hud-scanline 4s linear infinite' }} />
@@ -225,7 +225,7 @@ export default function GlobalStatusBar({ news = [] }: { news?: NewsTickerItem[]
               className="pointer-events-auto h-full flex items-center justify-center gap-2 text-white/40 hover:text-white/70"
             >
               <NewsIcon />
-              <span>جارٍ تحميل أهم الأخبار من M3TM.APP…</span>
+              <span>لا توجد عناوين حديثة متاحة الآن — فتح أخبار M3TM.APP</span>
             </a>
           )}
         </div>
