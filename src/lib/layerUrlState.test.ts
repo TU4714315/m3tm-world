@@ -5,7 +5,7 @@ const defaults = {
   flights: true, cctv: true,
   app_news: true, country_borders: true,
   military_activity: true, maritime: true, naval_activity: true,
-  private: true, jets: true, sdk_air: true, cf_outages: true, cf_attacks: true,
+  private: true, jets: true, sdk_air: true, cf_outages: true, cf_attacks: true, digital_clusters: true,
   conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true,
   gdelt_events: true, civil_unrest: true, alert_pins: true, global_incidents: true,
   weather: false,
@@ -25,6 +25,7 @@ describe('versioned WORLD layer bookmarks', () => {
     expect(restored.sdk_air).toBe(true);
     expect(restored.cf_outages).toBe(true);
     expect(restored.cf_attacks).toBe(true);
+    expect(restored.digital_clusters).toBe(true);
   });
 
   it('still applies v3 and v4 defaults to bookmarks that predate v3', () => {
@@ -36,6 +37,7 @@ describe('versioned WORLD layer bookmarks', () => {
     expect(restored.gdelt_events).toBe(true);
     expect(restored.civil_unrest).toBe(true);
     expect(restored.alert_pins).toBe(true);
+    expect(restored.digital_clusters).toBe(true);
     expect(restored.private).toBe(true);
     expect(restored.jets).toBe(true);
     expect(restored.sdk_air).toBe(true);
@@ -51,11 +53,12 @@ describe('versioned WORLD layer bookmarks', () => {
     expect(restored.sdk_air).toBe(false);
     expect(restored.cf_outages).toBe(false);
     expect(restored.cf_attacks).toBe(false);
+    expect(restored.digital_clusters).toBe(true); // promoted in v5 only
     expect(restored.conflict_zones).toBe(false);
     expect(restored.civil_unrest).toBe(false);
   });
 
-  it('round-trips an explicitly disabled layer state with the v4 schema marker', () => {
+  it('round-trips an explicitly disabled layer state with the v5 schema marker', () => {
     const selected = {
       ...defaults,
       military_activity: false,
@@ -63,12 +66,19 @@ describe('versioned WORLD layer bookmarks', () => {
       conflict_zones: false,
       civil_unrest: false,
       cctv: false,
+      digital_clusters: false,
     };
     const params = serializeLayerState(selected, new URLSearchParams('surface=public&foo=bar'));
-    expect(params.get('layers_v')).toBe('4');
+    expect(params.get('layers_v')).toBe('5');
     expect(params.get('surface')).toBe('public');
     expect(params.get('foo')).toBe('bar');
     expect(restoreLayerState(defaults, params)).toEqual(selected);
+  });
+
+  it('preserves deliberate opt-out on a v5 bookmark', () => {
+    const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=5&layers=flights'));
+    expect(restored.digital_clusters).toBe(false);
+    expect(restored.cf_outages).toBe(false);
   });
 
   it('does not modify defaults when the URL has no layer preference', () => {
