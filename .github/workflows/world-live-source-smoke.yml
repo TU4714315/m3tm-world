@@ -23,6 +23,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # Repository contains unrelated gitlink scratch/astra without a
+          # matching .gitmodules URL. Sparse checkout avoids touching it.
+          sparse-checkout: scripts/world-live-source-smoke.mjs
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
