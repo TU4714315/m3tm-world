@@ -42,12 +42,25 @@ describe('countryDigitalReportClusters', () => {
   it('never guesses a country from raw coordinates when country field is absent', () => {
     expect(countryDigitalReportClusters([outage('a', { country: null }), outage('b', { country: null })], NOW)).toEqual([]);
   });
+  it('excludes Saudi Arabia even when provider data includes reports for it', () => {
+    const rows = [
+      outage('one', { country: 'SA', annotation_id: 'shared' }),
+      outage('two', { country: 'SA', annotation_id: 'shared' }),
+      outage('three', { country: 'YE', annotation_id: 'shared' }),
+      outage('four', { country: 'OM', annotation_id: 'shared' }),
+    ];
+    expect(countryDigitalReportClusters(rows, NOW).some(c => c.country === 'SA')).toBe(false);
+    expect(sharedCountryOutageContexts(rows, NOW).some(
+      c => c.from_country === 'SA' || c.to_country === 'SA',
+    )).toBe(false);
+  });
+
   it('keeps distinct national aggregates separate without inferring a shared physical site', () => {
     const clusters = countryDigitalReportClusters([
       outage('a'), outage('b'),
-      outage('c', { country: 'SA' }), outage('d', { country: 'SA' }),
+      outage('c', { country: 'IQ' }), outage('d', { country: 'IQ' }),
     ], NOW);
-    expect(clusters.map(c => c.country)).toEqual(['SA', 'YE']);
+    expect(clusters.map(c => c.country)).toEqual(['IQ', 'YE']);
     expect(clusters.every(c => c.precision === 'country-centroid-display-only')).toBe(true);
   });
 });
