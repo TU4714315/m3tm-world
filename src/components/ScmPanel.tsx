@@ -69,7 +69,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">CRITICAL SUPPLIERS</span>
                 </div>
                 {criticalSuppliers.length === 0 ? (
-                  <div className="text-[10px] font-mono text-[#00E676] px-2">✓ All monitored Tier 1/2 nodes operational.</div>
+                  <div className="text-[10px] font-mono text-[var(--text-muted)] px-2">لا توجد مخاطر مرتفعة معروضة حاليًا ضمن البيانات المتاحة.</div>
                 ) : (
                   <div className="space-y-1">
                     {criticalSuppliers.map((s: any, i: number) => {
@@ -95,11 +95,11 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">CONGESTED NODES</span>
                 </div>
                 {(congestedPorts.length === 0 && riskyChokes.length === 0) ? (
-                  <div className="text-[10px] font-mono text-[#00E676] px-2">✓ Global maritime flow optimal.</div>
+                  <div className="text-[10px] font-mono text-[var(--text-muted)] px-2">لا توجد حالات ازدحام مرتفعة معروضة حاليًا ضمن البيانات المتاحة.</div>
                 ) : (
                   <div className="space-y-1">
                     {riskyChokes.map((c: any, i: number) => (
-                      <div key={`c-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500' }}>
+                      <div key={`c-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-s" style={{ borderInlineStartColor: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[11px] font-mono text-[#FF9500] font-bold">{c.name}</span>
                           <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500', color: '#000' }}>{c.risk}</span>
@@ -108,7 +108,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                       </div>
                     ))}
                     {congestedPorts.map((p: any, i: number) => (
-                      <div key={`p-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500' }}>
+                      <div key={`p-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-s" style={{ borderInlineStartColor: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[11px] font-mono text-[#00BCD4]">{p.name}</span>
                           <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500', color: '#000' }}>{p.congestion}</span>

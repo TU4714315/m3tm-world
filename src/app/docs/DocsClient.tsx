@@ -267,7 +267,7 @@ export default function DocsClient() {
             <h1 className="text-[38px] md:text-[52px] leading-[1.05] font-bold tracking-[-0.02em] mb-5">
               <span className="text-[var(--text-heading)]">Build on the</span>
               <br />
-              <span className="bg-gradient-to-r from-[var(--gold-primary)] via-[#F0D060] to-[var(--cyan-primary)] bg-clip-text text-transparent">
+              <span className="text-[var(--gold-primary)]">
                 M3TM.WORLD platform
               </span>
             </h1>
