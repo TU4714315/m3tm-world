@@ -2339,7 +2339,7 @@ export default function Dashboard() {
                   {mobilePanel === 'layers' && (
                     <>
                       <div className="glass-panel-sm p-2 mb-2">
-                        <div className="grid grid-cols-5 gap-1 text-center">
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-center">
                           <div><div className="hud-label" style={{fontSize:'9px'}}>طيران</div><div className="hud-value text-[10px]">{totalFlights.toLocaleString()}</div></div>
                           <div><div className="hud-label" style={{fontSize:'9px'}}>أقمار</div><div className="hud-value text-[10px]">{(data.satellites?.length||0)}</div></div>
                           <div><div className="hud-label" style={{fontSize:'9px'}}>كاميرات</div><div className="hud-value text-[10px]">{(data.cameras?.length||0)}</div></div>
