@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { centroidFor } from '@/lib/countryCentroids';
 import { fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 
@@ -263,7 +264,7 @@ export async function GET(req: Request) {
     const fallback = await fetchFallbackSections(true, true);
     const partial = fallback.failed.gdelt || fallback.failed.abuse_ch;
     return NextResponse.json(
-      {
+      maskSaudiPublicIndicators({
         configured: false,
         fallback_active: true,
         fallback_sections: { outages: true, attacks: true },
@@ -281,7 +282,7 @@ export async function GET(req: Request) {
         },
         ...(partial ? { partial: true } : {}),
         timestamp: new Date().toISOString(),
-      },
+      }),
       { headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300' } },
     );
   }
@@ -311,7 +312,7 @@ export async function GET(req: Request) {
     useOutageFallback || useAttackFallback || fallback.failed.gdelt || fallback.failed.abuse_ch;
 
   return NextResponse.json(
-    {
+    maskSaudiPublicIndicators({
       configured: true,
       fallback_active: fallbackActive,
       fallback_sections: { outages: useOutageFallback, attacks: useAttackFallback },
@@ -329,7 +330,7 @@ export async function GET(req: Request) {
       },
       ...(partial ? { partial: true } : {}),
       timestamp: new Date().toISOString(),
-    },
+    }),
     { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } },
   );
 }

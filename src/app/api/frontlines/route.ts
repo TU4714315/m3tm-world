@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
@@ -44,11 +45,12 @@ function validSnapshot(value: Snapshot | null): value is Snapshot {
 
 function respond(snapshot: Snapshot | null, status: 'ok' | 'cached-stale' | 'unavailable') {
   const valid = validSnapshot(snapshot);
+  const visibleFrontlines = maskSaudiPublicIndicators({ frontlines: valid ? snapshot.frontlines : EMPTY_FC }).frontlines;
   return NextResponse.json({
     // Consumers must respect status: "cached-stale" is historical context,
     // never an assertion about present control of territory.
-    frontlines: valid ? snapshot.frontlines : EMPTY_FC,
-    total: valid ? snapshot.total : 0,
+    frontlines: visibleFrontlines,
+    total: visibleFrontlines.features.length,
     status,
     source: 'DeepStateMap.Live',
     sourceMode: 'published-snapshot',

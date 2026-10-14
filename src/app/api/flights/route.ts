@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
 import { hasUsableCivilianFlightData } from '@/lib/flightReliability';
@@ -372,7 +373,7 @@ let osTokenExpiry = 0;
 
 function respond(req: Request, data: any, cacheControl: string) {
   const summaryOnly = new URL(req.url).searchParams.get('summary') === '1';
-  return NextResponse.json(summaryOnly ? buildFlightSummary(data) : data, {
+  return NextResponse.json(summaryOnly ? buildFlightSummary(data) : maskSaudiPublicIndicators(data), {
     headers: { 'Cache-Control': cacheControl },
   });
 }

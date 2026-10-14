@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import WebSocket from 'ws';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
@@ -567,7 +568,8 @@ export async function GET(req?: Request) {
 
   const maxAgeSeconds = Math.floor(snapshotTtlMs(snapshot.body) / 1000);
 
-  return new NextResponse(snapshot.body, {
+  const publicBody = JSON.stringify(maskSaudiPublicIndicators(JSON.parse(snapshot.body)));
+  return new NextResponse(publicBody, {
     headers: {
       'Content-Type': 'application/json',
       // The server would not have produced anything newer inside this window

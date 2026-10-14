@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { buildGdeltReportedRoutes, publisherCoverage, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import { gdeltWindowTime, isMiddleEastBelt } from '@/lib/menaSignals';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
@@ -89,7 +90,7 @@ export async function GET(req: Request) {
     if (cacheKey && publicEvents.length > 0) payload.cache_backend = await durableSetJson(cacheKey, payload, 60 * 60);
 
     return NextResponse.json(
-      payload,
+      maskSaudiPublicIndicators(payload),
       {
         // GDELT publishes a new export every 15 minutes, so anything under that
         // is wasted work. Serve stale while revalidating to absorb bursts.
@@ -99,7 +100,7 @@ export async function GET(req: Request) {
   } catch (error) {
     console.error('[OSIRIS] GDELT events fetch failed:', error);
     if (previous.value) {
-      return NextResponse.json({
+      return NextResponse.json(maskSaudiPublicIndicators({
         ...previous.value,
         // Old durable payloads were saved with articles>=3 treated as
         // multi-source. Correct the labels even when upstream is unavailable.
@@ -111,7 +112,7 @@ export async function GET(req: Request) {
         cache_backend: previous.backend,
         durable_cache_configured: durableCacheConfigured(),
         served_at: new Date().toISOString(),
-      }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+      }), { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
     return NextResponse.json(
       { events: [], reported_routes: [], total: 0, reported_routes_total: 0, error: 'Failed to fetch GDELT events' },

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isSaudiPublicIndicator } from '@/lib/publicCountryVisibility';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { cachedSource } from '@/lib/sourceCache';
 
@@ -770,9 +771,10 @@ export async function GET(request: Request) {
       ? 'no-store, max-age=0' 
       : 'public, s-maxage=300, stale-while-revalidate=600';
 
+    const publicCameras = allCameras.filter(camera => !isSaudiPublicIndicator(camera));
     return NextResponse.json({
-      cameras: allCameras,
-      total: allCameras.length,
+      cameras: publicCameras,
+      total: publicCameras.length,
       sources,
       regions: regionsToFetch,
       pendingRegions,

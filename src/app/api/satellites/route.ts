@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { propagateTLE } from '@/lib/orbit';
 import { buildPublicMilitarySatelliteActivity } from '@/lib/publicMilitarySatelliteActivity';
@@ -356,11 +357,12 @@ export async function GET() {
 
     const timestamp = new Date().toISOString();
 
+    const visible = maskSaudiPublicIndicators({ satellites: publicSatellites, military_satellite_activity: militaryProjection.activity });
     return NextResponse.json({
-      satellites: publicSatellites,
-      total: publicSatellites.length,
+      satellites: visible.satellites,
+      total: visible.satellites.length,
       category_counts: categoryCounts,
-      military_satellite_activity: militaryProjection.activity,
+      military_satellite_activity: visible.military_satellite_activity,
       military_satellite_summary: militaryProjection.summary,
       military_satellite_meta: militaryProjection.meta,
       satellite_source_status: {

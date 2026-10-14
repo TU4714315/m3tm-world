@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import "./globals.css";
 
-const SITE_URL = "https://m3tm-world.vercel.app";
+const SITE_URL = "https://m3tm.app/world";
+const ASSET_ORIGIN = "https://m3tm-world-recovery.onrender.com";
 const SITE_NAME = "M3TM.WORLD";
 const SITE_TITLE = "M3TM.WORLD — خريطة عالمية تفاعلية للبيانات الحية";
 const SITE_DESCRIPTION = "منصة مرئية لعرض بيانات عامة وحية على خريطة تفاعلية: حركة الطيران، الأقمار الصناعية، الكاميرات العامة، الطقس، الزلازل، الحرائق، الملاحة البحرية والأخبار من مصادرها المنشورة.";
@@ -16,7 +17,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(ASSET_ORIGIN),
   title: {
     default: SITE_TITLE,
     template: "%s | M3TM.WORLD",
@@ -75,7 +76,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     images: [
       {
-        url: `${SITE_URL}/m3tm-world-preview.png`,
+        url: `${ASSET_ORIGIN}/m3tm-world-preview.png`,
         width: 1440,
         height: 900,
         alt: "M3TM.WORLD — خريطة عالمية تفاعلية للبيانات الحية",
@@ -87,7 +88,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [`${SITE_URL}/m3tm-world-preview.png`],
+    images: [`${ASSET_ORIGIN}/m3tm-world-preview.png`],
   },
   category: "technology",
   classification: "خرائط وبيانات حية",

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
 import { stealthFetch } from '@/lib/stealthFetch';
 
@@ -86,12 +87,12 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({
+    return NextResponse.json(maskSaudiPublicIndicators({
       events: allEvents,
       total: allEvents.length,
       timestamp: new Date().toISOString(),
       source: 'GDACS RSS API',
-    }, {
+    }), {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
     });
   } catch (error) {

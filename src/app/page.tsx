@@ -7,6 +7,7 @@ import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon,
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { buildAppNewsPins } from '@/lib/appNewsPins';
 import { buildPublicFieldAlerts } from '@/lib/publicFieldAlerts';
 import { restoreLayerState, serializeLayerState } from '@/lib/layerUrlState';
@@ -1451,22 +1452,15 @@ export default function Dashboard() {
       : {}),
   })), [embeddedNewsItems]);
 
-  const sdkDisplayData = useMemo(() => (
-    embedSurface === 'public'
-      ? {
-          ...buildPublicLayerData(data, embeddedLiveFeeds),
-          app_news: buildAppNewsPins(data.news),
-          alert_pins: buildPublicFieldAlerts(data.news),
-          country_boundaries: data.country_boundaries || { type: 'FeatureCollection', features: [] },
-        }
-      : {
-          ...data,
-          app_news: buildAppNewsPins(data.news),
-          alert_pins: buildPublicFieldAlerts(data.news),
-          sdk_entities: sdkEntities,
-          ...(embeddedLiveFeeds.length ? { live_feeds: embeddedLiveFeeds } : {}),
-        }
-  ), [data, embedMode, embedSurface, embeddedLiveFeeds, sdkEntities]);
+  // WORLD has no authenticated subscriber session. A query string such as
+  // ?embed=1 (or surface=internal) MUST NOT switch it to raw/internal data.
+  // Subscriber-only indicators belong behind APP's actual auth/RLS boundary.
+  const sdkDisplayData = useMemo(() => maskSaudiPublicIndicators({
+    ...buildPublicLayerData(data, embeddedLiveFeeds),
+    app_news: buildAppNewsPins(data.news),
+    alert_pins: buildPublicFieldAlerts(data.news),
+    country_boundaries: data.country_boundaries || { type: 'FeatureCollection', features: [] },
+  }), [data, embeddedLiveFeeds]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1824,6 +1818,15 @@ export default function Dashboard() {
           <button type="button" onClick={() => {
               selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
               if (isMobile) setMobilePanel('intel');
+              setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
+            }}
+            className="rounded-md border border-amber-300/50 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-amber-100 hover:border-amber-200/70 focus-visible:ring-2 focus-visible:ring-amber-300"
+            title="الانتقال إلى اليمن: بلاغات عامة منشورة ومجمعة، دون تتبع مواقع أو تحركات عملياتية دقيقة">
+            <MapPinned className="inline h-3.5 w-3.5 ms-1"/> رصد اليمن
+          </button>
+          <button type="button" onClick={() => {
+              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
+              if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
             }}
             className="rounded-md border border-cyan-300/45 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300"
@@ -1932,6 +1935,14 @@ export default function Dashboard() {
                 }}
                 className="min-h-10 rounded-xl border border-cyan-300/30 bg-transparent px-2 text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 مرصد الشرق الأوسط
+              </button>
+              <button type="button" onClick={() => {
+                  selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
+                  setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
+                }}
+                className="min-h-10 rounded-xl border border-amber-300/40 bg-transparent px-2 text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300"
+                title="التركيز على اليمن وبلاغاتها العامة المنشورة دون تموضع عسكري دقيق">
+                رصد اليمن
               </button>
               <button type="button" aria-pressed={mapStyle === 'satellite'}
                 onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
