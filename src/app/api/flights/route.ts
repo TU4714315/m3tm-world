@@ -373,7 +373,8 @@ let osTokenExpiry = 0;
 
 function respond(req: Request, data: any, cacheControl: string) {
   const summaryOnly = new URL(req.url).searchParams.get('summary') === '1';
-  return NextResponse.json(summaryOnly ? buildFlightSummary(data) : maskSaudiPublicIndicators(data), {
+  const visible = maskSaudiPublicIndicators(data);
+  return NextResponse.json(summaryOnly ? buildFlightSummary(visible) : visible, {
     headers: { 'Cache-Control': cacheControl },
   });
 }

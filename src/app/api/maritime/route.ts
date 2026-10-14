@@ -510,8 +510,8 @@ export async function GET(req?: Request) {
         'Cache-Control': 'public, max-age=86400, s-maxage=86400',
       } });
     }
-    const ports = PORTS.filter(port => port.type !== 'naval');
-    const chokepoints = CHOKEPOINTS;
+    const ports = maskSaudiPublicIndicators({ ports: PORTS.filter(port => port.type !== 'naval') }).ports;
+    const chokepoints = maskSaudiPublicIndicators({ maritime_chokepoints: CHOKEPOINTS }).maritime_chokepoints;
     const body = JSON.stringify({
       ports, chokepoints, ships: [], naval_activity: [],
       total_ports: ports.length, total_chokepoints: chokepoints.length, total_ships: 0,
