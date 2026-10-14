@@ -112,6 +112,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3, duration: 0.6 }}
+      data-embed={embed ? "true" : "false"}
       className="world-news-ticker absolute bottom-0 left-0 right-0 z-[210] pointer-events-none"
     >
       <div className="h-[32px] overflow-hidden bg-[#0a0a0f]/55 border-t border-white/[0.12] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-md relative">
