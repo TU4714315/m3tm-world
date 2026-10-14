@@ -16,6 +16,7 @@ export function gdeltWindowTime(name: string): string | null {
 interface PublicEvent{
   id?:string;lat?:number;lng?:number;date?:string;timestamp?:string;
   title?:string;event_label_ar?:string;provider?:string;sourceLabel?:string;url?:string;
+  country?:string;country_code?:string;countryCode?:string;
   reported_actor1?:string;reported_actor2?:string;reportedActors?:string[];
   corroboration?: 'single-source-report'|'multi-source-report';
   event_category?:string;type?:string;sources?:number;
@@ -26,7 +27,7 @@ export function regionalPublicSignals(data:{
   military_activity?:PublicEvent[]; naval_activity?:PublicEvent[];
 }) {
   const reported:Array<{id:string;title:string;source:string;url:string;time:string|null;actors:string[];
-    category:string;multiplePublishers:boolean;}>=[];
+    country:string|null;category:string;multiplePublishers:boolean;}>=[];
   const seen=new Set<string>();
   const rows=[...(data.conflict_live_events??[]),...(data.gdelt_events??[]),...(data.civil_unrest??[])];
   for(const e of rows){
@@ -38,8 +39,12 @@ export function regionalPublicSignals(data:{
     seen.add(key);
     const actors=[...(e.reportedActors??[]),e.reported_actor1,e.reported_actor2]
       .filter((name):name is string=>typeof name==='string'&&Boolean(name.trim())).slice(0,2);
+    // The country identifies the publication-coded action location, never an
+    // actor's affiliation, ethnicity, religion or guessed origin.
+    const country=normalizePublicEventCountry(e.country??e.country_code??e.countryCode);
     reported.push({id:key,title:e.event_label_ar||e.title||'حدث مُبلّغ عنه',
       source:provider,url:e.url||'',time:e.date||e.timestamp||null,actors,
+      country,
       category:e.event_category||e.type||'other',
       multiplePublishers:e.corroboration==='multi-source-report' && (e.sources === undefined || e.sources>=2)});
   }
@@ -48,6 +53,22 @@ export function regionalPublicSignals(data:{
     airRegions:(data.military_activity??[]).filter(e=>isMiddleEastBelt(e.lat,e.lng)).length,
     seaRegions:(data.naval_activity??[]).filter(e=>isMiddleEastBelt(e.lat,e.lng)).length,
     precision:'regional-aggregate-only' as const};
+}
+
+/** GDELT ActionGeo uses FIPS 10-4: YM/IZ/MU differ from ISO YE/IQ/OM. */
+export function normalizePublicEventCountry(value: unknown): string|null {
+  if(typeof value!=='string')return null;
+  const key=value.trim().toLowerCase();
+  const countries:Record<string,string>={
+    ye:'YE',ym:'YE',yemen:'YE','اليمن':'YE',
+    iq:'IQ',iz:'IQ',iraq:'IQ','العراق':'IQ',
+    ir:'IR',iran:'IR','إيران':'IR','ايران':'IR',
+    om:'OM',mu:'OM',oman:'OM','عمان':'OM','عُمان':'OM',
+    sy:'SY',syria:'SY','سوريا':'SY',
+    lb:'LB',le:'LB',lebanon:'LB','لبنان':'LB',
+    jo:'JO',jordan:'JO','الأردن':'JO',
+  };
+  return countries[key]??null;
 }
 
 

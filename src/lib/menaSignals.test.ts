@@ -1,6 +1,23 @@
 import {describe,expect,it} from 'vitest';
-import {gdeltWindowTime,isMiddleEastBelt,regionalPublicSignals} from './menaSignals';
+import {gdeltWindowTime,isMiddleEastBelt,normalizePublicEventCountry,regionalPublicSignals} from './menaSignals';
 describe('M3TM regional public evidence',()=>{
+  it('uses the published incident country, not the named actor, for the regional country view',()=>{
+    expect(normalizePublicEventCountry('YM')).toBe('YE');
+    expect(normalizePublicEventCountry('IZ')).toBe('IQ');
+    expect(normalizePublicEventCountry('MU')).toBe('OM');
+    expect(normalizePublicEventCountry('IR')).toBe('IR');
+    expect(normalizePublicEventCountry('LE')).toBe('LB');
+    expect(normalizePublicEventCountry('SA')).toBeNull();
+    const r=regionalPublicSignals({gdelt_events:[
+      {id:'yemen',lat:15.4,lng:44.2,country:'YM',reported_actor1:'Ansar Allah'},
+      {id:'iraq',lat:33.3,lng:44.3,country:'IZ',reported_actor1:'Yemen'},
+      {id:'oman',lat:23.5,lng:58.4,country:'MU'},
+      {id:'unknown',lat:15.4,lng:44.2,reported_actor1:'Iran'},
+    ]});
+    expect(r.events.map(e=>[e.id,e.country])).toEqual([
+      ['gdelt:yemen','YE'],['gdelt:iraq','IQ'],['gdelt:oman','OM'],['gdelt:unknown',null],
+    ]);
+  });
   it('includes the Middle East and Red Sea but does not misclassify New York',()=>{
     expect(isMiddleEastBelt(24.7,46.7)).toBe(true);
     expect(isMiddleEastBelt(15.6,33)).toBe(true);
