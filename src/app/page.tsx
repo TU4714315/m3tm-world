@@ -7,7 +7,7 @@ import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon,
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
-import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
+import { maskSaudiPublicIndicators, inSaudiPublicBoundary, isSaudiPublicIndicator } from '@/lib/publicCountryVisibility';
 import { buildAppNewsPins } from '@/lib/appNewsPins';
 import { buildPublicFieldAlerts } from '@/lib/publicFieldAlerts';
 import { restoreLayerState, serializeLayerState } from '@/lib/layerUrlState';
@@ -248,10 +248,15 @@ export default function Dashboard() {
               || !item.id
               || latitude === null
               || longitude === null
+              || inSaudiPublicBoundary(latitude, longitude)
             ) return [];
             const originLatitude = toEmbeddedCoordinate(item?.originLatitude, -90, 90);
             const originLongitude = toEmbeddedCoordinate(item?.originLongitude, -180, 180);
-            const verifiedRoute = item?.routeStatus === 'verified' && originLatitude !== null && originLongitude !== null;
+            const verifiedRoute = item?.routeStatus === 'verified' && originLatitude !== null && originLongitude !== null
+              && !isSaudiPublicIndicator({
+                origin_lat: originLatitude, origin_lng: originLongitude,
+                target_lat: latitude, target_lng: longitude,
+              });
             const mapped: EmbeddedNewsItem = {
               id: item.id,
               title: String(item.title || 'خبر'),

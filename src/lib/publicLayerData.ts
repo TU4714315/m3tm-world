@@ -323,6 +323,28 @@ const publicAirSdkEntities = (...values: unknown[]) => {
     }));
 };
 
+/** Restore SEA and EVENTS SDK nodes from vetted public inputs, never raw SDK.
+ * No MMSI, airframe/warship identity, camera target or individual track leaves
+ * this projection. These are representative published observations only. */
+const publicNonAirSdkEntities = (domain: 'SEA' | 'EVENTS', values: unknown, source: string) => {
+  const rows = list(values).flatMap(raw => {
+    const item = record(raw);
+    const lat = finite(item.lat), lng = finite(item.lng);
+    if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return [];
+    return [{ lat, lng }];
+  });
+  const step = Math.max(1, Math.ceil(rows.length / 50));
+  return rows.filter((_, i) => i % step === 0).slice(0, 50).map(({ lat, lng }) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+    properties: {
+      domain,
+      name: domain === 'SEA' ? 'نقطة بحرية عامة' : 'حدث منشور',
+      source,
+    },
+  }));
+};
+
 export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unknown[] = []) {
   return {
     live_feeds: embeddedLiveFeeds.length ? embeddedLiveFeeds : list(data.live_feeds),
@@ -386,6 +408,11 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
     frontlines_meta: data.frontlines_meta || null,
     earthquakes: list(data.earthquakes),
-    sdk_entities: publicAirSdkEntities(data.commercial_flights, data.private_flights, data.private_jets),
+    sdk_entities: [
+      ...publicAirSdkEntities(data.commercial_flights, data.private_flights, data.private_jets),
+      ...publicNonAirSdkEntities('SEA', list(data.maritime_ships).filter(s => !vesselIsMilitary(s)), 'AIS public civilian observations'),
+      ...publicNonAirSdkEntities('SEA', data.maritime_ports, 'M3TM static maritime reference'),
+      ...publicNonAirSdkEntities('EVENTS', data.gdelt, 'GDACS published reports'),
+    ],
   };
 }

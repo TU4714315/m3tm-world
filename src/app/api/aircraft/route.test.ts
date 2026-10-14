@@ -16,6 +16,9 @@ describe('public aircraft detail country gate', () => {
   it('does not expose Saudi positions or known military aircraft', () => {
     expect(publicAircraftDetail(create([[44.19, 15.37], [46.6753, 24.7136]]))).toBeNull();
     expect(publicAircraftDetail(create([[44.19, 15.37]], 'Example Air Force'))).toBeNull();
+    expect(publicAircraftDetail({ ...create([[44.19,15.37]]), typeCode:'H60', model:'Sikorsky MH-60T Jayhawk' })).toBeNull();
+    expect(publicAircraftDetail({ ...create([[44.19,15.37]]), typeCode:'K35R', model:'KC-135R' })).toBeNull();
+    expect(publicAircraftDetail(create([[44.19,15.37]], 'United States Coast Guard'))).toBeNull();
   });
   it('does not reconnect disjoint legs around withheld Saudi samples', () => {
     const detail = create([[44.2, 15.4], [46.6753, 24.7136], [44.25, 15.45], [44.3, 15.48]]);

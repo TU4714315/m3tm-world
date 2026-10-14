@@ -45,7 +45,7 @@ export interface AircraftDetail {
 /** Do not offer public detail tracks for identifiable military airframes. */
 function militaryAirframe(detail: AircraftDetail): boolean {
   const description = `${detail.operator || ''} ${detail.model || ''} ${detail.typeCode || ''}`;
-  return /\b(?:air\s*force|airforce|armed\s*forces|military|defen[cs]e|fighter|warplane|usaf|raf|navy|army|f-?16|f-?35|f-?15|f-?18|b-?52|c-?130|c-?17|a-?400m)\b/i.test(description);
+  return /\b(?:air\s*force|airforce|armed\s*forces|military|defen[cs]e|fighter|warplane|usaf|raf|navy|army|marine\s*corps|coast\s*guard|national\s*guard|nato|f-?16|f-?35|f-?15|f-?18|b-?52|c-?130|c-?17|a-?400m|kc-?135r?|k35r|mh-?60\w*|h60)\b/i.test(description);
 }
 
 /** Keep only the most recent uninterrupted public segment outside Saudi Arabia.
@@ -284,7 +284,8 @@ export async function GET(request: Request) {
           registration: parsed?.registration || ac?.registration || null,
           typeCode: parsed?.typeCode || ac?.icao_type || null,
           model,
-          operator: ac?.registered_owner || null,
+          // Trace operator remains useful when the optional registry fails.
+          operator: [ac?.registered_owner, trace?.ownOp].filter(Boolean).join(' / ') || null,
           track: parsed?.track || [],
           altitudes: parsed?.altitudes || [],
           points: parsed?.points || 0,
