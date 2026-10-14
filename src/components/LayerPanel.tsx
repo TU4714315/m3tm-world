@@ -133,7 +133,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Network,
     layers: [
       { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'تصور تقديري للتهديدات', description: 'روابط استدلالية مشتقة من مؤشرات Feodo، وليست هجمات مرصودة أو إسنادًا موثوقًا لمصدرها', dataKey: 'cyber_attacks' },
+      { key: 'cyber_attacks', label: 'رصد بنية التهديدات الشبكية', description: 'مشاهدات عامة مُجمعة على مستوى البلد من Feodo/Cloudflare، دون مسارات هجوم أو IP فردي', dataKey: 'cf_attack_origins' },
     ],
   },
   {

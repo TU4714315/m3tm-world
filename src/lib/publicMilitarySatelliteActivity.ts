@@ -1,3 +1,5 @@
+import { inSaudiPublicBoundary } from './publicCountryVisibility';
+
 export interface MilitarySatelliteRow {
   lat: number;
   lng: number;
@@ -67,7 +69,7 @@ export function buildPublicMilitarySatelliteActivity(
   for (const satellite of military) {
     const lat = Number(satellite?.lat);
     const lng = Number(satellite?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180 || inSaudiPublicBoundary(lat, lng)) continue;
 
     const latIndex = Math.min(
       Math.floor(180 / PUBLIC_MILITARY_SATELLITE_CELL_DEG) - 1,

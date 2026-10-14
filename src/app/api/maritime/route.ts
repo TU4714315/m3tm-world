@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
+import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import WebSocket from 'ws';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
@@ -302,7 +302,7 @@ export function buildPublicNavalActivity(allShips: any[], now = Date.now()): Pub
     if (ship?.type !== 'military') continue;
     const lat = Number(ship?.lat);
     const lng = Number(ship?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || inSaudiPublicBoundary(lat, lng)) continue;
     const latIndex = Math.floor((lat + 90) / PUBLIC_NAVAL_CELL_DEG);
     const lngIndex = Math.floor((lng + 180) / PUBLIC_NAVAL_CELL_DEG);
     const key = `${latIndex}:${lngIndex}`;

@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
+import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { buildFlightSummary, markCachedFlightDataStale } from '@/lib/flightSummary';
 import { hasUsableCivilianFlightData } from '@/lib/flightReliability';
@@ -269,7 +269,7 @@ function buildPublicMilitaryActivity(flights: any[], observedAtMs = Date.now()):
   for (const flight of flights) {
     const lat = Number(flight?.lat);
     const lng = Number(flight?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || inSaudiPublicBoundary(lat, lng)) continue;
     const latIndex = Math.floor((lat + 90) / PUBLIC_MILITARY_CELL_DEG);
     const lngIndex = Math.floor((lng + 180) / PUBLIC_MILITARY_CELL_DEG);
     const centerLat = Math.max(-87, Math.min(87, -90 + latIndex * PUBLIC_MILITARY_CELL_DEG + PUBLIC_MILITARY_CELL_DEG / 2));

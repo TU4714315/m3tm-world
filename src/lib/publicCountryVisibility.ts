@@ -55,26 +55,36 @@ function isSaudiPointBetween(lat1: unknown, lon1: unknown, lat2: unknown, lon2: 
   const a = [numeric(lat1), numeric(lon1), numeric(lat2), numeric(lon2)];
   if (a.some(value => value === null)) return false;
   const [y1, x1, y2, x2] = a as number[];
+  // Interpolate the shorter path through the antimeridian, not via Asia.
+  let deltaLng = x2 - x1;
+  if (deltaLng > 180) deltaLng -= 360;
+  if (deltaLng < -180) deltaLng += 360;
   for (let step = 0; step <= 16; step++) {
     const fraction = step / 16;
-    if (inSaudiPublicBoundary(y1 + (y2 - y1) * fraction, x1 + (x2 - x1) * fraction)) return true;
+    const wrappedLng = ((x1 + deltaLng * fraction + 540) % 360) - 180;
+    if (inSaudiPublicBoundary(y1 + (y2 - y1) * fraction, wrappedLng)) return true;
   }
   return false;
 }
 
-/** Indicators with verified Yemen coordinates are preserved even on the border. */
+/** Saudi country tags or positions inside the approximate Saudi polygon are withheld. */
 export function isSaudiPublicIndicator(value: unknown): boolean {
   const row = record(value);
   if (!row) return false;
   const props = record(row.properties);
   const source = props ? [row, props] : [row];
   for (const obj of source) {
-    for (const key of ['country', 'country_code', 'countryCode', 'country_iso2', 'country_iso3', 'iso2', 'iso3', 'country_name']) {
+    const countryKeys = ['country', 'country_code', 'countryCode', 'country_iso2', 'country_iso3', 'iso2', 'iso3', 'country_name'];
+    for (const key of countryKeys) {
       if (saudiCountryCode(obj[key])) return true;
     }
+    // Geographic containment wins over a potentially incorrect country label.
     if (inSaudiPublicBoundary(obj.lat ?? obj.latitude, obj.lng ?? obj.lon ?? obj.longitude)) return true;
     if (inSaudiPublicBoundary(obj.target_lat, obj.target_lng) ||
         inSaudiPublicBoundary(obj.origin_lat, obj.origin_lng)) return true;
+    if (saudiCountryCode(obj.target_country) ||
+        inSaudiPublicBoundary(obj.dst_lat, obj.dst_lng) ||
+        inSaudiPublicBoundary(obj.src_lat, obj.src_lng)) return true;
     if (isSaudiPointBetween(obj.origin_lat, obj.origin_lng, obj.target_lat, obj.target_lng)) return true;
     // APP geo-tagged feed uses [lat, lng], not GeoJSON [lng, lat].
     if (Array.isArray(obj.coords) && inSaudiPublicBoundary(obj.coords[0], obj.coords[1])) return true;
@@ -93,7 +103,7 @@ const PUBLIC_OBSERVATION_LISTS = [
   'alert_pins', 'sdk_entities', 'live_feeds',
   // Direct public API response names differ from the browser projection.
   'events', 'liveEvents', 'zones', 'outages', 'attack_origins', 'ships',
-  'ports', 'flights', 'aircraft', 'countries', 'feeds',
+  'ports', 'flights', 'aircraft', 'countries', 'feeds', 'attacks',
 ] as const;
 
 export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
@@ -103,9 +113,18 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
       result[key] = result[key].filter((row: unknown) => !isSaudiPublicIndicator(row)).map((row: unknown) => {
         if (key !== 'zones') return row;
         const zone = record(row);
-        return zone && Array.isArray(zone.events)
-          ? { ...zone, events: zone.events.filter((event: unknown) => !isSaudiPublicIndicator(event)) }
-          : row;
+        if (!zone || !Array.isArray(zone.events)) return row;
+        const events = zone.events.filter((event: unknown) => !isSaudiPublicIndicator(event));
+        const kinds: Record<string, number> = {};
+        for (const event of events) {
+          const kind = String(record(event)?.type || 'other');
+          kinds[kind] = (kinds[kind] || 0) + 1;
+        }
+        const eventCount = events.length;
+        return { ...zone, events, eventCount, eventKinds: kinds,
+          dominantKind: Object.keys(kinds).sort((a, b) => kinds[b] - kinds[a])[0] || 'other',
+          activityBand: eventCount >= 10 ? 'active' : eventCount >= 3 ? 'elevated' : 'quiet',
+        };
       });
     }
   }
@@ -118,12 +137,35 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
   for (const [items, total] of [
     ['events', 'total'], ['zones', 'totalZones'], ['liveEvents', 'totalLiveEvents'],
     ['cameras', 'total'], ['fires', 'total'], ['ships', 'total_ships'],
+    ['ports', 'total_ports'], ['chokepoints', 'total_chokepoints'],
     ['satellites', 'total'], ['outages', 'total_outages'],
-    ['attack_origins', 'total_attack_origins'], ['reported_routes', 'reported_routes_total'],
+    ['attack_origins', 'total_attack_origins'], ['attacks', 'total'],
+    ['reported_routes', 'reported_routes_total'],
   ] as const) {
     if (Array.isArray(result[items]) && typeof result[total] === 'number') {
       result[total] = result[items].length;
     }
+  }
+  const rows = result.liveEvents;
+  if (Array.isArray(rows) && 'categoryCounts' in result) {
+    const categories: Record<string, number> = {};
+    for (const row of rows) {
+      const category = String(record(row)?.type || 'other');
+      categories[category] = (categories[category] || 0) + 1;
+    }
+    result.categoryCounts = categories;
+  }
+  const zones = result.zones;
+  if (Array.isArray(zones) && 'zonesWithRecentReports' in result) {
+    result.zonesWithRecentReports = zones.filter(v => Number(record(v)?.eventCount) > 0).length;
+  }
+  const sourceStatus = record(result.source_status);
+  const reference = record(sourceStatus?.reference);
+  if (sourceStatus && reference && Array.isArray(result.ports)) {
+    result.source_status = { ...sourceStatus, reference: { ...reference,
+      ports: result.ports.length,
+      ...(Array.isArray(result.chokepoints) ? { chokepoints: result.chokepoints.length } : {}),
+    } };
   }
   return result as T;
 }

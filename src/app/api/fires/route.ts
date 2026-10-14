@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
+import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
 
 export const dynamic = 'force-dynamic';
@@ -81,7 +81,7 @@ export function parseCSV(csv: string): any[] {
     const cols = lines[i].split(',');
     const lat = parseFloat(cols[latIdx]);
     const lng = parseFloat(cols[lngIdx]);
-    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng)) continue;
+    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng) || inSaudiPublicBoundary(lat, lng)) continue;
 
     fires.push({
       lat: Math.round(lat * 1000) / 1000,

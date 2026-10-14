@@ -22,6 +22,7 @@ describe('Saudi-only public observation visibility', () => {
     expect(isSaudiPublicIndicator({ country: 'Saudi Arabia' })).toBe(true);
     expect(isSaudiPublicIndicator({ country: 'السعودية' })).toBe(true);
     expect(isSaudiPublicIndicator({ country: 'YE', lat: 15.3, lng: 44.2 })).toBe(false);
+    expect(isSaudiPublicIndicator({ country: 'YE', lat: 24.7136, lng: 46.6753 })).toBe(true);
     expect(isSaudiPublicIndicator({ title: 'Saudi Arabia mentioned in a world news article' })).toBe(false);
     expect(isSaudiPublicIndicator({ type: 'Feature', geometry: { type: 'Point', coordinates: [46.6753, 24.7136] }, properties: {} })).toBe(true);
     expect(isSaudiPublicIndicator({ origin_lat: 15.3694, origin_lng: 44.1910, target_lat: 33.3152, target_lng: 44.3661 })).toBe(true);
@@ -57,7 +58,10 @@ describe('Saudi-only public observation visibility', () => {
     };
     const masked = maskSaudiPublicIndicators(source);
     expect(masked.events.map(event => event.id)).toEqual(['sanaa']);
-    expect(masked.zones).toEqual([{ country: 'YE', events: [{ country: 'YE' }] }]);
+    expect(masked.zones).toEqual([expect.objectContaining({
+      country: 'YE', events: [{ country: 'YE' }], eventCount: 1,
+      eventKinds: { other: 1 }, dominantKind: 'other', activityBand: 'quiet',
+    })]);
     expect(masked.outages).toEqual([{ country: 'YE' }]);
     expect([masked.total, masked.totalZones, masked.total_outages]).toEqual([1, 1, 1]);
     expect(source.zones[1].events).toHaveLength(2);

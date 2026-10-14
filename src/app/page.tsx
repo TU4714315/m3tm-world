@@ -47,7 +47,7 @@ const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, type DrawResult } from '@/lib/draw';
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
-import { PUBLIC_REFRESH_MS, significantCyberIndicators } from '@/lib/publicRefreshPolicy';
+import { PUBLIC_REFRESH_MS } from '@/lib/publicRefreshPolicy';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 
 const M3TM_APP_ORIGIN = 'https://m3tm.app';
@@ -448,12 +448,13 @@ export default function Dashboard() {
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
   // This affects map rendering only, not source ingestion or the user's saved layer preferences.
-  const displayedMapLayers = useMemo(
-    () => embedMode && embedSurface === 'public'
-      ? hidePublicMapMarkers(activeLayers, showPublicMapMarkers)
-      : activeLayers,
-    [activeLayers, embedMode, embedSurface, showPublicMapMarkers],
-  );
+  const displayedMapLayers = useMemo(() => {
+    const visible = embedMode && embedSurface === 'public'
+      ? hidePublicMapMarkers(activeLayers, showPublicMapMarkers) : activeLayers;
+    // Source-backed public Feodo/Cloudflare country observations replace the
+    // speculative actor-to-target cyber arc visualization.
+    return { ...visible, cf_attacks: visible.cf_attacks || visible.cyber_attacks, cyber_attacks: false };
+  }, [activeLayers, embedMode, embedSurface, showPublicMapMarkers]);
   const workspaceAutoSaveReadyRef = useRef(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
 
@@ -1001,11 +1002,8 @@ export default function Dashboard() {
 
         // Live Malware (abuse.ch) is pushed, not fetched — see the SSE subscription below.
 
-    // Live Cyber Attacks (animated arcs)
-    if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }));
-      layerFetchedRef.current.add('cyber_attacks');
-    }
+    // This toggle reuses evidence-backed national network observations below,
+    // never synthetic attacker-to-target arcs.
     /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
        release the mark if nothing landed — otherwise one failed request leaves
        the layer permanently empty. */
@@ -1073,7 +1071,7 @@ export default function Dashboard() {
     }
 
     // Network events — Cloudflare Radar when configured, otherwise factual public fallbacks.
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
+    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks || (activeLayers as any).cyber_attacks) {
       loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
@@ -1104,13 +1102,7 @@ export default function Dashboard() {
       intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
     }
 
-    if ((activeLayers as any).cyber_attacks) {
-      intervals.push(setInterval(() => {
-        layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: significantCyberIndicators(d.attacks) }), undefined, { skipWhenHidden: true });
-        layerFetchedRef.current.add('cyber_attacks');
-      }, PUBLIC_REFRESH_MS.cyberThreatSummary)); // once daily while the layer is visible
-    }
+    // Legacy speculative /api/cyber-attacks arcs are intentionally not polled.
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true }), 300000));
@@ -1162,7 +1154,7 @@ export default function Dashboard() {
 
     // Network-event monitor: refresh source-backed public observations without
     // depending on a Cloudflare credential. Cloudflare remains preferred when configured.
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
+    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks || (activeLayers as any).cyber_attacks) {
       intervals.push(setInterval(() => fetchEndpoint('/api/cloudflare-radar', d => ({
         cf_outages: d.outages ?? [],
         cf_attack_origins: d.attack_origins ?? [],
