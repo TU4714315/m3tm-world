@@ -67,7 +67,7 @@ function isSaudiPointBetween(lat1: unknown, lon1: unknown, lat2: unknown, lon2: 
   return false;
 }
 
-/** Saudi country tags or positions inside the approximate Saudi polygon are withheld. */
+/** Explicit non-Saudi country classifications take precedence near coarse borders. */
 export function isSaudiPublicIndicator(value: unknown): boolean {
   const row = record(value);
   if (!row) return false;
@@ -78,8 +78,10 @@ export function isSaudiPublicIndicator(value: unknown): boolean {
     for (const key of countryKeys) {
       if (saudiCountryCode(obj[key])) return true;
     }
-    // Geographic containment wins over a potentially incorrect country label.
-    if (inSaudiPublicBoundary(obj.lat ?? obj.latitude, obj.lng ?? obj.lon ?? obj.longitude)) return true;
+    // Natural Earth 1:110m is not precise enough to override a named country
+    // classification, especially for reports near the Yemen border.
+    const hasNamedOtherCountry = countryKeys.some(key => typeof obj[key] === 'string' && obj[key].trim().length >= 2);
+    if (!hasNamedOtherCountry && inSaudiPublicBoundary(obj.lat ?? obj.latitude, obj.lng ?? obj.lon ?? obj.longitude)) return true;
     if (inSaudiPublicBoundary(obj.target_lat, obj.target_lng) ||
         inSaudiPublicBoundary(obj.origin_lat, obj.origin_lng)) return true;
     if (saudiCountryCode(obj.target_country) ||
