@@ -141,6 +141,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
+      { key: 'digital_clusters', label: 'تجمعات المؤشرات الرقمية', description: 'تجميع بلاغات اتصال متميزة على مستوى الدولة فقط؛ ليس تجمع أجهزة أو موقع منشأة أو إشارة اتصال ميدانية.', dataKey: '' },
       { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'Cloudflare Radar عند تهيئته؛ وإلا أحداث سيبرانية منشورة من GDELT CAMEO 176. لا يُفترض أن كل بلاغ يمثل انقطاعًا شاملاً.', dataKey: 'cf_outages', requires: 'cloudflare' },
       { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'Cloudflare Layer 3 عند تهيئته؛ وإلا تجميع بلدي لبنية C2 المرصودة من abuse.ch/Feodo. البلد هو موقع البنية المرصودة وليس إسنادًا لهوية المهاجم.', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
@@ -216,6 +217,14 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
    */
   const [pinnedGroup, setPinnedGroup] = useState<string | null>(null);
   const [studioOpen, setStudioOpen] = useState(false);
+  // This layer accepts only original Cloudflare outage annotations. GDELT
+  // fallback cyber reports do not create national digital clusters.
+  const radarOutageState = data?.cloudflare_source_status?.providers?.cloudflare_outages;
+  const digitalClusterSourceNote = radarOutageState === 'not_configured'
+    ? 'Cloudflare Radar غير مهيأ؛ لا توجد تجمعات رقمية موثّقة.'
+    : radarOutageState === 'unavailable'
+      ? 'تعذّر جلب بلاغات Cloudflare Radar؛ لا تُعرض تجمعات تخمينية.'
+      : null;
 
   useEffect(() => {
     if (!pinnedGroup) return;
@@ -318,9 +327,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
-                    <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
-                      {layer.label}
-                      
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className={`text-[11px] font-mono uppercase tracking-wider transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
+                        {layer.label}
+                      </span>
+                      {layer.key === 'digital_clusters' && isLayerActive && digitalClusterSourceNote && (
+                        <span className="text-[9px] leading-4 tracking-normal text-white/45" dir="rtl">{digitalClusterSourceNote}</span>
+                      )}
                     </span>
                     
                     {count !== null && (
@@ -536,6 +549,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                 <span className="flex w-full items-center gap-2" dir="rtl">
                                   
                                   {count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
+                                  {layer.key === 'digital_clusters' && isLayerActive && digitalClusterSourceNote && (
+                                    <span className="text-[9px] leading-4 text-white/45">{digitalClusterSourceNote}</span>
+                                  )}
                                 </span>
                                 
                               </>

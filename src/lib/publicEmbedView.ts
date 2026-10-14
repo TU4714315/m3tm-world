@@ -30,7 +30,7 @@ export const PUBLIC_MAP_MARKER_LAYERS = [
   'maritime', 'naval_activity', 'satellites', 'sat_comms', 'sat_military',
   'sat_navigation', 'sat_earth', 'sat_science', 'cctv', 'cctv_previews',
   'sdk_air', 'sdk_sea', 'sdk_naval', 'infrastructure', 'malware',
-  'cf_outages', 'cf_attacks',
+  'cf_outages', 'cf_attacks', 'digital_clusters',
 ] as const;
 
 export function hidePublicMapMarkers<T extends Record<string, boolean>>(layers: T, visible: boolean): T {

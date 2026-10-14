@@ -24,6 +24,7 @@ import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
+import { countryDigitalReportClusters, sharedCountryOutageContexts } from '@/lib/publicDigitalClusters';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
@@ -357,7 +358,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks', 'digital-observation-clusters', 'digital-shared-events'];
       // Clusters group only the *visual* symbol footprints. Public records
       // and source attribution are retained and expand on zoom.
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
@@ -872,6 +873,42 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'text-field': ['get','country_name'], 'text-size': 9, 'text-font': ['JetBrains Mono Bold', 'Open Sans Bold'],
         'text-offset': [0, 1.4], 'text-max-width': 12, 'text-allow-overlap': false,
       }, paint: { 'text-color': '#FFB300', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.85 }});
+
+      // Country-centroid lines indicate a SHARED published outage annotation;
+      // they do not indicate a physical/radio/BGP connection between countries.
+      map.addLayer({ id: 'digital-shared-event-line', type: 'line', source: 'digital-shared-events', layout: {
+        'line-cap':'round', 'line-join':'round',
+      }, paint: {
+        'line-color':'#7DD3FC','line-width':['interpolate',['linear'],['zoom'],1,1,4,2.2,7,2.8],
+        'line-opacity':['case',['==',['get','reported_ongoing'],true],0.82,0.35],
+        'line-dasharray':[2,3],
+      }});
+      // Heat visualizes annotations at NATIONAL scale only, not device density.
+      map.addLayer({ id: 'digital-cluster-heat', type: 'heatmap', source: 'digital-observation-clusters', maxzoom:6, paint: {
+        'heatmap-weight':['interpolate',['linear'],['get','report_count'],2,0.18,10,0.48,35,0.85],
+        'heatmap-intensity':['interpolate',['linear'],['zoom'],1,0.7,5,1.15],
+        'heatmap-radius':['interpolate',['linear'],['zoom'],1,28,5,62],
+        'heatmap-opacity':['interpolate',['linear'],['zoom'],1,0.68,5,0.35,6,0],
+        'heatmap-color':['interpolate',['linear'],['heatmap-density'],
+          0,'rgba(0,0,0,0)',0.25,'rgba(2,132,199,0.18)',0.5,'rgba(8,145,178,0.38)',0.8,'rgba(125,211,252,0.7)',1,'rgba(224,242,254,0.85)'],
+      }});
+
+      // Source-backed country aggregates: group annotations, NOT devices/sites.
+      // Icon location is a country display centroid; never geolocate individual IPs.
+      map.addLayer({ id: 'digital-cluster-halo', type: 'circle', source: 'digital-observation-clusters', paint: {
+        'circle-radius': ['interpolate',['linear'],['zoom'],1,22,5,31],
+        'circle-color':'#7DD3FC','circle-opacity':0.13,'circle-blur':0.65,
+      }});
+      map.addLayer({ id: 'digital-cluster-dots', type: 'circle', source: 'digital-observation-clusters', paint: {
+        'circle-radius':['step',['get','report_count'],9,5,12,15,15],
+        'circle-color':'#0284C7','circle-opacity':0.88,
+        'circle-stroke-width':2,'circle-stroke-color':'#BAE6FD',
+      }});
+      map.addLayer({ id: 'digital-cluster-label', type: 'symbol', source: 'digital-observation-clusters', minzoom: 2.5, layout: {
+        'text-field':['concat','تجمع رقمي · ',['to-string',['get','report_count']]],
+        'text-size':10,'text-font':['Open Sans Bold'],'text-offset':[0,1.65],
+        'text-allow-overlap':false,
+      }, paint: {'text-color':'#DFF8FF','text-halo-color':'#07131B','text-halo-width':1.7} });
 
       /* ── Cloudflare Radar — layer-3 attack origin share ── */
       map.addLayer({ id: 'cf-attack-dots', type: 'circle', source: 'cf-attacks', paint: {
@@ -1780,6 +1817,41 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
+    map.on('click', 'digital-shared-event-line', e => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const start = Date.parse(String(p.started_at || ''));
+      const end = p.ended_at ? Date.parse(String(p.ended_at)) : Date.now();
+      const elapsed = Number.isFinite(start) && Number.isFinite(end) && end >= start
+        ? Math.floor((end-start)/60000) : null;
+      const duration = elapsed === null ? 'غير محددة' : String(Math.floor(elapsed / 60)) + ' ساعة و' + String(elapsed % 60) + ' دقيقة';
+      // GeoJSON/MapLibre can surface boolean properties as strings in query features.
+      const ongoing = p.reported_ongoing === true || p.reported_ongoing === 'true';
+      const state = ongoing ? 'بلاغ مستمر بحسب المصدر' : 'بلاغ انتهى بحسب المصدر';
+      const html = '<div dir="rtl" style="' + pStyle + 'border:1px solid rgba(125,211,252,.42);">'
+        + '<div style="font-size:12px;font-weight:700;color:#7DD3FC;margin-bottom:7px;">حدث اضطراب مشترك بين دولتين</div>'
+        + '<div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">' + htmlEsc(p.from_country || '—') + ' / ' + htmlEsc(p.to_country || '—') + '</div>'
+        + '<div style="font-size:10px;color:#E8E6E0;margin-bottom:6px;">' + htmlEsc(state) + ' · مدة البلاغ ' + htmlEsc(duration) + '</div>'
+        + '<div style="font-size:10px;color:#B8C3CA;margin-bottom:6px;">Cloudflare Radar · ' + htmlEsc(p.started_at || '—') + '</div>'
+        + '<div style="font-size:10px;color:#FFDB9F;line-height:1.6;">الخط تمثيل لدولتين في نفس بلاغ الانقطاع؛ لا يثبت اتصالًا مباشرًا أو كابلًا أو موقع عقدة أو مسارًا فعليًا.</div>'
+        + '</div>';
+      popup([e.lngLat.lng, e.lngLat.lat], html);
+    });
+
+    map.on('click', 'digital-cluster-dots', e => {
+      const f = e.features?.[0];
+      if (!f || f.geometry.type !== 'Point') return;
+      const p = f.properties || {};
+      const coords = f.geometry.coordinates as [number, number];
+      popup(coords, `<div dir="rtl" style="${pStyle}border:1px solid rgba(125,211,252,.42);">
+        <div style="color:#7DD3FC;font-size:12px;font-weight:700;margin-bottom:8px;">تجمع مؤشرات رقمية · ${htmlEsc(p.country || '—')}</div>
+        <div style="font-size:11px;color:#E8E6E0;margin-bottom:7px;">${htmlEsc(p.report_count || 0)} بلاغات اتصال متميزة في نطاق الدولة من ${htmlEsc(p.source || '—')}.</div>
+        <div style="font-size:10px;color:#B8C3CA;margin-bottom:7px;">أحدث وقت بدء انقطاع: ${htmlEsc(p.latest_report_utc || 'غير معروف')}</div>
+        <div style="font-size:10px;color:#FFDB9F;line-height:1.6;">الرمز في مركز الدولة للعرض فقط؛ ليس موقع تجمع أجهزة أو محطة ارتباط. تعدد بلاغات مزود واحد ليس تأكيدًا مستقلًا.</div>
+      </div>`);
+    });
+
     // ── Public network events / Cloudflare Radar ──
     map.on('click', 'cf-outage-dots', e => {
       if (!e.features?.length) return;
@@ -2079,7 +2151,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat','gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','app-news-dots','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-event-icons','cf-outage-dots','cf-attack-dots','digital-cluster-dots','digital-shared-event-line'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
@@ -2369,6 +2441,24 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     const iv = setInterval(update, 300000); // 5 min (was 1 min — shadow barely moves)
     return () => clearInterval(iv);
   }, [mapReady, activeLayers.day_night]);
+
+  // Re-evaluate expiring public network annotations even when fetching fails.
+  // This timer runs only while the country-level signal layer is visible and
+  // never fetches/polls a provider or reads raw device/IP data.
+  const [digitalExpiryTick, setDigitalExpiryTick] = useState(0);
+  useEffect(() => {
+    if (!mapReady || !(activeLayers as any).digital_clusters) return;
+    const updateIfVisible = () => {
+      if (!document.hidden) setDigitalExpiryTick(x => x + 1);
+    };
+    const handleVisibility = () => updateIfVisible();
+    const interval = window.setInterval(updateIfVisible, 60_000);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [mapReady, (activeLayers as any).digital_clusters]);
 
   // Helper to set GeoJSON
   const setGeo = useCallback((source: string, features: any[]) => {
@@ -2665,7 +2755,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         precision: o.precision || '',
       },
     })) : []);
-  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, setGeo]);
+    setGeo('digital-shared-events', al.digital_clusters ? sharedCountryOutageContexts(data.cf_outages).map(c => ({
+      type: 'Feature' as const,
+      geometry: { type:'LineString' as const, coordinates:[c.from,c.to] },
+      properties: {
+        id:c.id, from_country:c.from_country, to_country:c.to_country,
+        started_at:c.started_at, ended_at:c.ended_at,
+        reported_ongoing:c.reported_ongoing, source:c.source, relation:c.relation,
+      },
+    })) : []);
+    setGeo('digital-observation-clusters',
+      al.digital_clusters ? countryDigitalReportClusters(data.cf_outages).map(c => ({
+        type: 'Feature' as const,
+        geometry: {type:'Point' as const,coordinates:[c.lng,c.lat]},
+        properties: c,
+      })) : []);
+  }, [mapReady, data.cf_outages, (activeLayers as any).cf_outages, (activeLayers as any).digital_clusters, digitalExpiryTick, setGeo]);
 
   /* ── Cloudflare Radar: attack origins ── */
   useEffect(() => {
@@ -3108,6 +3213,31 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   }, [mapReady, data.conflict_zones, data.conflict_live_events, data.gdelt_events, data.civil_unrest, (activeLayers as any).gdelt_events, (activeLayers as any).civil_unrest, data.conflict_data_state, setGeo]);
 
 
+  // Low-cost status pulse: only a provider-reported ongoing cross-country
+  // outage annotation pulses. It does NOT mean the physical connection failed.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !(activeLayers as any).digital_clusters) return;
+    // The toggle defaults on, but most feeds have no ongoing shared annotation.
+    // Avoid repainting an otherwise idle global map every 1.2 seconds.
+    if (!sharedCountryOutageContexts(data.cf_outages).some(c => c.reported_ongoing)) return;
+    const map = mapRef.current;
+    let high = false;
+    const pulse = () => {
+      if (document.hidden || mapRef.current !== map || !map.getLayer('digital-shared-event-line')) return;
+      high = !high;
+      map.setPaintProperty('digital-shared-event-line', 'line-opacity',
+        ['case',['==',['get','reported_ongoing'],true], high ? 0.9 : 0.25, 0.35]);
+    };
+    const timer = window.setInterval(pulse, 1200);
+    return () => {
+      window.clearInterval(timer);
+      if (mapRef.current === map && map.getLayer('digital-shared-event-line')) {
+        map.setPaintProperty('digital-shared-event-line', 'line-opacity',
+          ['case',['==',['get','reported_ongoing'],true],0.82,0.35]);
+      }
+    };
+  }, [mapReady, data.cf_outages, (activeLayers as any).digital_clusters]);
+
   // Visibility
   useEffect(() => {
     if (!mapReady) return;
@@ -3124,6 +3254,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters','civil-unrest-cluster-count'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
+    setVis(['digital-cluster-heat','digital-cluster-halo','digital-cluster-dots','digital-cluster-label','digital-shared-event-line'], (activeLayers as any).digital_clusters);
 
     setVis(['malware-glow','malware-dots','malware-label','malware-new-ring'], activeLayers.malware);
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
