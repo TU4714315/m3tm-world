@@ -13,6 +13,14 @@ describe('WORLD mobile ticker and uncluttered glass controls', () => {
     expect(css).toContain('.world-news-ticker {');
     expect(css).toContain('safe-area-inset-bottom');
   });
+  it('renders news in the internal iframe without stealing APP navigation', () => {
+    expect(page).toContain('<GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />');
+    expect(page).not.toContain("(!embedMode || embedSurface === 'public') && <GlobalStatusBar");
+    expect(ticker).toContain('delay: embed ? 0 : 0.2');
+    expect(ticker).toContain('{!embed && (');
+    expect(css).toContain(".world-news-ticker[data-embed='true']");
+    expect(css).toContain('bottom: env(safe-area-inset-bottom, 0px) !important;');
+  });
   it('folds dense secondary HUD controls on phones', () => {
     expect(page).toContain('showMobileHudDetails');
     expect(page).toContain('(!isMobile || showMobileHudDetails)');
