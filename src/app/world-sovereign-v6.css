@@ -1,0 +1,120 @@
+/*
+ * M3TM Sovereign Luxury V6 (staging).
+ * Interface chrome only. Does NOT alter MapLibre canvas, tile style, published
+ * incident locations, realtime feeds or internal authorization. Preserve
+ * embedMode behavior to avoid chrome overlay inside APP iframe.
+ */
+body {
+  --luxury-gold: #D4AF6B;
+  --luxury-gold-pale: #F6E3B2;
+  --luxury-chrome: #0A0E14;
+  --luxury-border: rgba(212,175,107,.3);
+  --luxury-text: #E5E8EF;
+  --luxury-muted: #B8C3D1;
+  --luxury-radius: 16px;
+}
+body[data-m3tm-world-appearance="dark"] {
+  --luxury-chrome: #0A0E14;
+  --luxury-panel: #0F1B2D;
+  --luxury-border: rgba(212,175,107,.28);
+  --luxury-text: #E5E8EF;
+  --luxury-muted: #C4CCDA;
+  --luxury-accent: #D4AF6B;
+}
+body[data-m3tm-world-appearance="midnight"] {
+  --luxury-chrome: #0A1B3D;
+  --luxury-panel: #112852;
+  --luxury-border: rgba(98,159,255,.32);
+  --luxury-text: #F8FAFF;
+  --luxury-muted: #CDD9F0;
+  --luxury-accent: #A6C8FF;
+}
+body[data-m3tm-world-appearance="light"] {
+  --luxury-chrome: #FFFDF8;
+  --luxury-panel: #F2F7FD;
+  --luxury-border: rgba(15,78,199,.26);
+  --luxury-text: #27354A;
+  --luxury-muted: #3E4756;
+  --luxury-accent: #0F4EC7;
+  color-scheme: light;
+}
+/* Brand is a bounded, designed masthead with a single motion affordance. */
+.m3tm-world-v5-header {
+  isolation: isolate;
+  align-items: center;
+  gap: 13px;
+  max-width: min(84vw,690px);
+  padding: 5px 9px;
+  border: 1px solid var(--luxury-border);
+  border-radius: 17px;
+  background: color-mix(in srgb,var(--luxury-chrome) 91%,transparent);
+  box-shadow: 0 20px 40px -28px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.07);
+  backdrop-filter: blur(21px);
+}
+.m3tm-world-v5-header :is(svg,img) {
+  object-fit: contain;
+}
+.m3tm-world-v5-header .m3tm-world-v5-switcher {
+  border-radius: 12px;
+  box-shadow: none;
+  border-color: color-mix(in srgb,var(--luxury-border) 75%,transparent);
+  background: transparent;
+  color: var(--luxury-text);
+}
+.m3tm-world-v5-header .m3tm-world-v5-switcher button {
+  min-width: 36px;
+  min-height: 38px;
+  border-radius: 9px;
+}
+.m3tm-world-v5-header .m3tm-world-v5-switcher button.is-active {
+  border-color: var(--luxury-border);
+  color: var(--luxury-accent);
+  background: color-mix(in srgb,var(--luxury-accent) 12%,transparent);
+}
+.m3tm-world-v5-header .m3tm-world-v5-switcher button:focus-visible {
+  outline: 2px solid var(--luxury-accent);
+  outline-offset: 3px;
+}
+/* Group primary world tools using the same restrained outline vocabulary. */
+body[data-m3tm-world-appearance] :is(.glass-panel,.status-bar-desktop > a) {
+  border-radius: 14px;
+  border-color: var(--luxury-border);
+  box-shadow: 0 16px 40px -29px rgba(0,0,0,.66);
+}
+/* Keep text contrast on mixed dark WebGL overlays; LIGHT only affects shell,
+ * not map HUD typography, as tiles remain dark and variable. */
+body[data-m3tm-world-appearance="light"] .m3tm-world-v5-header {
+  color: var(--luxury-text);
+  box-shadow: 0 16px 48px -32px rgba(10,27,61,.45);
+}
+body[data-m3tm-world-appearance="light"] .m3tm-world-v5-header > div:last-child > div:first-child span:last-child {
+  color: #27354a;
+}
+/* Functional embed: no extra masthead in frames and no accidental page overflow. */
+body:has(iframe) .m3tm-world-v5-header { max-width: min(84vw,690px); }
+@media(max-width:900px) {
+  .m3tm-world-v5-header {
+    gap: 6px;
+    max-width: min(68vw,370px);
+    padding: 4px 6px;
+    border-radius: 13px;
+  }
+  .m3tm-world-v5-header .m3tm-world-v5-switcher {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 2;
+    padding: 4px;
+    border: 1px solid var(--luxury-border);
+    background: color-mix(in srgb,var(--luxury-chrome) 93%,transparent);
+    box-shadow: 0 8px 22px -16px rgba(0,0,0,.62);
+  }
+  .m3tm-world-v5-header .m3tm-world-v5-switcher button { min-width:35px; }
+}
+@media(max-width:410px) {
+  .m3tm-world-v5-header { max-width: 65vw; }
+  .m3tm-world-v5-header .m3tm-world-v5-switcher button { min-width:33px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .m3tm-world-v5-header *, .m3tm-world-v5-switcher * { transition: none !important;animation:none!important; }
+}

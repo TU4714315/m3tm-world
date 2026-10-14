@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import "./globals.css";
+import "./world-v5.css";
+import "./world-sovereign-v6.css";
 
 const SITE_URL = "https://m3tm.app/world";
 const ASSET_ORIGIN = "https://m3tm-world-recovery.onrender.com";

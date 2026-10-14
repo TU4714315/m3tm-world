@@ -1,0 +1,85 @@
+/*
+ * V5 progressive shell modernization.
+ * Keep all selectors on the appearance switcher / logo. No modification
+ * to map tiles, military/coarse activity display, or MapLibre canvas.
+ */
+.m3tm-world-v5-header {
+  display: flex;
+  align-items: center;
+  gap: clamp(9px,1.4vw,20px);
+  max-width: min(76vw,720px);
+}
+.m3tm-world-v5-header > :first-child {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.m3tm-world-v5-switcher {
+  --world-v5-surface: rgba(10,14,20,.91);
+  --world-v5-fg: #e5e8ef;
+  --world-v5-active: #d4af6b;
+  --world-v5-border: rgba(212,175,107,.28);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--world-v5-border);
+  border-radius: 13px;
+  background: var(--world-v5-surface);
+  color: var(--world-v5-fg);
+  box-shadow: 0 14px 36px rgba(0,0,0,.25);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.m3tm-world-v5-switcher button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 35px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.m3tm-world-v5-switcher button svg { width: 15px; height: 15px; flex: 0 0 15px; }
+.m3tm-world-v5-switcher button.is-active {
+  color: var(--world-v5-active);
+  border-color: var(--world-v5-border);
+  background: color-mix(in srgb,var(--world-v5-active) 12%,transparent);
+}
+.m3tm-world-v5-switcher button:focus-visible {
+  outline: 2px solid var(--world-v5-active);
+  outline-offset: 2px;
+}
+body[data-m3tm-world-appearance="light"] .m3tm-world-v5-switcher {
+  --world-v5-surface: rgba(255,253,248,.96);
+  --world-v5-fg: #27354a;
+  --world-v5-active: #0f4ec7;
+  --world-v5-border: rgba(15,78,199,.25);
+}
+body[data-m3tm-world-appearance="midnight"] .m3tm-world-v5-switcher {
+  --world-v5-surface: rgba(10,27,61,.94);
+  --world-v5-fg: #f8faff;
+  --world-v5-active: #a1c5ff;
+  --world-v5-border: rgba(14,91,255,.42);
+}
+@media (max-width: 1140px) {
+  .m3tm-world-v5-switcher button span { display: none; }
+  .m3tm-world-v5-switcher button { min-width: 35px; justify-content: center; }
+}
+@media (max-width: 700px) {
+  .m3tm-world-v5-header { position: relative; max-width: 62vw; }
+  .m3tm-world-v5-switcher {
+    position: absolute;
+    top: 51px;
+    left: 0;
+    border-radius: 12px;
+  }
+  .m3tm-world-v5-switcher button { min-width: 34px; min-height: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m3tm-world-v5-switcher * { transition: none !important; }
+}

@@ -35,6 +35,12 @@ const FALLBACK_FEEDS = {
 const RISK_KEYWORDS = ['war','missile','strike','attack','crisis','tension','military','conflict','defense','clash','nuclear','invasion','bomb','drone','weapon','sanctions','ceasefire','escalation', 'killed', 'destroyed', 'operation', 'casualty', 'frontline', 'threat'];
 const M3TM_APP_PUBLIC_NEWS = 'https://m3tm.app/data/news.json';
 
+// Exact first-party cross-origin consumer. Keep errors readable by the APP UI.
+export const NEWS_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': 'https://m3tm.app',
+  'Vary': 'Origin',
+} as const;
+
 function scoreRisk(text: string): number {
   const lower = text.toLowerCase();
   let score = 1;
@@ -206,7 +212,7 @@ export async function GET() {
         geo_contract: 'APP published coordinates only; RSS headlines are unlocated',
       }, {headers:{
         'Cache-Control':'public, s-maxage=45, stale-while-revalidate=90',
-        'Access-Control-Allow-Origin':'https://m3tm.app',
+        ...NEWS_CORS_HEADERS,
       }});
     }
 
@@ -264,10 +270,13 @@ export async function GET() {
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=45, stale-while-revalidate=90',
-        'Access-Control-Allow-Origin': 'https://m3tm.app',
+        ...NEWS_CORS_HEADERS,
       },
     });
   } catch (error) {
-    return NextResponse.json({ news: [], error: 'Failed to fetch data' }, { status: 500 });
+    return NextResponse.json({ news: [], error: 'Failed to fetch data' }, {
+      status: 500,
+      headers: { 'Cache-Control': 'no-store', ...NEWS_CORS_HEADERS },
+    });
   }
 }

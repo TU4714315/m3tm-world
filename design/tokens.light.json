@@ -1,0 +1,26 @@
+{
+  "themeId": "light",
+  "labelAr": "فاتح",
+  "palette": {
+    "oceanBlue": "#0F4EC7",
+    "skyBlue": "#CFE6FF",
+    "ivory": "#FFFDF8",
+    "lightGold": "#D4AF6B",
+    "silver": "#D7DDE6",
+    "graphite": "#3E4756"
+  },
+  "semantic": {
+    "background": "#FFFDF8",
+    "surface": "#FFFDF8",
+    "surfaceRaised": "#CFE6FF",
+    "text": "#3E4756",
+    "textStrong": "#0F4EC7",
+    "accent": "#0F4EC7",
+    "accentText": "#FFFDF8",
+    "accentDecorative": "#D4AF6B",
+    "border": "#D7DDE6",
+    "focus": "#0F4EC7"
+  },
+  "_source": "M3TM approved image-board labels; eyedropper verification needed against raw identity master assets.",
+  "_status": "staging specification, not yet wired to application"
+}

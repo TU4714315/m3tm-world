@@ -35,6 +35,7 @@ import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/wo
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
 import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
+import WorldV5AppearanceSwitch from '@/components/WorldV5AppearanceSwitch';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -1864,8 +1865,9 @@ export default function Dashboard() {
       </motion.div>
 
             {/* ── HEADER ── */}
-      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.3 }} className={`absolute top-4 z-[201] pointer-events-none ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px' }}>
+      <motion.div dir="ltr" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.3 }} className={`m3tm-world-v5-header absolute top-4 z-[201] pointer-events-none ${embedMode ? 'hidden' : ''}`} style={{ left: isMobile ? '24px' : '64px' }}>
         <WorldBrandMark variant="header" className="shrink-0" />
+        <WorldV5AppearanceSwitch />
       </motion.div>
 
       {/* ── TOP-RIGHT STATUS (desktop) ── */}

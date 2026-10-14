@@ -1,0 +1,26 @@
+{
+  "themeId": "midnight",
+  "labelAr": "أزرق ليلي",
+  "palette": {
+    "midnightBlue": "#0A1B3D",
+    "electricBlue": "#0E5BFF",
+    "deepBlue": "#1E3A8A",
+    "silver": "#E8ECF8",
+    "lightGold": "#D4AF6B",
+    "white": "#F8FAFF"
+  },
+  "semantic": {
+    "background": "#0A1B3D",
+    "surface": "#1E3A8A",
+    "surfaceRaised": "#1E3A8A",
+    "text": "#F8FAFF",
+    "textStrong": "#E8ECF8",
+    "accent": "#0E5BFF",
+    "accentText": "#F8FAFF",
+    "accentDecorative": "#D4AF6B",
+    "border": "#1E3A8A",
+    "focus": "#E8ECF8"
+  },
+  "_source": "M3TM approved image-board labels; eyedropper verification needed against raw identity master assets.",
+  "_status": "staging specification, not yet wired to application"
+}

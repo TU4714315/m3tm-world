@@ -13,16 +13,18 @@ describe('WORLD public defaults and branding', () => {
     expect(page).toContain("'cf_outages', 'cf_attacks'");
   });
 
-  it('uses a vector brand mark instead of the raster logo with a white halo', () => {
+  it('uses the approved cropped falcon image with a vector fallback', () => {
     expect(page).toContain('<WorldBrandMark variant="hero"');
     expect(page).toContain('<WorldBrandMark variant="header"');
     expect(page).not.toContain('/branding/m3tm-world-logo-transparent.png');
     expect(brand).toContain('<svg');
+    expect(brand).toContain("/brand/m3tm-approved-falcon.png");
+    expect(brand).toContain("unoptimized");
     expect(brand).toContain('bg-transparent');
-    expect(brand).toContain('بيانات عالمية · مصادر منشورة · عرض حي');
+    expect(brand).toContain('ذكاء واحد · عالم أوسع');
     expect(brand).toContain('{hero && (');
-    expect(brand).toContain('ellipse');
-    expect(brand).toContain('m3tm-gold');
+    expect(brand).toContain('M100 42 C109 42 122 54 124 65');
+    expect(brand).toContain('const gold =');
     expect(brand).not.toContain('<img');
     expect(brand).not.toContain('<rect');
   });
