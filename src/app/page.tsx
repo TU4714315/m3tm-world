@@ -1786,7 +1786,7 @@ export default function Dashboard() {
       {/* ── MAP VIEW CONTROLS ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className={`absolute bottom-[112px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none ${embedMode ? 'hidden' : ''}`}
+        className={`world-mobile-map-hud absolute bottom-[112px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none ${embedMode ? 'hidden' : ''}`}
         style={{ left: isMobile ? '12px' : '120px', right: isMobile ? '12px' : 'auto' }}
       >
         {/* Unified Control Strip */}
