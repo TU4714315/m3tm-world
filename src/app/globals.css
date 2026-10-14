@@ -2616,3 +2616,7 @@ html[dir='rtl'] [dir='ltr'] {
 @media (max-height: 500px) and (max-width: 1024px) {
   .world-news-ticker { bottom: calc(48px + env(safe-area-inset-bottom, 0px)) !important; }
 }
+
+@media (max-width: 767px) {
+  .world-mobile-map-hud { bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
+}
