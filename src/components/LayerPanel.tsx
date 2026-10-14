@@ -216,6 +216,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
    */
   const [pinnedGroup, setPinnedGroup] = useState<string | null>(null);
   const [studioOpen, setStudioOpen] = useState(false);
+  const [mobileGroup, setMobileGroup] = useState('الكل');
+  const [mobileSearch, setMobileSearch] = useState('');
 
   useEffect(() => {
     if (!pinnedGroup) return;
@@ -268,10 +270,21 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
 
   /* Keep credential-gated layers visible and operable. Missing credentials are
      provider state ("غير مهيأ"), not a locked UI state. */
-  const visibleGroups = LAYER_GROUPS.map(g => ({
+  const availableGroups = LAYER_GROUPS.map(g => ({
     ...g,
     layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
   })).filter(g => g.layers.length > 0);
+  const normalizedSearch = mobileSearch.trim().toLocaleLowerCase('ar');
+  const visibleGroups = !isMobile ? availableGroups : availableGroups
+    .filter(group => mobileGroup === 'الكل' || group.label === mobileGroup)
+    .map(group => ({
+      ...group,
+      layers: group.layers.filter(layer =>
+        !normalizedSearch
+        || (group.fullLabel + ' ' + layer.label + ' ' + layer.key)
+          .toLocaleLowerCase('ar').includes(normalizedSearch)),
+    }))
+    .filter(group => group.layers.length > 0);
 
   const getCount = (dk: string, catKey?: string): number | null => {
     if (!dk) return null;
@@ -293,7 +306,30 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   /* ── MOBILE ── */
   if (isMobile) {
     return (
-      <div className="flex flex-col gap-5 py-2">
+      <div className="flex flex-col gap-4 py-2" dir="rtl">
+        <div className="rounded-xl border border-white/20 bg-white/[0.04] p-2.5">
+          <label htmlFor="world-layer-search" className="mb-2 block text-[11px] font-semibold text-white/85">
+            جميع الطبقات · {availableGroups.reduce((total, group) => total + group.layers.length, 0)} خيارًا
+          </label>
+          <input id="world-layer-search" type="search" value={mobileSearch}
+            onChange={event => setMobileSearch(event.target.value)}
+            placeholder="ابحث عن طبقة أو مصدر..."
+            className="mb-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-xs text-white outline-none placeholder:text-white/45 focus:border-cyan-300/60"
+          />
+          <div role="group" aria-label="تصفية مجموعات الطبقات"
+            className="flex max-h-[116px] flex-wrap content-start gap-1.5 overflow-y-auto">
+            {['الكل', ...availableGroups.map(group => group.label)].map(label => (
+              <button type="button" key={label} onClick={() => setMobileGroup(label)}
+                aria-pressed={mobileGroup === label}
+                className={`rounded-lg border px-2 py-1.5 text-[10px] transition-colors ${mobileGroup === label
+                  ? 'border-cyan-300/60 bg-cyan-300/15 text-cyan-100'
+                  : 'border-white/20 bg-transparent text-white/70'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {visibleGroups.length === 0 && <p role="status" className="rounded-lg border border-white/10 p-3 text-center text-xs text-white/65">لا توجد طبقات مطابقة؛ غيّر عبارة البحث أو المجموعة.</p>}
         {visibleGroups.map((group) => (
           <div key={group.label} className="flex flex-col gap-2">
             <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-white/30 border-b border-white/[0.06] pb-1.5">
@@ -314,7 +350,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     aria-pressed={!!isLayerActive}
                     aria-label={layer.label}
                     
-                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-left hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
+                    className={`relative w-full flex items-center gap-3 py-2 rounded-md text-right hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />

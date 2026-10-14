@@ -124,6 +124,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLoadState, setMapLoadState] = useState<'loading' | 'recovery' | 'unavailable'>('loading');
 
   useEffect(() => {
     if (mapReady) onReady?.();
@@ -316,13 +317,56 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       } catch (e) {
         // A failed constructor leaves its canvas behind; the next attempt needs a clean container.
         container.innerHTML = '';
-        if (canvasContextAttributes === attributeFallbacks[attributeFallbacks.length - 1]) throw e;
+        if (canvasContextAttributes === attributeFallbacks[attributeFallbacks.length - 1]) {
+          console.error('[M3TM.WORLD] No supported WebGL2 context for this browser:', e);
+          setMapLoadState('unavailable');
+          return;
+        }
         console.warn('[M3TM.WORLD] WebGL context rejected, retrying with weaker attributes:', e instanceof Error ? e.message : e);
       }
     }
     if (!map) return;
 
+    // A remote vector style can stall indefinitely on mobile Safari. Recover
+    // from an unavailable CARTO style with a published, attributed raster map
+    // rather than leave a silent black screen. This is only a basemap change:
+    // existing public overlays and their source checks remain unchanged.
+    let basemapLoaded = false;
+    let recoveryAttempted = false;
+    let recoveryTimeout: number | undefined;
+    const attemptBasemapRecovery = () => {
+      if (basemapLoaded || recoveryAttempted) return;
+      recoveryAttempted = true;
+      setMapLoadState('recovery');
+      try {
+        map.setStyle({
+          version: 8,
+          name: 'M3TM alternate public basemap',
+          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+          sources: {
+            'm3tm-street-fallback': {
+              type: 'raster',
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
+              tileSize: 256,
+              attribution: 'Tiles © Esri; data © OpenStreetMap contributors and other providers',
+            },
+          },
+          layers: [{ id: 'm3tm-street-fallback', type: 'raster', source: 'm3tm-street-fallback' }],
+        });
+      } catch (error) {
+        console.error('[M3TM.WORLD] Alternate public basemap failed:', error);
+        setMapLoadState('unavailable');
+      }
+      recoveryTimeout = window.setTimeout(() => {
+        if (!basemapLoaded) setMapLoadState('unavailable');
+      }, 15000);
+    };
+    const initialTimeout = window.setTimeout(attemptBasemapRecovery, 14000);
+
     map.on('load', () => {
+      basemapLoaded = true;
+      window.clearTimeout(initialTimeout);
+      if (recoveryTimeout) window.clearTimeout(recoveryTimeout);
       mapRef.current = map;
       // CARTO's hard-coded name_en text fields must be changed on the actual
       // loaded style, not just in UI labels. Preserve all border geometries.
@@ -1272,6 +1316,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
 
       setMapReady(true);
+      setMapLoadState(recoveryAttempted ? 'recovery' : 'loading');
       // Dev-only handle. The map is otherwise unreachable from the console,
       // which makes interaction bugs guesswork rather than diagnosis.
       if (process.env.NODE_ENV === 'development') (window as any).__m3tmWorldMap = map;
@@ -2352,7 +2397,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       </div>`);
     });
 
-    return () => { cancelAnimationFrame(hoverFrame); map.remove(); mapRef.current = null; };
+    return () => {
+      window.clearTimeout(initialTimeout);
+      if (recoveryTimeout) window.clearTimeout(recoveryTimeout);
+      cancelAnimationFrame(hoverFrame);
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
   // Day/Night
@@ -4067,6 +4118,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+      {!mapReady && (
+        <div role="status" aria-live="polite" className="pointer-events-none absolute inset-x-4 top-[38%] z-20 flex justify-center">
+          <div className="max-w-sm rounded-xl border border-cyan-300/30 bg-[#081322]/80 px-4 py-3 text-center text-xs text-cyan-100 shadow-lg backdrop-blur-sm">
+            {mapLoadState === 'loading'
+              ? 'جارٍ تجهيز الخريطة العامة…'
+              : mapLoadState === 'recovery'
+                ? 'تعذر تحميل النمط الأساسي؛ جارٍ تجربة خريطة بديلة…'
+                : 'تعذر رسم الخريطة على هذا المتصفح حاليًا؛ جرّب إعادة تحميل الصفحة أو العرض ثنائي الأبعاد.'}
+          </div>
+        </div>
+      )}
+      {mapReady && mapLoadState === 'recovery' && (
+        <div role="status" className="pointer-events-none absolute bottom-28 left-3 z-10 rounded-lg border border-white/15 bg-[#081322]/60 px-2 py-1 text-[10px] text-white/85">
+          خريطة بديلة · بيانات الخلفية من Esri
+        </div>
+      )}
       {mapReady && mapRef.current && (
         <CctvPreviews
           mapRef={mapRef}

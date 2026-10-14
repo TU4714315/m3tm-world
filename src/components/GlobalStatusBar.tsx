@@ -112,9 +112,10 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 3, duration: 0.6 }}
-      className={`${embed ? 'block' : 'hidden md:block'} absolute bottom-0 left-0 right-0 z-[210] pointer-events-none`}
+      data-embed={embed ? "true" : "false"}
+      className="world-news-ticker absolute bottom-0 left-0 right-0 z-[210] pointer-events-none"
     >
-      <div className="h-[28px] overflow-hidden bg-[#0a0a0f]/95 border-t border-white/[0.06] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-xl relative">
+      <div className="h-[32px] overflow-hidden bg-[#0a0a0f]/55 border-t border-white/[0.12] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-md relative">
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--cyan-primary)]/30 to-transparent" style={{ animation: 'hud-scanline 4s linear infinite' }} />
 
         {/* ── LEFT: M3TM.APP + project docs ── */}
@@ -130,7 +131,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
             <span className="text-[9px] font-bold tracking-[0.12em]">أهم الأخبار</span>
           </a>
           <Link href="/docs" prefetch title="الوثائق ودليل واجهات API" aria-label="الوثائق ودليل واجهات API"
-            className="h-full px-3 flex items-center gap-1.5 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)]/80 hover:text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/25 border-r border-white/[0.04] transition-all duration-200"
+            className="hidden sm:flex h-full px-3 items-center gap-1.5 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)]/80 hover:text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/25 border-r border-white/[0.04] transition-all duration-200"
           >
             <DocsIcon />
             <span className="text-[9px] font-bold tracking-[0.15em] uppercase">الوثائق</span>
