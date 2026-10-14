@@ -414,6 +414,7 @@ export default function Dashboard() {
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
+  const [showMobileHudDetails, setShowMobileHudDetails] = useState(false);
   const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
@@ -1785,7 +1786,7 @@ export default function Dashboard() {
       {/* ── MAP VIEW CONTROLS ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 3.5 }}
-        className={`absolute bottom-[75px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none ${embedMode ? 'hidden' : ''}`}
+        className={`absolute bottom-[112px] md:bottom-[100px] z-[200] flex flex-col gap-1.5 pointer-events-none ${embedMode ? 'hidden' : ''}`}
         style={{ left: isMobile ? '12px' : '120px', right: isMobile ? '12px' : 'auto' }}
       >
         {/* Unified Control Strip */}
@@ -1806,9 +1807,18 @@ export default function Dashboard() {
             <Save className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{saveConfirmed ? 'تم الحفظ' : 'حفظ'}</span>
           </button>
+          {isMobile && <button type="button" aria-expanded={showMobileHudDetails}
+            aria-label={showMobileHudDetails ? 'طي خيارات الخريطة' : 'عرض خيارات الخريطة'}
+            onClick={() => setShowMobileHudDetails(value => !value)}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/20 bg-transparent px-2 text-[11px] text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            {showMobileHudDetails ? 'طي' : 'خيارات'}
+          </button>}
         </div>
 
 
+        {/* Keep secondary panels folded on phones to protect the map viewport. */}
+        {(!isMobile || showMobileHudDetails) && <>
         {/* One-touch regional operations layout, independent of source layers. */}
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
           <button type="button" onClick={() => {
@@ -1844,6 +1854,7 @@ export default function Dashboard() {
             <span className="block text-[10px] text-white/60">الرموز تلخص بلاغات منشورة ولا تعني تأكيد الواقعة.</span>
           </div>
         </details>}
+        </>}
         {/* Scale Bar */}
         {!isMobile && (
           <div className="pl-0.5">
@@ -2314,8 +2325,8 @@ export default function Dashboard() {
               <motion.div
                 initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed bottom-[52px] left-0 right-0 z-[400] glass-panel rounded-b-none overflow-y-auto styled-scrollbar"
-                style={{ maxHeight: 'min(55vh, calc(100dvh - 100px))', paddingBottom: 'env(safe-area-inset-bottom, 4px)' }}
+                className="world-mobile-drawer fixed bottom-[52px] left-0 right-0 z-[400] glass-panel rounded-b-none overflow-y-auto styled-scrollbar"
+                style={{ maxHeight: 'min(72dvh, calc(100dvh - 130px))', paddingBottom: 'env(safe-area-inset-bottom, 4px)' }}
               >
                 <div className="mobile-drawer-handle" />
                 <div className="px-3 pb-3">
