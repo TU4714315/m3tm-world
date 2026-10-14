@@ -1988,7 +1988,7 @@ export default function Dashboard() {
                   <X className="h-4 w-4"/>
                 </button>
               </div>
-              <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+              <MenaPulse data={sdkDisplayData} news={data.news} stale={data.conflict_data_state === 'cached-stale'}
                 publishedAt={data.conflict_source_published_at}
                 onFocus={() => setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() })} />
             </section>
@@ -2069,7 +2069,7 @@ export default function Dashboard() {
           </button>
           <span className="absolute right-11 top-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-[#05080d]/65 px-2 py-1 text-[11px] text-white backdrop-blur-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">المرصد</span>
           {showMenaPulse && <div className="absolute right-12 top-1/2 -translate-y-1/2 w-[min(89vw,440px)]">
-            <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+            <MenaPulse data={sdkDisplayData} news={data.news} stale={data.conflict_data_state === 'cached-stale'}
               publishedAt={data.conflict_source_published_at}
               onFocus={() => setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()})}
               onLocate={(lat,lng) => setFlyToLocation({lat,lng,zoom:6,ts:Date.now()})}/>
@@ -2372,7 +2372,7 @@ export default function Dashboard() {
                       <summary className="cursor-pointer py-2 text-sm font-semibold text-cyan-100">
                         مرصد الشرق الأوسط · الاشتباكات والنزاعات والمواقع
                       </summary>
-                      <MenaPulse data={sdkDisplayData} stale={data.conflict_data_state === 'cached-stale'}
+                      <MenaPulse data={sdkDisplayData} news={data.news} stale={data.conflict_data_state === 'cached-stale'}
                         publishedAt={data.conflict_source_published_at}
                         onFocus={() => {
                           setFlyToLocation({lat:27,lng:43,zoom:4.5,ts:Date.now()});
