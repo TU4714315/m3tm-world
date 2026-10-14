@@ -55,13 +55,15 @@ export function buildPublicMilitarySatelliteActivity(
     Math.floor(nowMs / PUBLIC_MILITARY_SATELLITE_TIME_BUCKET_MS) * PUBLIC_MILITARY_SATELLITE_TIME_BUCKET_MS,
   ).toISOString();
 
-  const military = satellites.filter((satellite) => satellite?.category === 'military');
+  const military = satellites.filter((satellite) => satellite?.category === 'military'
+    && !inSaudiPublicBoundary(Number(satellite.lat), Number(satellite.lng)));
   const buckets = new Map<string, {
     latIndex: number;
     lngIndex: number;
     count: number;
     altitudeTotal: number;
     altitudeSamples: number;
+    anchors: Map<string, { lat: number; lng: number; count: number }>;
   }>();
   const missionCounts: Counter = {};
   const altitudeBandCounts: Counter = {};
@@ -80,8 +82,19 @@ export function buildPublicMilitarySatelliteActivity(
       Math.max(0, Math.floor((lng + 180) / PUBLIC_MILITARY_SATELLITE_CELL_DEG)),
     );
     const key = `${latIndex}:${lngIndex}`;
-    const current = buckets.get(key) || { latIndex, lngIndex, count: 0, altitudeTotal: 0, altitudeSamples: 0 };
+    const current = buckets.get(key) || { latIndex, lngIndex, count: 0, altitudeTotal: 0, altitudeSamples: 0, anchors: new Map() };
     current.count += 1;
+    // Keep a broad fixed 10-degree representative cell for mixed 20-degree
+    // regions, so Yemen/Oman observations are not displayed inside Saudi Arabia.
+    // Never publish a per-satellite position or identifier.
+    const anchorLat = -90 + (Math.floor((lat + 90) / 10) + 0.5) * 10;
+    const anchorLng = -180 + (Math.floor((lng + 180) / 10) + 0.5) * 10;
+    if (!inSaudiPublicBoundary(anchorLat, anchorLng)) {
+      const anchorKey = `${anchorLat}:${anchorLng}`;
+      const existing = current.anchors.get(anchorKey) || { lat: anchorLat, lng: anchorLng, count: 0 };
+      existing.count += 1;
+      current.anchors.set(anchorKey, existing);
+    }
 
     const alt = Number(satellite?.alt);
     if (Number.isFinite(alt)) {
@@ -96,9 +109,18 @@ export function buildPublicMilitarySatelliteActivity(
 
   const activity = Array.from(buckets.values())
     .filter((bucket) => bucket.count >= PUBLIC_MILITARY_SATELLITE_MIN_GROUP)
-    .map((bucket) => ({
-      lat: -90 + (bucket.latIndex + 0.5) * PUBLIC_MILITARY_SATELLITE_CELL_DEG,
-      lng: -180 + (bucket.lngIndex + 0.5) * PUBLIC_MILITARY_SATELLITE_CELL_DEG,
+    .flatMap((bucket) => {
+      let lat = -90 + (bucket.latIndex + 0.5) * PUBLIC_MILITARY_SATELLITE_CELL_DEG;
+      let lng = -180 + (bucket.lngIndex + 0.5) * PUBLIC_MILITARY_SATELLITE_CELL_DEG;
+      if (inSaudiPublicBoundary(lat, lng)) {
+        const anchor = [...bucket.anchors.values()].sort((a, b) => b.count - a.count || a.lat - b.lat || a.lng - b.lng)[0];
+        if (!anchor) return [];
+        lat = anchor.lat;
+        lng = anchor.lng;
+      }
+      return [{
+      lat,
+      lng,
       level: activityLevel(bucket.count),
       activity: bucket.count >= 10 ? 'high' : bucket.count >= 6 ? 'medium' : 'limited',
       approximate_count: approximateCount(bucket.count),
@@ -108,7 +130,7 @@ export function buildPublicMilitarySatelliteActivity(
       cell_degrees: PUBLIC_MILITARY_SATELLITE_CELL_DEG,
       observed_at_bucket: observedAtBucket,
       reporting_mode: 'coarse-public-tle-propagation',
-    }))
+    }]; })
     .sort((a, b) => b.level - a.level || a.lat - b.lat || a.lng - b.lng);
 
   const representedObjects = Array.from(buckets.values())

@@ -66,4 +66,15 @@ describe('Saudi-only public observation visibility', () => {
     expect([masked.total, masked.totalZones, masked.total_outages]).toEqual([1, 1, 1]);
     expect(source.zones[1].events).toHaveLength(2);
   });
+  it('filters URLhaus detections and totals at the public snapshot boundary', () => {
+    const masked = maskSaudiPublicIndicators({
+      threats: [
+        { ip: '198.51.100.10', country: 'SA', lat: 24.7, lng: 46.6 },
+        { ip: '198.51.100.20', country: 'YE', lat: 15.3, lng: 44.2 },
+      ],
+      total: 2,
+    });
+    expect(masked.total).toBe(1);
+    expect(masked.threats.map(row => row.country)).toEqual(['YE']);
+  });
 });

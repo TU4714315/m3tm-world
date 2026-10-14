@@ -105,7 +105,7 @@ const PUBLIC_OBSERVATION_LISTS = [
   'alert_pins', 'sdk_entities', 'live_feeds',
   // Direct public API response names differ from the browser projection.
   'events', 'liveEvents', 'zones', 'outages', 'attack_origins', 'ships',
-  'ports', 'flights', 'aircraft', 'countries', 'feeds', 'attacks',
+  'ports', 'flights', 'aircraft', 'countries', 'feeds', 'attacks', 'threats', 'detections',
 ] as const;
 
 export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
@@ -141,7 +141,8 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
     ['cameras', 'total'], ['fires', 'total'], ['ships', 'total_ships'],
     ['ports', 'total_ports'], ['chokepoints', 'total_chokepoints'],
     ['satellites', 'total'], ['outages', 'total_outages'],
-    ['attack_origins', 'total_attack_origins'], ['attacks', 'total'],
+    ['attack_origins', 'total_attack_origins'], ['attacks', 'total'], ['threats', 'total'],
+    ['detections', 'total'],
     ['reported_routes', 'reported_routes_total'],
   ] as const) {
     if (Array.isArray(result[items]) && typeof result[total] === 'number') {

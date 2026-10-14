@@ -4,6 +4,7 @@ import {
   PUBLIC_MILITARY_SATELLITE_CELL_DEG,
   PUBLIC_MILITARY_SATELLITE_MIN_GROUP,
 } from './publicMilitarySatelliteActivity';
+import { inSaudiPublicBoundary } from './publicCountryVisibility';
 
 describe('public military satellite activity', () => {
   it('projects military TLE rows into coarse cells without identifiers or exact tracks', () => {
@@ -61,5 +62,17 @@ describe('public military satellite activity', () => {
       { lat: 0, lng: 181, alt: 500, category: 'military', mission: 'Military Recon' },
     ], 0);
     expect(result.activity).toEqual([]);
+  });
+
+  it('preserves non-Saudi Yemen and Oman groups when their 20-degree center falls in Saudi Arabia', () => {
+    const result = buildPublicMilitarySatelliteActivity([
+      { lat: 15.3, lng: 44.2, category: 'military' },
+      { lat: 14.4, lng: 44.7, category: 'military' },
+      { lat: 13.6, lng: 45.1, category: 'military' },
+    ], 0);
+    expect(result.activity).toHaveLength(1);
+    expect(result.activity[0].approximate_count).toBe('3-5');
+    expect(inSaudiPublicBoundary(result.activity[0].lat, result.activity[0].lng)).toBe(false);
+    expect(result.summary.represented_objects).toBe(3);
   });
 });
