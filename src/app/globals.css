@@ -2611,6 +2611,11 @@ html[dir='rtl'] [dir='ltr'] {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
     z-index: 360 !important;
   }
+  /* Embedded WORLD has no native mobile navigation to clear. Keep the
+     ticker attached to the iframe edge, not floating over APP content. */
+  .world-news-ticker[data-embed='true'] {
+    bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
   .world-news-ticker a { -webkit-tap-highlight-color: transparent; }
 }
 @media (max-height: 500px) and (max-width: 1024px) {

@@ -111,7 +111,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 3, duration: 0.6 }}
+      transition={{ delay: embed ? 0 : 0.2, duration: 0.35 }}
       data-embed={embed ? "true" : "false"}
       className="world-news-ticker absolute bottom-0 left-0 right-0 z-[210] pointer-events-none"
     >
@@ -130,12 +130,14 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
             <NewsIcon />
             <span className="text-[9px] font-bold tracking-[0.12em]">أهم الأخبار</span>
           </a>
+          {!embed && (
           <Link href="/docs" prefetch title="الوثائق ودليل واجهات API" aria-label="الوثائق ودليل واجهات API"
             className="hidden sm:flex h-full px-3 items-center gap-1.5 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)]/80 hover:text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/25 border-r border-white/[0.04] transition-all duration-200"
           >
             <DocsIcon />
             <span className="text-[9px] font-bold tracking-[0.15em] uppercase">الوثائق</span>
           </Link>
+          )}
         </div>
 
         {/* ── CENTER: M3TM.APP Important News Ticker ── */}
