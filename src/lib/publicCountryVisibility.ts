@@ -93,7 +93,7 @@ const PUBLIC_OBSERVATION_LISTS = [
   'alert_pins', 'sdk_entities', 'live_feeds',
   // Direct public API response names differ from the browser projection.
   'events', 'liveEvents', 'zones', 'outages', 'attack_origins', 'ships',
-  'ports', 'flights', 'aircraft',
+  'ports', 'flights', 'aircraft', 'countries', 'feeds',
 ] as const;
 
 export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
@@ -126,4 +126,10 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
     }
   }
   return result as T;
+}
+
+/** News text and its cited publisher stay public; geotags are observations. */
+export function maskSaudiPublicNewsLocation<T extends object>(news: T): T {
+  if (!isSaudiPublicIndicator(news)) return news;
+  return { ...news, coords: null, coords_default: true, location_basis: 'none' } as T;
 }

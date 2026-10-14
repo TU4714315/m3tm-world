@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { inSaudiPublicBoundary, isSaudiPublicIndicator, maskSaudiPublicIndicators } from './publicCountryVisibility';
+import { inSaudiPublicBoundary, isSaudiPublicIndicator, maskSaudiPublicIndicators, maskSaudiPublicNewsLocation } from './publicCountryVisibility';
 
 describe('Saudi-only public observation visibility', () => {
+  it('retains cited public headlines but strips Saudi API coordinates', () => {
+    const saudi = { title: 'خبر منشور', link: 'https://example.org', coords: [24.7136, 46.6753], coords_default: false, location_basis: 'published-feed-coordinate' };
+    const yemen = { title: 'خبر اليمن', coords: [15.3694, 44.191], coords_default: false, location_basis: 'published-feed-coordinate' };
+    expect(maskSaudiPublicNewsLocation(saudi)).toMatchObject({ title: 'خبر منشور', coords: null, coords_default: true, location_basis: 'none' });
+    expect(maskSaudiPublicNewsLocation(yemen)).toEqual(yemen);
+  });
   it('uses a country boundary rather than a Middle-East bounding box', () => {
     expect(inSaudiPublicBoundary(24.7136, 46.6753)).toBe(true); // Riyadh
     expect(inSaudiPublicBoundary(21.4858, 39.1925)).toBe(true); // Jeddah

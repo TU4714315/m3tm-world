@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicNewsLocation } from '@/lib/publicCountryVisibility';
 import crypto from 'crypto';
 import { fetchFastRssNews, fusePublicNews, type RoutedNews } from '@/lib/fastNews';
 import { isLikelyArabicText } from '@/lib/newsLanguage';
@@ -192,7 +193,7 @@ export async function GET() {
       const freshest = news.reduce<string | null>((best,item) =>
         !best || Date.parse(item.published)>Date.parse(best) ? item.published : best, null);
       return NextResponse.json({
-        news, total: news.length,
+        news: news.map(maskSaudiPublicNewsLocation), total: news.length,
         timestamp: new Date().toISOString(),
         source_published_at: freshest,
         app_fetched_at: appPublishedAt,
@@ -256,7 +257,7 @@ export async function GET() {
     newsItems.sort((a, b) => new Date(b.published).getTime() - new Date(a.published).getTime());
 
     return NextResponse.json({
-      news: newsItems,
+      news: newsItems.map(maskSaudiPublicNewsLocation),
       total: newsItems.length,
       timestamp: new Date().toISOString(),
       source: allArticles.length ? 'Telegram / RSS independent fallback' : 'none',

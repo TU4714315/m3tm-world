@@ -1,4 +1,5 @@
 import {NextResponse} from 'next/server';
+import {maskSaudiPublicIndicators} from '@/lib/publicCountryVisibility';
 import {fetchGdeltPublishedHistory} from '@/lib/gdeltPublicHistory';
 
 export const dynamic='force-dynamic';
@@ -10,7 +11,7 @@ export async function GET(request:Request) {
   const limit = Math.min(200,Math.max(10,Number(params.get('limit')||80)||80));
   try {
     const history=await fetchGdeltPublishedHistory(hours,limit);
-    return NextResponse.json(history,{
+    return NextResponse.json(maskSaudiPublicIndicators(history),{
       headers:{'Cache-Control':'public, s-maxage=90, stale-while-revalidate=120'}
     });
   } catch {
