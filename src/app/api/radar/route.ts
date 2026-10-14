@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,20 +51,19 @@ export async function GET() {
       .filter((e: any) => {
         // IODA uses "location" field like "country/RW"
         const code = e.location?.split('/')[1];
-        return code && COUNTRY_CENTROIDS[code];
+        return code && code !== 'SA' && COUNTRY_CENTROIDS[code];
       })
       .map((e: any, i: number) => {
         const code = e.location.split('/')[1];
         const [lng, lat] = COUNTRY_CENTROIDS[code];
-        // Jitter so overlapping events don't stack
-        const jLng = ((i * 137.5) % 200 - 100) / 100 * 2;
-        const jLat = ((i * 251.3) % 200 - 100) / 100 * 2;
         return {
           id: `ioda-${code}-${i}`,
-          lat: lat + jLat,
-          lng: lng + jLng,
+          // Country reference, never a location of a specific outage.
+          lat,
+          lng,
           country: code,
           code,
+          precision: 'country-centroid-not-incident-location',
           score: e.score || 0,
           level: e.severity || 'unknown',
           from: e.start,
@@ -72,12 +72,12 @@ export async function GET() {
         };
       });
 
-    return NextResponse.json({
+    return NextResponse.json(maskSaudiPublicIndicators({
       outages,
       total: outages.length,
       timestamp: new Date().toISOString(),
       source: 'IODA — Georgia Tech Internet Outage Detection',
-    }, {
+    }), {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
     });
   } catch (error) {

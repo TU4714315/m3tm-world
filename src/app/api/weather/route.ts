@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { stealthFetch } from '@/lib/stealthFetch';
 
 /**
@@ -264,11 +265,11 @@ export async function GET() {
       return NextResponse.json({ events: [], error: 'Failed to fetch weather data' }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return NextResponse.json(maskSaudiPublicIndicators({
       events,
       total: events.length,
       timestamp: new Date().toISOString(),
-    });
+    }));
   } catch (error) {
     console.error('Weather API error:', error);
     return NextResponse.json({ events: [], error: 'Failed to fetch weather data' }, { status: 500 });

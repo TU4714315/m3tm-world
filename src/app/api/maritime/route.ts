@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import WebSocket from 'ws';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
@@ -301,7 +302,7 @@ export function buildPublicNavalActivity(allShips: any[], now = Date.now()): Pub
     if (ship?.type !== 'military') continue;
     const lat = Number(ship?.lat);
     const lng = Number(ship?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || inSaudiPublicBoundary(lat, lng)) continue;
     const latIndex = Math.floor((lat + 90) / PUBLIC_NAVAL_CELL_DEG);
     const lngIndex = Math.floor((lng + 180) / PUBLIC_NAVAL_CELL_DEG);
     const key = `${latIndex}:${lngIndex}`;
@@ -509,8 +510,8 @@ export async function GET(req?: Request) {
         'Cache-Control': 'public, max-age=86400, s-maxage=86400',
       } });
     }
-    const ports = PORTS.filter(port => port.type !== 'naval');
-    const chokepoints = CHOKEPOINTS;
+    const ports = maskSaudiPublicIndicators({ ports: PORTS.filter(port => port.type !== 'naval') }).ports;
+    const chokepoints = maskSaudiPublicIndicators({ maritime_chokepoints: CHOKEPOINTS }).maritime_chokepoints;
     const body = JSON.stringify({
       ports, chokepoints, ships: [], naval_activity: [],
       total_ports: ports.length, total_chokepoints: chokepoints.length, total_ships: 0,
@@ -567,7 +568,8 @@ export async function GET(req?: Request) {
 
   const maxAgeSeconds = Math.floor(snapshotTtlMs(snapshot.body) / 1000);
 
-  return new NextResponse(snapshot.body, {
+  const publicBody = JSON.stringify(maskSaudiPublicIndicators(JSON.parse(snapshot.body)));
+  return new NextResponse(publicBody, {
     headers: {
       'Content-Type': 'application/json',
       // The server would not have produced anything newer inside this window

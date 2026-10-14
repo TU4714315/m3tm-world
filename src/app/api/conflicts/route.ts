@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { fetchGdeltEvents, publisherCoverage, toPublicGdeltEvent } from '@/lib/gdeltEvents';
 import {
   fetchAcledPublicEvents, ACLED_EVENT_WINDOW_DAYS,
@@ -423,7 +424,7 @@ export async function GET() {
 
     payload.cacheBackend = await durableSetJson(CONFLICT_CACHE_KEY, payload, CONFLICT_CACHE_TTL_SECONDS);
 
-    return NextResponse.json(payload, {
+    return NextResponse.json(maskSaudiPublicIndicators(payload), {
       headers: {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
@@ -432,7 +433,7 @@ export async function GET() {
     console.error('[OSIRIS] Conflict API error:', error);
 
     if (previous.value) {
-      return NextResponse.json({
+      return NextResponse.json(maskSaudiPublicIndicators({
         ...previous.value,
         // Preserve durable last-good data while correcting the old publisher
         // classification, even when upstream is down.
@@ -452,7 +453,7 @@ export async function GET() {
         cacheBackend: previous.backend,
         durableCacheConfigured: durableCacheConfigured(),
         servedAt,
-      }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+      }), { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
 
     // Keep contextual zones visible if GDELT is temporarily unavailable, but do

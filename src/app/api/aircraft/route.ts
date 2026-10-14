@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { httpJson, optional } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
 import { nearestAirport, type Airport } from '@/lib/airports';
+import { inSaudiPublicBoundary, isSaudiPublicIndicator } from '@/lib/publicCountryVisibility';
 
 export const maxDuration = 20;
 
@@ -39,6 +40,49 @@ export interface AircraftDetail {
   /** Airport this leg was seen to land at. Null while still airborne. */
   arrival: Airport | null;
   source: string;
+}
+
+/** Do not offer public detail tracks for identifiable military airframes. */
+function militaryAirframe(detail: AircraftDetail): boolean {
+  const description = `${detail.operator || ''} ${detail.model || ''} ${detail.typeCode || ''}`;
+  return /\b(?:air\s*force|airforce|armed\s*forces|military|defen[cs]e|fighter|warplane|usaf|raf|navy|army|marine\s*corps|coast\s*guard|national\s*guard|nato|f-?16|f-?35|f-?15|f-?18|b-?52|c-?130|c-?17|a-?400m|kc-?135r?|k35r|mh-?60\w*|h60)\b/i.test(description);
+}
+
+/** Keep only the most recent uninterrupted public segment outside Saudi Arabia.
+ * Never splice two sides of a removed segment into a false flight path. */
+export function publicAircraftDetail(detail: AircraftDetail): AircraftDetail | null {
+  if (militaryAirframe(detail)) return null;
+  const final = detail.track[detail.track.length - 1];
+  if (final && inSaudiPublicBoundary(final[1], final[0])) return null;
+  let visible: [number, number][] = [];
+  let visibleAltitudes: (number | null)[] = [];
+  let previous: [number, number] | null = null;
+  for (let i = 0; i < detail.track.length; i++) {
+    const point = detail.track[i];
+    if (!Array.isArray(point) || point.length < 2 || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) continue;
+    const crossing = previous && isSaudiPublicIndicator({
+      origin_lat: previous[1], origin_lng: previous[0],
+      target_lat: point[1], target_lng: point[0],
+    });
+    if (inSaudiPublicBoundary(point[1], point[0]) || crossing) {
+      visible = [];
+      visibleAltitudes = [];
+    } else {
+      visible.push(point);
+      visibleAltitudes.push(detail.altitudes[i] ?? null);
+    }
+    previous = point;
+  }
+  const outsideAirport = (airport: Airport | null) => airport &&
+    airport.country !== 'SA' && !inSaudiPublicBoundary(airport.lat, airport.lng) ? airport : null;
+  return {
+    ...detail,
+    track: visible,
+    altitudes: visibleAltitudes,
+    points: visible.length,
+    departure: outsideAirport(detail.departure),
+    arrival: outsideAirport(detail.arrival),
+  };
 }
 
 /** readsb shards traces by the last two characters of the hex address. */
@@ -240,7 +284,8 @@ export async function GET(request: Request) {
           registration: parsed?.registration || ac?.registration || null,
           typeCode: parsed?.typeCode || ac?.icao_type || null,
           model,
-          operator: ac?.registered_owner || null,
+          // Trace operator remains useful when the optional registry fails.
+          operator: [ac?.registered_owner, trace?.ownOp].filter(Boolean).join(' / ') || null,
           track: parsed?.track || [],
           altitudes: parsed?.altitudes || [],
           points: parsed?.points || 0,
@@ -258,7 +303,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Aircraft not found', icao24 }, { status: 404 });
     }
 
-    return NextResponse.json(detail[0], {
+    const publicDetail = publicAircraftDetail(detail[0]);
+    if (!publicDetail) return NextResponse.json({ error: 'Aircraft detail unavailable' }, { status: 404 });
+    return NextResponse.json(publicDetail, {
       headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
     });
   } catch (error) {

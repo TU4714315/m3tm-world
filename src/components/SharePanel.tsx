@@ -14,24 +14,10 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const generateShareUrl = useCallback(() => {
-    const params = new URLSearchParams();
-    const lat = mouseCoords?.lat ?? mapView.latitude ?? 20;
-    const lng = mouseCoords?.lng ?? mapView.longitude ?? 0;
-    params.set('lat', lat.toFixed(4));
-    params.set('lon', lng.toFixed(4));
-    params.set('zoom', mapView.zoom.toFixed(2));
-
-    // Encode active layers as compact string
-    const layerKeys = Object.entries(activeLayers)
-      .filter(([, v]) => v)
-      .map(([k]) => k)
-      .join(',');
-    if (layerKeys) params.set('layers', layerKeys);
-
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://m3tm.world';
-    return `${base}/?${params.toString()}`;
-  }, [mapView, activeLayers, mouseCoords]);
+  // APP's /world is the stable public address. Querying the Render origin
+  // exposed its infrastructure hostname and produced unshareably long links.
+  // APP currently does not transfer private map workspace/layer URL state.
+  const generateShareUrl = useCallback(() => 'https://m3tm.app/world', []);
 
   const copyToClipboard = useCallback(async () => {
     const url = generateShareUrl();
@@ -154,7 +140,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             </div>
 
             <div className="mt-3 text-center text-[9px] font-mono text-[var(--text-muted)] tracking-widest">
-              اضغط [S] لفتح المشاركة · الرابط يحتفظ بحالة العرض الحالية
+              اضغط [S] لفتح المشاركة · رابط مختصر للخريطة العامة دون نقل إعدادات العرض الشخصية
             </div>
           </motion.div>
         )}

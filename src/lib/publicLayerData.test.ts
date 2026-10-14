@@ -136,6 +136,18 @@ describe('public WORLD source-backed layer projection', () => {
     expect(result.live_feeds).toEqual([{ id: 'app-feed' }]);
     expect(buildPublicLayerData({}).conflict_zones).toEqual([]);
   });
+
+  it('retains safe SEA and EVENTS SDK symbols without sensitive vessel identity', () => {
+    const result = buildPublicLayerData({
+      maritime_ships: [{ lat: 15.2, lng: 53.1, type: 'cargo', mmsi: 'NEVER_PUBLISH', name: 'SEA_NAME' }],
+      maritime_ports: [{ lat: 12.8, lng: 45.0 }],
+      gdelt: [{ lat: 14.6, lng: 44.2, id: 'news-event', name: 'Public disaster report' }],
+    });
+    const domains = result.sdk_entities.map(entity => entity.properties.domain);
+    expect(domains).toContain('SEA');
+    expect(domains).toContain('EVENTS');
+    expect(JSON.stringify(result.sdk_entities)).not.toMatch(/NEVER_PUBLISH|SEA_NAME|news-event/);
+  });
 });
 
 describe('public feed readiness projection', () => {

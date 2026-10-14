@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { orbitPath, orbitalPeriodMinutes, splitAtAntimeridian } from '@/lib/orbit';
+import { isSaudiPublicIndicator, inSaudiPublicBoundary } from '@/lib/publicCountryVisibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +112,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'could not propagate', noradId: id }, { status: 422 });
   }
 
+  // This catalogue already excludes military objects. Suppress auxiliary
+  // public orbit segments over Saudi Arabia and never bridge across gaps.
+  const visibleSegments = splitAtAntimeridian(path).flatMap(run => {
+    const chunks: typeof run[] = [];
+    let visible: typeof run = [];
+    for (const point of run) {
+      const previous = visible[visible.length - 1];
+      const crossesSaudi = previous && isSaudiPublicIndicator({
+        origin_lat: previous.lat, origin_lng: previous.lng,
+        target_lat: point.lat, target_lng: point.lng,
+      });
+      if (inSaudiPublicBoundary(point.lat, point.lng) || crossesSaudi) {
+        if (visible.length >= 2) chunks.push(visible);
+        visible = [];
+        if (!inSaudiPublicBoundary(point.lat, point.lng)) visible = [point];
+      } else visible.push(point);
+    }
+    if (visible.length >= 2) chunks.push(visible);
+    return chunks;
+  });
   return NextResponse.json({
     noradId: id,
     name: tle.name,
@@ -119,7 +140,7 @@ export async function GET(req: Request) {
     anchoredAt: anchor.toISOString(),
     // Split at the antimeridian so each run draws as one continuous line
     // instead of one segment sweeping back across the whole world.
-    segments: splitAtAntimeridian(path).map(run =>
+    segments: visibleSegments.map(run =>
       run.map(p => [
         Math.round(p.lng * 10000) / 10000,
         Math.round(p.lat * 10000) / 10000,

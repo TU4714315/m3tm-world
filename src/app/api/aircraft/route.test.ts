@@ -1,6 +1,33 @@
 import { describe, it, expect } from 'vitest';
-import { shardFor, downsample, parseTrace, currentLeg, legEndpoints } from './route';
+import { shardFor, downsample, parseTrace, currentLeg, legEndpoints, publicAircraftDetail, type AircraftDetail } from './route';
 import { nearestAirport } from '@/lib/airports';
+
+describe('public aircraft detail country gate', () => {
+  const create = (track: [number, number][], operator: string | null = 'Civilian'): AircraftDetail => ({
+    icao24: 'abc123', registration: 'TEST', typeCode: 'B738', model: 'Boeing 737-800',
+    operator, track, altitudes: track.map(() => 12000), points: track.length,
+    departure: null, arrival: null, source: 'adsb.lol',
+  });
+  it('preserves civilian Yemen observations and altitude alignment', () => {
+    const detail = create([[44.19, 15.37], [44.23, 15.43]]);
+    expect(publicAircraftDetail(detail)?.track).toEqual(detail.track);
+    expect(publicAircraftDetail(detail)?.altitudes).toEqual([12000, 12000]);
+  });
+  it('does not expose Saudi positions or known military aircraft', () => {
+    expect(publicAircraftDetail(create([[44.19, 15.37], [46.6753, 24.7136]]))).toBeNull();
+    expect(publicAircraftDetail(create([[44.19, 15.37]], 'Example Air Force'))).toBeNull();
+    expect(publicAircraftDetail({ ...create([[44.19,15.37]]), typeCode:'H60', model:'Sikorsky MH-60T Jayhawk' })).toBeNull();
+    expect(publicAircraftDetail({ ...create([[44.19,15.37]]), typeCode:'K35R', model:'KC-135R' })).toBeNull();
+    expect(publicAircraftDetail(create([[44.19,15.37]], 'United States Coast Guard'))).toBeNull();
+  });
+  it('does not reconnect disjoint legs around withheld Saudi samples', () => {
+    const detail = create([[44.2, 15.4], [46.6753, 24.7136], [44.25, 15.45], [44.3, 15.48]]);
+    const published = publicAircraftDetail(detail);
+    expect(published?.track).toEqual([[44.3, 15.48]]);
+    expect(published?.points).toBe(1);
+    expect(published?.altitudes).toHaveLength(1);
+  });
+});
 
 describe('shardFor', () => {
   it('uses the last two hex characters, as readsb shards them', () => {

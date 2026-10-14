@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
 
 export const dynamic = 'force-dynamic';
@@ -43,12 +44,12 @@ export async function GET() {
     // No volcano/earthquake lookups: those categories are disabled.
     if (!providerSucceeded) return NextResponse.json({ fires: [], error: 'fire_provider_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 
-    return NextResponse.json({
+    return NextResponse.json(maskSaudiPublicIndicators({
       fires,
       total: fires.length,
       source: source || 'Unknown',
       timestamp: new Date().toISOString(),
-    }, {
+    }), {
       headers: {
         'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
       },
@@ -80,7 +81,7 @@ export function parseCSV(csv: string): any[] {
     const cols = lines[i].split(',');
     const lat = parseFloat(cols[latIdx]);
     const lng = parseFloat(cols[lngIdx]);
-    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng)) continue;
+    if (isNaN(lat) || isNaN(lng) || !isPublicFireRegion(lat, lng) || inSaudiPublicBoundary(lat, lng)) continue;
 
     fires.push({
       lat: Math.round(lat * 1000) / 1000,
