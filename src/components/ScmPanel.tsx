@@ -99,7 +99,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                 ) : (
                   <div className="space-y-1">
                     {riskyChokes.map((c: any, i: number) => (
-                      <div key={`c-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500' }}>
+                      <div key={`c-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-s" style={{ borderInlineStartColor: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[11px] font-mono text-[#FF9500] font-bold">{c.name}</span>
                           <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: c.risk === 'CRITICAL' ? '#FF1744' : '#FF9500', color: '#000' }}>{c.risk}</span>
@@ -108,7 +108,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                       </div>
                     ))}
                     {congestedPorts.map((p: any, i: number) => (
-                      <div key={`p-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-l-2" style={{ borderLeftColor: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500' }}>
+                      <div key={`p-${i}`} className="px-2 py-1.5 rounded hover:bg-white/5 transition-colors border-s" style={{ borderInlineStartColor: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500' }}>
                         <div className="flex justify-between items-center mb-0.5">
                           <span className="text-[11px] font-mono text-[#00BCD4]">{p.name}</span>
                           <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: p.congestion === 'SEVERE' ? '#FF1744' : '#FF9500', color: '#000' }}>{p.congestion}</span>
