@@ -69,7 +69,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">CRITICAL SUPPLIERS</span>
                 </div>
                 {criticalSuppliers.length === 0 ? (
-                  <div className="text-[10px] font-mono text-[#00E676] px-2">✓ All monitored Tier 1/2 nodes operational.</div>
+                  <div className="text-[10px] font-mono text-[var(--text-muted)] px-2">لا توجد مخاطر مرتفعة معروضة حاليًا ضمن البيانات المتاحة.</div>
                 ) : (
                   <div className="space-y-1">
                     {criticalSuppliers.map((s: any, i: number) => {
@@ -95,7 +95,7 @@ export default function ScmPanel({ data }: ScmPanelProps) {
                   <span className="text-[10px] font-mono text-[var(--text-muted)] tracking-widest">CONGESTED NODES</span>
                 </div>
                 {(congestedPorts.length === 0 && riskyChokes.length === 0) ? (
-                  <div className="text-[10px] font-mono text-[#00E676] px-2">✓ Global maritime flow optimal.</div>
+                  <div className="text-[10px] font-mono text-[var(--text-muted)] px-2">لا توجد حالات ازدحام مرتفعة معروضة حاليًا ضمن البيانات المتاحة.</div>
                 ) : (
                   <div className="space-y-1">
                     {riskyChokes.map((c: any, i: number) => (
