@@ -333,7 +333,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // existing public overlays and their source checks remain unchanged.
     let basemapLoaded = false;
     let recoveryAttempted = false;
-    let recoveryTimeout: ReturnType<typeof setTimeout> | undefined;
+    let recoveryTimeout: number | undefined;
     const attemptBasemapRecovery = () => {
       if (basemapLoaded || recoveryAttempted) return;
       recoveryAttempted = true;
