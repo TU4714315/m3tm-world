@@ -1,10 +1,11 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import {NextResponse} from 'next/server';
 import {maskSaudiPublicIndicators} from '@/lib/publicCountryVisibility';
 import {fetchGdeltPublishedHistory} from '@/lib/gdeltPublicHistory';
 
 export const dynamic='force-dynamic';
 
-export async function GET(request:Request) {
+async function providerGET(request:Request) {
   const params = new URL(request.url).searchParams;
   const hoursRaw = Number(params.get('hours')||24);
   const hours = [1,6,24,168].includes(hoursRaw) ? hoursRaw : 24;
@@ -12,7 +13,7 @@ export async function GET(request:Request) {
   try {
     const history=await fetchGdeltPublishedHistory(hours,limit);
     return NextResponse.json(maskSaudiPublicIndicators(history),{
-      headers:{'Cache-Control':'public, s-maxage=90, stale-while-revalidate=120'}
+      headers:{'Cache-Control': 'private, no-store, max-age=0'}
     });
   } catch {
     return NextResponse.json({
@@ -22,3 +23,5 @@ export async function GET(request:Request) {
     },{status:503,headers:{'Cache-Control':'no-store'}});
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

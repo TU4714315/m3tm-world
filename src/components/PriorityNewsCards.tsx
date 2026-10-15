@@ -1,10 +1,30 @@
 'use client';
 import { useMemo } from 'react';
-import { Clock3, Globe2, MapPin, Newspaper } from 'lucide-react';
+import { Clock3, Globe2, MapPin, Newspaper, LockKeyhole } from 'lucide-react';
 import { priorityNews } from '@/lib/priorityNews';
 
-export default function PriorityNewsCards({ items, onLocate }: { items: unknown; onLocate: (lat: number, lng: number) => void }) {
-  const news = useMemo(() => priorityNews(items), [items]);
+export function RestrictedNewsCard({ onRequestAccess }: { onRequestAccess?: () => void }) {
+  return <section dir="rtl" aria-label="الأخبار الحديثة المقفلة" className="p-3">
+    <div className="relative overflow-hidden rounded-xl border border-cyan-100/20 bg-[#172333]/35 p-4 shadow-[inset_0_1px_0_#ffffff12,0_8px_24px_#0002] backdrop-blur-xl">
+      <div aria-hidden="true" className="select-none space-y-3 blur-[5px]">
+        <div className="h-2 w-1/3 rounded bg-slate-300/15" />
+        <div className="h-2.5 w-full rounded bg-slate-300/20" />
+        <div className="h-2.5 w-4/5 rounded bg-slate-300/20" />
+        <div className="h-2 w-1/2 rounded bg-slate-300/15" />
+      </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#0a1723]/55 px-3 text-center">
+        <p className="flex items-center gap-2 text-xs font-semibold text-slate-100"><LockKeyhole aria-hidden="true" className="h-4 w-4 text-cyan-100" />الأخبار الحديثة</p>
+        <button type="button" onClick={onRequestAccess} className="min-h-9 rounded-lg border border-cyan-100/30 bg-cyan-100/10 px-4 text-xs text-cyan-50 hover:bg-cyan-100/15 focus-visible:ring-2 focus-visible:ring-cyan-100">كود الدعوة</button>
+      </div>
+    </div>
+  </section>;
+}
+
+export default function PriorityNewsCards({ items, onLocate, restricted = false, onRequestAccess }: {
+  items: unknown; onLocate: (lat: number, lng: number) => void; restricted?: boolean; onRequestAccess?: () => void;
+}) {
+  const news = useMemo(() => restricted ? [] : priorityNews(items), [items, restricted]);
+  if (restricted) return <RestrictedNewsCard onRequestAccess={onRequestAccess} />;
   return <section dir="rtl" aria-label="أهم الأخبار" className="space-y-2 p-3">
     <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-100"><Newspaper className="h-4 w-4 text-slate-300" />أهم الأخبار</h3>
     {news.map(item => <article key={item.key} className="rounded-xl border border-white/20 bg-[#172333]/35 p-3 shadow-[inset_0_1px_0_#ffffff12,0_8px_24px_#0002] backdrop-blur-xl">

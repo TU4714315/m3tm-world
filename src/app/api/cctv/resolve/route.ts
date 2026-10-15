@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { safeFetch } from '@/lib/ssrf-guard';
 import { isSkylineUrl, parseSkylinePage } from '@/lib/skyline';
@@ -77,7 +78,7 @@ function isResolvable(url: string): boolean {
   return isYouTubeUrl(url) && parseYouTubeUrl(url)?.kind === 'live-channel';
 }
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const url = new URL(req.url).searchParams.get('url');
 
   if (!url || !isResolvable(url)) {
@@ -139,7 +140,9 @@ export async function GET(req: Request) {
   return NextResponse.json(value, {
     headers: {
       'X-Cache': 'MISS',
-      'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1800',
+      'Cache-Control': 'private, no-store, max-age=0',
     },
   });
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

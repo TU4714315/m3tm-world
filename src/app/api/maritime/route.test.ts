@@ -27,6 +27,7 @@ describe('GET /api/maritime', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals(); vi.unstubAllEnvs();
     vi.useRealTimers();
   });
 
@@ -66,12 +67,14 @@ describe('GET /api/maritime', () => {
     expect(JSON.stringify(body)).not.toContain('test-only-not-returned');
   });
 
-  it('publishes only coarse naval activity when multiple military AIS observations share a region', async () => {
+  it('publishes only coarse naval activity for an authorized viewer when observations share a region', async () => {
+    vi.stubEnv('M3TM_APP_SUPABASE_ANON_KEY', 'public-test-key');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ scope:'published-map', accessMode:'guest', expiresAt:new Date(Date.now()+60000).toISOString() })));
     process.env.AIS_API_KEY = 'test-only-not-returned';
     addShip(1001, 1.2, 103.8, 'military');
     addShip(1002, 1.4, 103.9, 'military');
 
-    const body = await (await GET()).json();
+    const body = await (await GET(new Request('https://map.test/api/maritime', { headers:{ Authorization:'Bearer '+ 'n'.repeat(80) } }))).json();
 
     expect(body.total_ships).toBe(0);
     expect(body.naval_activity).toHaveLength(1);
@@ -141,7 +144,7 @@ describe('GET /api/maritime', () => {
     expect((await (await GET()).json()).total_ships).toBe(2);
   });
 
-  it('lets the browser and any CDN reuse the daily reference response', async () => {
+  it('keeps the reference response private after the viewing access gate', async () => {
     addShip(55, 1.26, 103.84);
     const res = await GET(new Request('http://localhost/api/maritime?reference=1'));
     const body = await res.clone().json();
@@ -151,15 +154,15 @@ describe('GET /api/maritime', () => {
     expect(body.refresh).toBe('daily_reference');
     const cc = res.headers.get('cache-control') ?? '';
 
-    expect(cc).toContain('s-maxage=86400');
-    expect(cc).toContain('max-age=86400');
-    expect(cc).not.toContain('no-store');
+    expect(cc).toContain('private');
+    expect(cc).toContain('no-store');
+    expect(cc).not.toContain('s-maxage');
     expect(res.headers.get('content-type')).toContain('application/json');
   });
 
   it('never caches precise live ship observations for 24 hours', async () => {
     addShip(77, 1.26, 103.84);
     const response = await GET();
-    expect(response.headers.get('cache-control')).toContain('s-maxage=300');
+    expect(response.headers.get('cache-control')).toContain('no-store');
   });
 });

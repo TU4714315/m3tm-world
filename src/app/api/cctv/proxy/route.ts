@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextRequest, NextResponse } from 'next/server';
 import http from 'node:http';
 import https from 'node:https';
@@ -141,7 +142,7 @@ async function retrieveImage(firstUrl: URL): Promise<Frame> {
   throw new Error('Camera redirect limit exceeded');
 }
 
-export async function GET(request: NextRequest) {
+async function providerGET(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get('url');
   if (!raw) return NextResponse.json({ error: 'Missing URL' }, { status: 400 });
   let target: URL;
@@ -162,7 +163,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': mime,
         'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'public, max-age=5, stale-while-revalidate=10',
+        'Cache-Control': 'private, no-store, max-age=0',
         'Access-Control-Allow-Origin': '*',
       },
     });
@@ -171,3 +172,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Camera provider unavailable' }, { status: 502 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

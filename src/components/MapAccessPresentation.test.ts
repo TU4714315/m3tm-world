@@ -1,0 +1,46 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+import PriorityNewsCards from './PriorityNewsCards';
+import GlobalStatusBar from './GlobalStatusBar';
+import LayerPanel from './LayerPanel';
+
+describe('access-aware public map presentation', () => {
+  it('uses synthetic shapes rather than hidden real news in a restricted card', () => {
+    const html = renderToStaticMarkup(createElement(PriorityNewsCards, {
+      items: [{ title: 'PRIVATE_UNAPPROVED_HEADLINE', link: 'https://private.example/news', source: 'PRIVATE_SOURCE' }],
+      restricted: true, onLocate: vi.fn(), onRequestAccess: vi.fn(),
+    }));
+    expect(html).toContain('كود الدعوة');
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).not.toContain('PRIVATE_UNAPPROVED_HEADLINE');
+    expect(html).not.toContain('PRIVATE_SOURCE');
+    expect(html).not.toContain('private.example');
+  });
+  it('renders allowed server-provided delayed news without applying the lock placeholder', () => {
+    const html = renderToStaticMarkup(createElement(PriorityNewsCards, {
+      items: [{ title: 'خبر متاح منشور سابقًا', source: 'ناشر', link: 'https://example.org/report' }], onLocate: vi.fn(),
+    }));
+    expect(html).toContain('خبر متاح منشور سابقًا');
+    expect(html).toContain('https://example.org/report');
+    expect(html).not.toContain('كود الدعوة');
+  });
+  it('shows the restricted layer as locked and off even if a persisted selection was on', () => {
+    const props = { data: {}, activeLayers: { military_activity: true, reference_atlas: true, flights: true }, setActiveLayers: vi.fn(), isMobile: true };
+    const locked = renderToStaticMarkup(createElement(LayerPanel, props));
+    const unlocked = renderToStaticMarkup(createElement(LayerPanel, { ...props, hasMapAccess: true }));
+    expect(locked).toMatch(/aria-disabled="true" aria-pressed="false" aria-label="نشاط جوي عسكري عام · كود الدعوة"/);
+    expect(locked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="التجارية"/);
+    expect(unlocked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
+  });
+  it('keeps the bottom bar dedicated to news in both standalone and embedded views', () => {
+    const news = [{ id: 'public', title: 'خبر عام متاح', source: 'ناشر', risk_score: 1, published: new Date(Date.now() - 13 * 3_600_000).toISOString() }];
+    for (const embed of [false, true]) {
+      const html = renderToStaticMarkup(createElement(GlobalStatusBar, { news, embed }));
+      expect(html).toContain('خبر عام متاح');
+      expect(html).not.toContain('/docs');
+      expect(html).not.toContain('الوثائق');
+      expect(html).not.toContain('إعدادات');
+    }
+  });
+});

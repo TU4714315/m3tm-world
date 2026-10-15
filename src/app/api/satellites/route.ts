@@ -1,3 +1,4 @@
+import { withMixedMapPolicy } from '@/lib/mapAccessServer';
 
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
@@ -191,7 +192,7 @@ async function fetchCelesTrakGroup(url: string): Promise<{ name: string; line1: 
   }
 }
 
-export async function GET() {
+async function providerGET() {
   try {
     const nowTime = Date.now();
     let allSats: any[] = globalCachedSats;
@@ -389,3 +390,5 @@ export async function GET() {
   }
 }
 
+
+export const GET = withMixedMapPolicy('satellites', providerGET);

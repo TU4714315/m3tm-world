@@ -1,3 +1,4 @@
+import { withMixedMapPolicy } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import WebSocket from 'ws';
@@ -499,7 +500,7 @@ export function clearMaritimeSnapshot(): void {
 }
 
 /** Daily, reference-only map never exposes time-frozen live ship positions. */
-export async function GET(req?: Request) {
+async function providerGET(req?: Request) {
   const referenceOnly = req ? new URL(req.url).searchParams.get('reference') === '1' : false;
   if (referenceOnly) {
     const now = Date.now();
@@ -579,3 +580,5 @@ export async function GET(req?: Request) {
     },
   });
 }
+
+export const GET = withMixedMapPolicy('maritime', providerGET);

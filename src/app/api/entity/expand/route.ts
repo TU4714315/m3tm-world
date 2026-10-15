@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
@@ -21,7 +22,7 @@ const INTEL_URL = process.env.INTEL_URL || (
 
 const ALLOWED_TYPES = new Set(['aircraft', 'vessel', 'company', 'person', 'ip', 'country']);
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const clientIp = getClientIp(req);
   if (isRateLimited(clientIp, 30, 60_000)) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
@@ -63,7 +64,7 @@ export async function GET(req: Request) {
 
     const data = await res.json();
     return NextResponse.json(data, {
-      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   } catch (e) {
     console.error('[M3TM.WORLD] Data proxy error:', e instanceof Error ? e.message : e);
@@ -73,3 +74,5 @@ export async function GET(req: Request) {
     );
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 
 /**
@@ -11,7 +12,7 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{1,48}$/;
 const MAX_BYTES = 5_000_000;
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+async function providerGET(request: Request) {
   const id = new URL(request.url).searchParams.get('id') || '';
   if (!ID_PATTERN.test(id)) return new Response('Invalid camera ID', { status: 400 });
   const url = new URL(BASE);
@@ -32,9 +33,11 @@ export async function GET(request: Request) {
     }
     return new NextResponse(data, { headers: {
       'Content-Type': 'image/jpeg', 'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=20',
+      'Cache-Control': 'private, no-store, max-age=0',
     } });
   } catch {
     return new Response('Frame unavailable', { status: 502, headers: { 'Cache-Control': 'no-store' } });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

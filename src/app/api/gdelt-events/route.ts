@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { buildGdeltReportedRoutes, publisherCoverage, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
@@ -46,7 +47,7 @@ function durableProfile(quads: number[], minArticles: number, limit: number): st
   return null;
 }
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const { searchParams } = new URL(req.url);
 
   const quads = parseQuads(searchParams.get('quad'));
@@ -94,7 +95,7 @@ export async function GET(req: Request) {
       {
         // GDELT publishes a new export every 15 minutes, so anything under that
         // is wasted work. Serve stale while revalidating to absorb bursts.
-        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
       }
     );
   } catch (error) {
@@ -120,3 +121,5 @@ export async function GET(req: Request) {
     );
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

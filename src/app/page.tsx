@@ -1,4 +1,9 @@
 'use client';
+import MapAccessGate from '@/components/MapAccessGate';
+import { createMapMemberExchange } from '@/lib/mapMemberExchange';
+import { useMapAccess } from '@/lib/useMapAccess';
+import { publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
+
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -188,9 +193,14 @@ function ViewSegment({ active, onClick, title, icon: Icon, label, layoutId }: {
 }
 
 export default function Dashboard() {
+  const { hasMapAccess, accessModeRef, blockMemberResume, acceptMapAccess, clearMapAccess, mapAccessHeaders } = useMapAccess();
+  const [showMapAccess, setShowMapAccess] = useState(false);
+  const accessGeneration = useRef(0);
+  const allowedRef = useRef(hasMapAccess);
+  allowedRef.current = hasMapAccess;
   const dataRef = useRef<any>({});
   const [dataVersion, setDataVersion] = useState(0);
-  const data = dataRef.current;
+  const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
 
   useEffect(() => {
     void recordWorldVisitOnce();
@@ -238,7 +248,7 @@ export default function Dashboard() {
       }
       if (message.type !== 'm3tm:sync') return;
 
-      const items: EmbeddedNewsItem[] = Array.isArray(message.newsItems)
+      const items: EmbeddedNewsItem[] = allowedRef.current && Array.isArray(message.newsItems)
         ? message.newsItems.flatMap((item: EmbeddedNewsPayload) => {
             const latitude = toEmbeddedCoordinate(item?.latitude, -90, 90);
             const longitude = toEmbeddedCoordinate(item?.longitude, -180, 180);
@@ -515,6 +525,29 @@ export default function Dashboard() {
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
 
+  useEffect(() => {
+    accessGeneration.current++;
+    dataRef.current = {};
+    setDataVersion(value => value + 1);
+    setEmbeddedNewsItems([]); setEmbeddedRoute(null);
+    setActiveCamera(null); setLiveFeedUrl('');
+    setRegionDossier(null); setDossierLoading(false);
+    if (!hasMapAccess) { setShowSpaceCam(false); setShowMenaPulse(false); }
+  }, [hasMapAccess]);
+
+  useEffect(() => {
+    const exchange = createMapMemberExchange({ mode: () => accessModeRef.current,
+      blockResume: blockMemberResume, accept: acceptMapAccess, deny: clearMapAccess });
+    const onSession = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== M3TM_APP_ORIGIN
+        || event.data?.source !== 'm3tm-app' || event.data.version !== 1
+        || event.data.type !== 'm3tm:map-session') return;
+      void exchange.receive(event.data.accessToken);
+    };
+    window.addEventListener('message', onSession);
+    return () => { exchange.dispose(); window.removeEventListener('message', onSession); };
+  }, [acceptMapAccess, clearMapAccess, accessModeRef, blockMemberResume]);
+
   // Splash screen
   useEffect(() => {
     const splashTimer = setTimeout(() => setShowSplash(false), 2500);
@@ -693,12 +726,18 @@ export default function Dashboard() {
 
   // Region dossier (right-click)
   const handleRightClick = useCallback(async (coords: { lat: number; lng: number }) => {
+    if (!allowedRef.current) { setShowMapAccess(true); return; }
+    const generation = accessGeneration.current;
     setDossierLoading(true); setRegionDossier(null);
     try {
-      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
-      if (res.ok) setRegionDossier(await res.json());
-    } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
-  }, []);
+      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`, { headers: mapAccessHeaders(), cache: 'no-store' });
+      if (res.ok) {
+        const dossier = await res.json();
+        if (generation === accessGeneration.current && allowedRef.current) setRegionDossier(dossier);
+      }
+    } catch { /* Keep the current map usable when the dossier is unavailable. */ }
+    finally { if (generation === accessGeneration.current) setDossierLoading(false); }
+  }, [mapAccessHeaders]);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
     if (entity?.type === 'cctv') setActiveCamera(entity);
@@ -808,11 +847,15 @@ export default function Dashboard() {
     { skipWhenHidden = false }: { skipWhenHidden?: boolean } = {},
   ): Promise<boolean> => {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
+    if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])) return false;
     try {
       // Force the browser to bypass its local disk cache for real-time data
-      const res = await fetch(url, { ...options, cache: 'no-store' });
+      const generation = accessGeneration.current;
+      const res = await fetch(url, { ...options, cache: 'no-store', headers: { ...options?.headers, ...mapAccessHeaders() } });
+      if (generation !== accessGeneration.current) return false;
       if (res.ok) {
         const json = await res.json();
+        if (generation !== accessGeneration.current) return false;
         const d = transform ? transform(json) : json;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
@@ -825,7 +868,7 @@ export default function Dashboard() {
       setBackendStatus('error');
       return false;
     }
-  }, []);
+  }, [mapAccessHeaders]);
 
   // Browser checks do not imply that the publisher has changed the reference map.
   useEffect(() => {
@@ -839,7 +882,7 @@ export default function Dashboard() {
       void check(true);
     }, PUBLIC_REFRESH_MS.referenceAtlasCheck15min);
     return () => { window.clearInterval(timer); };
-  }, [activeLayers.reference_atlas, fetchEndpoint]);
+  }, [activeLayers.reference_atlas, fetchEndpoint, hasMapAccess]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
@@ -877,7 +920,7 @@ export default function Dashboard() {
       clearTimeout(spaceTimer);
       intervals.forEach(clearInterval);
     };
-  }, [fetchEndpoint]);
+  }, [fetchEndpoint, hasMapAccess]);
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
@@ -1109,7 +1152,7 @@ export default function Dashboard() {
     }
 
 
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, hasMapAccess]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
@@ -1216,7 +1259,7 @@ export default function Dashboard() {
       }), undefined, { skipWhenHidden: true });
     }, 5 * 60_000);
     return () => window.clearInterval(retry);
-  }, [activeLayers.frontlines, fetchEndpoint]);
+  }, [activeLayers.frontlines, fetchEndpoint, hasMapAccess]);
 
     // Refresh time-sensitive, published MENA activity once when returning from a
   // meaningful hidden period. Do not revive daily reference layers or duplicate
@@ -1268,7 +1311,7 @@ export default function Dashboard() {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, hasMapAccess]);
 
 
   // Rolling 24-hour regional fire observations; no fetch on layer toggling.
@@ -1288,7 +1331,7 @@ export default function Dashboard() {
       });
     }, 60_000);
     return () => clearInterval(timer);
-  }, [activeLayers.fires, fetchEndpoint]);
+  }, [activeLayers.fires, fetchEndpoint, hasMapAccess]);
 
   // Public maritime reference is updated daily instead of repeated vessel polling.
   // Layer toggling retains an initial on-demand load; no public exact naval tracks.
@@ -1321,7 +1364,7 @@ export default function Dashboard() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activeLayers.maritime, activeLayers.naval_activity, activeLayers.sdk_sea, fetchEndpoint]);
+  }, [activeLayers.maritime, activeLayers.naval_activity, activeLayers.sdk_sea, fetchEndpoint, hasMapAccess]);
   /* ── LIVE MALWARE — pushed over SSE while the layer is on ──
      Detections arrive when URLhaus reports them rather than on a timer, so
      there is no poll interval to tune and no request that re-downloads the
@@ -1441,7 +1484,7 @@ export default function Dashboard() {
     return entities;
   }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
 
-  const embeddedLiveFeeds = useMemo(() => embeddedNewsItems.map(item => ({
+  const embeddedLiveFeeds = useMemo(() => (hasMapAccess ? embeddedNewsItems : []).map(item => ({
     bridge_id: item.id,
     name: item.title,
     city: '',
@@ -1460,7 +1503,7 @@ export default function Dashboard() {
           origin_lng: item.originLongitude,
         }
       : {}),
-  })), [embeddedNewsItems]);
+  })), [embeddedNewsItems, hasMapAccess]);
 
   // WORLD has no authenticated subscriber session. A query string such as
   // ?embed=1 (or surface=internal) MUST NOT switch it to raw/internal data.
@@ -1669,7 +1712,7 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={displayedMapLayers}
+          activeLayers={visibleMapLayers(displayedMapLayers, hasMapAccess)}
           onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
@@ -2034,7 +2077,7 @@ export default function Dashboard() {
                   onClick={() => setShowPublicEmbedLayers(false)}><X className="w-4 h-4" /></button>
               </div>
               <p className="mb-2 text-[10px] text-white/50">إتاحة الطبقة لا تعني توفر بيانات مصدرها الآن؛ تظهر أعداد العناصر بعد وصول البيانات.</p>
-              <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers}
+              <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
                 />
@@ -2044,16 +2087,16 @@ export default function Dashboard() {
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
 
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto rounded-full border border-white/10 bg-[#05080d]/20 p-1 shadow-[0_14px_50px_rgba(0,0,0,0.25)] backdrop-blur-2xl">
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(false); setShowSpaceCam(v => !v); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
+          <button onClick={() => { setShowAlerts(false); if (hasMapAccess) setShowSpaceCam(v => !v); else setShowMapAccess(true); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
-            {showSpaceCam && (
+            {hasMapAccess && showSpaceCam && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[#00E5FF]"
@@ -2062,7 +2105,7 @@ export default function Dashboard() {
           </button>
           <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">الفضاء</span>
           <AnimatePresence>
-            {showSpaceCam && (
+            {hasMapAccess && showSpaceCam && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
                 <SpaceCam />
               </motion.div>
@@ -2104,7 +2147,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showAlerts && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <LiveAlerts data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                <LiveAlerts hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -2350,7 +2393,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
+                      <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>
@@ -2382,7 +2425,7 @@ export default function Dashboard() {
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
-                      <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
+                      <SharePanel mapView={mapView} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} mouseCoords={null} />
                     </div>
                   )}
                 </div>
@@ -2415,7 +2458,7 @@ export default function Dashboard() {
       {/* Scale bar is now integrated into the map controls section above */}
 
       {/* ── Region Dossier ── */}
-      {!embedMode && (regionDossier || dossierLoading) && (
+      {hasMapAccess && !embedMode && (regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
           <div className="glass-panel p-5 world-glow">
             <div className="flex items-center justify-between mb-3">
@@ -2509,6 +2552,9 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
+      {!hasMapAccess && <button type="button" onClick={() => setShowMapAccess(true)}
+        className="absolute top-20 left-4 z-[220] rounded-xl border border-amber-200/25 bg-black/45 px-4 py-2 text-xs text-amber-100 backdrop-blur-xl">كود الدعوة</button>}
+      {showMapAccess && <MapAccessGate onClose={() => setShowMapAccess(false)} onAccess={grant => { acceptMapAccess(grant); setShowMapAccess(false); }} />}
       <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />
 
       {/* Shortcut hint — more visible */}

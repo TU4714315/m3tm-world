@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 /**
  * OSIRIS — Flight Route API (v2)
  *
@@ -219,7 +220,7 @@ async function fromAirplanesLive(icao24: string, callsign: string): Promise<{ or
 }
 
 // ── Handler ────────────────────────────────────────────────────────
-export async function GET(req: NextRequest) {
+async function providerGET(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const callsign  = (sp.get('callsign') || '').trim().toUpperCase();
   const icao24    = (sp.get('icao24')   || '').trim().toLowerCase();
@@ -245,7 +246,7 @@ export async function GET(req: NextRequest) {
         ));
       }
       return NextResponse.json(out, {
-        headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300' },
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
       });
     }
   }
@@ -290,7 +291,7 @@ export async function GET(req: NextRequest) {
     const miss = { found: false, callsign, icao24 };
     routeCache.set(cacheKey, { data: miss, ts: Date.now() });
     return NextResponse.json(miss, {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   }
 
@@ -319,6 +320,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(out, {
-    headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=300' },
+    headers: { 'Cache-Control': 'private, no-store, max-age=0' },
   });
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

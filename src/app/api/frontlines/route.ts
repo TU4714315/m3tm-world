@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { durableGetJson, durableSetJson } from '@/lib/durableCache';
@@ -110,7 +111,7 @@ async function refresh(): Promise<Snapshot | null> {
 }
 
 /** Public frontline areas, source-backed and clearly dated. */
-export async function GET() {
+async function providerGET() {
   const now = Date.now();
   const { value: stored } = await durableGetJson<Snapshot>(CACHE_KEY);
   const cached = validSnapshot(stored) ? stored : null;
@@ -132,3 +133,5 @@ export async function GET() {
   retryAfter = Date.now() + FAILURE_RETRY_MS;
   return respond(cached, cached ? 'cached-stale' : 'unavailable');
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

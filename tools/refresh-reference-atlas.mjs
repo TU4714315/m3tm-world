@@ -1,12 +1,14 @@
-// One central check; no browser session, auth token, or caller-selected URL.
+// Server collector credential grants only this refresh, never map viewing.
 const allowedOrigins = new Set([
   'https://m3tm-world-recovery.onrender.com',
   'https://m3tm-world.vercel.app',
 ]);
 const origin = process.env.REFERENCE_ATLAS_ORIGIN || 'https://m3tm-world-recovery.onrender.com';
 if (!allowedOrigins.has(origin)) throw new Error('Unsupported reference atlas origin');
+const token = process.env.WORLD_MAP_REFRESH_TOKEN;
+if (!token || token.length < 32) throw new Error('Collector authorization is not configured');
 const response = await fetch(`${origin}/api/reference-atlas`, {
-  headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(55_000),
+  headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(55_000),
 });
 if (!response.ok) throw new Error(`Reference atlas check returned HTTP ${response.status}`);
 const snapshot = await response.json();

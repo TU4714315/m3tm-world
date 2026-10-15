@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { httpJson, optional } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
@@ -248,7 +249,7 @@ async function fetchTrace(icao24: string, full: boolean): Promise<TraceFile> {
   return httpJson<TraceFile>(url, { timeoutMs: 12000 });
 }
 
-export async function GET(request: Request) {
+async function providerGET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const icao24 = (searchParams.get('icao24') || '').trim().toLowerCase();
@@ -306,10 +307,12 @@ export async function GET(request: Request) {
     const publicDetail = publicAircraftDetail(detail[0]);
     if (!publicDetail) return NextResponse.json({ error: 'Aircraft detail unavailable' }, { status: 404 });
     return NextResponse.json(publicDetail, {
-      headers: { 'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   } catch (error) {
     console.error('[OSIRIS] Aircraft lookup error:', error);
     return NextResponse.json({ error: 'Aircraft lookup failed' }, { status: 500 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

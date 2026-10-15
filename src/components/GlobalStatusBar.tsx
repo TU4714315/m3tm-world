@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 interface NewsTickerItem {
@@ -16,13 +15,6 @@ interface NewsTickerItem {
 const M3TM_APP_NEWS_URL = 'https://m3tm.app/news#news';
 
 /* ─── Inline SVG Icons ─── */
-const DocsIcon = () => (
-  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H10a2 2 0 0 1 2 2 2 2 0 0 1 2-2h4.5A1.5 1.5 0 0 1 20 4.5v13a1.5 1.5 0 0 1-1.5 1.5H14a2 2 0 0 0-2 2 2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 17.5z"/>
-    <path d="M12 7v14"/>
-  </svg>
-);
-
 const NewsIcon = () => (
   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 5h16v14H4z" />
@@ -118,7 +110,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
       <div className="h-[32px] overflow-hidden bg-[#0a0a0f]/55 border-t border-white/[0.12] flex items-center text-[10px] font-mono tracking-wider backdrop-blur-md relative">
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--cyan-primary)]/30 to-transparent" style={{ animation: 'hud-scanline 4s linear infinite' }} />
 
-        {/* ── LEFT: M3TM.APP + project docs ── */}
+        {/* ── NEWS ── */}
         <div className="flex-shrink-0 h-full flex items-center pointer-events-auto">
           <a
             href={M3TM_APP_NEWS_URL}
@@ -130,14 +122,6 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
             <NewsIcon />
             <span className="text-[9px] font-bold tracking-[0.12em]">أهم الأخبار</span>
           </a>
-          {!embed && (
-          <Link href="/docs" prefetch title="الوثائق ودليل واجهات API" aria-label="الوثائق ودليل واجهات API"
-            className="hidden sm:flex h-full px-3 items-center gap-1.5 bg-[var(--gold-primary)]/10 text-[var(--gold-primary)]/80 hover:text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/25 border-r border-white/[0.04] transition-all duration-200"
-          >
-            <DocsIcon />
-            <span className="text-[9px] font-bold tracking-[0.15em] uppercase">الوثائق</span>
-          </Link>
-          )}
         </div>
 
         {/* ── CENTER: M3TM.APP Important News Ticker ── */}

@@ -58,7 +58,7 @@ describe('public OSINT boundary', () => {
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'false');
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
 
-    const response = middleware(
+    const response = await middleware(
       new NextRequest('https://m3tm-world.vercel.app/api/osint/shodan'),
       { waitUntil: vi.fn() } as never,
     );
@@ -73,7 +73,7 @@ describe('public OSINT boundary', () => {
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
 
-    const response = middleware(
+    const response = await middleware(
       new NextRequest('https://m3tm-world.vercel.app/api/scanner?target=example.com&type=headers'),
       { waitUntil: vi.fn() } as never,
     );
@@ -82,11 +82,11 @@ describe('public OSINT boundary', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
   });
 
-  it('allows an explicitly enabled internal route only with the matching server token', () => {
+  it('allows an explicitly enabled internal route only with the matching server token', async () => {
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
 
-    const response = middleware(
+    const response = await middleware(
       new NextRequest('https://m3tm-world.vercel.app/api/scanner?target=example.com&type=headers', {
         headers: { 'x-m3tm-internal-token': 'owner-only-token' },
       }),
@@ -101,7 +101,7 @@ describe('public OSINT boundary', () => {
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED', 'true');
     vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_TOKEN', 'owner-only-token');
 
-    const response = middleware(
+    const response = await middleware(
       new NextRequest('https://m3tm-world.vercel.app/api/tools/shodan', {
         headers: { authorization: 'Bearer wrong-token' },
       }),
@@ -110,5 +110,37 @@ describe('public OSINT boundary', () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: 'internal_only' });
+  });
+});
+
+describe('published map route authorization', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('gates every API path including alternate media routes', () => {
+    expect(config.matcher).toContain('/api/:path*');
+  });
+  it('denies raw conflict data and camera streams regardless of query flags', async () => {
+    vi.stubEnv('M3TM_APP_SUPABASE_ANON_KEY','');
+    for (const path of ['/api/frontlines', '/api/reference-atlas', '/api/cctv/proxy', '/api/sdk/stream']) {
+      const response=await middleware(new NextRequest(`https://map.test${path}?surface=internal&access=owner`), {waitUntil:vi.fn()} as never);
+      expect(response.status).toBe(403);
+      expect(response.headers.get('cache-control')).toContain('no-store');
+    }
+  });
+  it('limits the scheduler credential to the atlas collector', async () => {
+    vi.stubEnv('WORLD_MAP_REFRESH_TOKEN','r'.repeat(40));
+    vi.stubEnv('M3TM_APP_SUPABASE_ANON_KEY','');
+    const headers={Authorization:`Bearer ${'r'.repeat(40)}`};
+    const event={waitUntil:vi.fn()} as never;
+    expect((await middleware(new NextRequest('https://map.test/api/reference-atlas',{headers}),event)).status).toBe(200);
+    expect((await middleware(new NextRequest('https://map.test/api/cctv',{headers}),event)).status).toBe(403);
+    expect((await middleware(new NextRequest('https://map.test/api/osint/shodan',{headers}),event)).status).toBe(403);
+  });
+  it('does not allow viewing credentials into raw SDK, enrichment or analysis tools', async () => {
+    vi.stubEnv('M3TM_WORLD_INTERNAL_TOOLS_ENABLED','false');
+    for (const path of ['/api/sdk/stream','/api/sdk/ingest','/api/entity/expand','/api/astra','/api/ai/analyze']) {
+      const response=await middleware(new NextRequest(`https://map.test${path}`,{headers:{Authorization:`Bearer ${'v'.repeat(80)}`}}),{waitUntil:vi.fn()} as never);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({error:'internal_only'});
+    }
   });
 });

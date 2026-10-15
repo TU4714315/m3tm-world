@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { fetchGdeltEvents, publisherCoverage, toPublicGdeltEvent } from '@/lib/gdeltEvents';
@@ -358,7 +359,7 @@ async function fetchAllLiveConflictData(): Promise<{
   };
 }
 
-export async function GET() {
+async function providerGET() {
   const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
   const servedAt = new Date().toISOString();
   try {
@@ -426,7 +427,7 @@ export async function GET() {
 
     return NextResponse.json(maskSaudiPublicIndicators(payload), {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'private, no-store, max-age=0',
       },
     });
   } catch (error) {
@@ -495,3 +496,5 @@ export async function GET() {
     });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

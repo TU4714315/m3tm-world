@@ -17,7 +17,7 @@ describe('WORLD independent public layer controls', () => {
     expect(panel).toContain('if (layer?.parent && !activeLayers[layer.parent]) return;');
     expect(panel).toContain('if (layer?.parent && !prev[layer.parent]) return prev;');
     expect(panel.match(/(?:^|\s)disabled=\{dormant\}/g)).toHaveLength(2);
-    expect(panel.match(/aria-disabled=\{dormant\}/g)).toHaveLength(2);
+    expect(panel.match(/aria-disabled=\{dormant \|\| locked\}/g)).toHaveLength(2);
   });
 
   it('turns child display toggles off when disabling the parent', () => {

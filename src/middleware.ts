@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest, NextFetchEvent } from 'next/server';
+import { restrictedMapEndpoint } from './lib/mapAccessPolicy';
+import { authorizeMapRequest, mapPrivateHeaders } from './lib/mapAccessServer';
 
-export function middleware(request: NextRequest, event: NextFetchEvent) {
+export async function middleware(request: NextRequest, event: NextFetchEvent) {
   const url = request.nextUrl.pathname;
 
-  const protectedOsint = url === '/api/scanner' || url.startsWith('/api/osint/') || url.startsWith('/api/tools/');
+  const sdkPublisher = url === '/api/sdk/ingest' && request.method === 'POST';
+  // The ingestion route retains its dedicated body API-key check. Viewing
+  // grants never authorize raw SDK stores, enrichment, analysis, or writes.
+  if (sdkPublisher) return NextResponse.next();
+  const protectedOsint = url === '/api/scanner' || url.startsWith('/api/osint/') || url.startsWith('/api/tools/')
+    || url.startsWith('/api/sdk/') || url.startsWith('/api/entity/') || url.startsWith('/api/ai/') || url === '/api/astra';
   if (protectedOsint) {
     const expectedToken = process.env.M3TM_WORLD_INTERNAL_TOOLS_TOKEN;
     const explicitlyEnabled = process.env.M3TM_WORLD_INTERNAL_TOOLS_ENABLED === 'true';
@@ -25,6 +32,22 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
         },
       );
     }
+    return NextResponse.next();
+  }
+
+  if (url.startsWith('/api/')) {
+    if (restrictedMapEndpoint(url)) {
+      const scheduler = process.env.WORLD_MAP_REFRESH_TOKEN;
+      const refreshOnly = url === '/api/reference-atlas' && scheduler && scheduler.length >= 32
+        && request.headers.get('authorization') === `Bearer ${scheduler}`;
+      if (!refreshOnly && !await authorizeMapRequest(request)) {
+        return NextResponse.json({ error: 'map_access_required' }, { status: 403, headers: mapPrivateHeaders });
+      }
+      const response = NextResponse.next();
+      Object.entries(mapPrivateHeaders).forEach(([key, value]) => response.headers.set(key, value));
+      return response;
+    }
+    return NextResponse.next();
   }
 
   const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '127.0.0.1';
@@ -77,6 +100,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
    map's critical path. Analytics wants page views; asset fetches are not one. */
 export const config = {
   matcher: [
+    '/api/:path*',
     '/api/osint/:path*',
     '/api/tools/:path*',
     '/api/scanner',

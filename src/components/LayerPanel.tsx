@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
   CloudLightning, Ship, Network, Database, Ghost,
-  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal
+  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal, LockKeyhole
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
+import { RESTRICTED_MAP_LAYERS } from '@/lib/mapAccessPolicy';
 
 interface LayerPanelProps {
   data: any;
@@ -23,6 +24,8 @@ interface LayerPanelProps {
   onTerrainRetry?: () => void;
   onTerrainFocus?: () => void;
   on3DModeSelected?: () => void;
+  hasMapAccess?: boolean;
+  onRequestAccess?: () => void;
 }
 
 interface LayerDef {
@@ -208,7 +211,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected, hasMapAccess = false, onRequestAccess }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -228,6 +231,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   }, [pinnedGroup]);
 
   const toggle = (key: string) => {
+    if (!hasMapAccess && RESTRICTED_MAP_LAYERS.has(key)) { onRequestAccess?.(); return; }
     // Sub-layers cannot become active independently of their parent, even
     // during rapid clicks while React is applying queued state updates.
     const definitions = LAYER_GROUPS.flatMap(group => group.layers);
@@ -260,11 +264,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   /** Switch a whole group at once. Provider availability never locks the toggle:
    *  an enabled layer with no configured provider remains an honest no-data state. */
   const toggleGroup = (layers: LayerDef[]) => {
-    const anyOn = layers.some(l => activeLayers[l.key]);
-    if (!anyOn && layers.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
+    const available = layers.filter(layer => hasMapAccess || !RESTRICTED_MAP_LAYERS.has(layer.key));
+    if (!available.length) { onRequestAccess?.(); return; }
+    const anyOn = available.some(l => activeLayers[l.key]);
+    if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
     setActiveLayers((prev: any) => {
       const next = { ...prev };
-      for (const l of layers) next[l.key] = !anyOn;
+      for (const l of available) next[l.key] = !anyOn;
       return next;
     });
   };
@@ -338,25 +344,28 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
             </div>
             <div className="flex flex-col gap-1">
               {group.layers.map((layer) => {
-                const isLayerActive = activeLayers[layer.key];
-                const count = getCount(layer.dataKey, layer.catKey);
-                const dormant = !!layer.parent && !activeLayers[layer.parent];
+                const locked = !hasMapAccess && RESTRICTED_MAP_LAYERS.has(layer.key);
+                const isLayerActive = !locked && activeLayers[layer.key];
+                const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
                 return (
                   <button
                     key={layer.key}
                     type="button"
                     onClick={() => toggle(layer.key)}
                     disabled={dormant}
-                    aria-disabled={dormant}
+                    aria-disabled={dormant || locked}
                     aria-pressed={!!isLayerActive}
-                    aria-label={layer.label}
+                    aria-label={locked ? `${layer.label} · كود الدعوة` : layer.label}
                     
                     className={`relative w-full flex items-center gap-3 py-2 rounded-md text-right hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
+                    {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                     <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
                       {layer.label}
+                      {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                       
                     </span>
                     
@@ -444,7 +453,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         {visibleGroups.map((group) => {
           /* Sub-layers modify a parent rather than draw anything of their own,
              so they do not count towards the rail's reading. */
-          const counted = group.layers.filter(l => !l.parent);
+          const counted = group.layers.filter(l => !l.parent && (hasMapAccess || !RESTRICTED_MAP_LAYERS.has(l.key)));
           const groupActive = counted.some(l => activeLayers[l.key]);
           const isHovered = hoveredGroup === group.label;
           const Icon = group.icon;
@@ -546,9 +555,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {group.layers.map((layer) => {
-                        const isLayerActive = activeLayers[layer.key];
-                        const count = getCount(layer.dataKey, layer.catKey);
-                        const dormant = !!layer.parent && !activeLayers[layer.parent];
+                        const locked = !hasMapAccess && RESTRICTED_MAP_LAYERS.has(layer.key);
+                        const isLayerActive = !locked && activeLayers[layer.key];
+                        const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                        const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
 
                         return (
                           <button
@@ -556,9 +566,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             type="button"
                             onClick={() => toggle(layer.key)}
                             disabled={dormant}
-                            aria-disabled={dormant}
+                            aria-disabled={dormant || locked}
                             aria-pressed={!!isLayerActive}
-                            aria-label={layer.label}
+                            aria-label={locked ? `${layer.label} · كود الدعوة` : layer.label}
                             
                             className={`relative w-full rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${group.label === 'شبكة وأحداث' ? 'flex flex-col items-stretch gap-1.5 p-2' : 'flex items-center gap-3 py-1.5'} ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
@@ -566,8 +576,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               <>
                                 <span className="flex w-full min-w-0 items-center gap-2" dir="rtl">
                                   <ToggleSwitch active={!!isLayerActive} />
+                                  {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                                   <span className={`min-w-0 flex-1 text-right text-[11px] font-medium leading-5 ${isLayerActive ? 'text-white/85' : 'text-white/45'}`}>
                                     {layer.label}
+                                    {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                                   </span>
                                 </span>
                                 <span className="flex w-full items-center gap-2" dir="rtl">
@@ -580,8 +592,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               <>
                                 {layer.parent && <SubLayerStem />}
                                 <ToggleSwitch active={!!isLayerActive} />
+                                {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                                 <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
                                   {layer.label}
+                                  {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                                   
                                 </span>
                                 

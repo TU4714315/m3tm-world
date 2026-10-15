@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 
 /**
@@ -23,7 +24,7 @@ if (!globalForSDK.sdkEntityStore) {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+async function providerGET() {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -88,3 +89,5 @@ export async function GET() {
     },
   });
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

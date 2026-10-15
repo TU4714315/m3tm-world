@@ -25,6 +25,7 @@ describe('satellite API Saudi public mask', () => {
     expect(body.total).toBe(1);
     expect(body.category_counts).toEqual({ comms: 1 });
     expect(body.satellite_source_status.public_individual_objects).toBe(1);
-    expect(body.satellite_source_status.military_public_cells).toBe(body.military_satellite_activity.length);
+    expect(body.satellite_source_status.military_public_cells).toBeUndefined();
+    expect(body.military_satellite_activity).toEqual([]);
   });
 });

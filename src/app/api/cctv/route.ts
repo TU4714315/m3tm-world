@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { isSaudiPublicIndicator } from '@/lib/publicCountryVisibility';
 import { stealthFetch } from '@/lib/stealthFetch';
@@ -721,14 +722,14 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
   return regions.length > 0 ? regions : ['uk', 'us-east']; // Default fallback
 }
 
-export async function GET(request: Request) {
+async function providerGET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     // Lightweight region discovery. The global map loads CCTV in bounded
     // batches, avoiding dozens of concurrent upstreams during first paint.
     if (searchParams.get('catalog') === 'regions') {
       return NextResponse.json({ regions: Object.keys(REGION_FETCHERS) }, {
-        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' },
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
       });
     }
     const region = searchParams.get('region');
@@ -787,3 +788,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ cameras: [], error: 'Failed' }, { status: 500 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

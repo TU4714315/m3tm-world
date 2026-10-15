@@ -1,3 +1,4 @@
+import { withMixedMapPolicy } from '@/lib/mapAccessServer';
 
 import { NextResponse } from 'next/server';
 import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
@@ -416,7 +417,7 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
   }
 }
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const now = Date.now();
 
   const cachedSummary = cachedData ? buildFlightSummary(cachedData) : null;
@@ -793,3 +794,5 @@ function aggregateJamming(points: any[], threshold: number) {
       count: z.count,
     }));
 }
+
+export const GET = withMixedMapPolicy('flights', providerGET);
