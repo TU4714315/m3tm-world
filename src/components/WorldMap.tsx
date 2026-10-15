@@ -3171,6 +3171,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       phase += .13;
       map.updateImage('territory-wave-red', territoryWave('#CB6E71', phase));
       map.updateImage('territory-wave-green', territoryWave('#63AA91', phase));
+      map.triggerRepaint();
     }, 200);
     return () => window.clearInterval(timer);
   }, [mapReady, activeLayers.reference_atlas]);
