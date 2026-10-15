@@ -33,6 +33,7 @@ import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
+import { embeddedBasemapPreference } from '@/lib/embedBasemapPreference';
 import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
@@ -219,7 +220,11 @@ export default function Dashboard() {
     const publicSurface = params.get('surface') === 'public';
     if (!embedded && !publicSurface) return;
 
+    // Public WORLD remains satellite by default. Only embedded APP frames
+    // accept a cosmetic basemap preference; this is NOT authorization.
+    const embeddedBasemap = embeddedBasemapPreference(params, embedded, publicSurface);
     const frameId = window.requestAnimationFrame(() => {
+      if (embeddedBasemap) setMapStyle(embeddedBasemap);
       setEmbedMode(embedded);
       setEmbedSurface(publicSurface ? 'public' : 'internal');
       setShowSplash(false);
