@@ -171,3 +171,15 @@ Verified after PR #66 that /api/gdelt-events returned 235 valid current archive 
 - **Review fix:** CCTV cluster click now uses MapLibre `GeoJSONSource.getClusterExpansionZoom(cluster_id)`, not constant `zoom+2.1`; one click opens the expected individual camera level. An async callback ignores a replaced/unmounted map and falls back to zoom 9 if the cluster API fails. Other event clusters retain previous handler.
 - **VERIFY before claiming complete:** Required TypeScript/Vitest/Next, Vercel Preview, resolved reviewer threads, desktop & 390x844 image comparison, test camera viewer on city zoom, all existing military/data/satellite/camera layers present, APP `hello/ready/sync/select` preserved. Production main/deployed SHA must match the resulting merge commit.
 - **Separate blocker:** PR #68 durable GDELT history is a different concurrent feature; APP-owned Supabase persistence and CI/Deno review issues must be closed independently. Do not merge unresolved upstream governance or bypass deployment quotas.
+
+## 2026-10-15 — Published map integration and owner-directed presentation
+
+DONE: Added bounded server ISWN KML/RSS collector and a separate public reference layer in the existing WORLD/APP map. Full refresh12h or recent major publisher report; scheduled check15min. Added pre-cache/final Saudi geometry masking and count repair, distinct IDs for repeated area labels, honest source dates/stale fallback and retry. Owner-directed UI removes atlas/source dashboard and map numbers; named Yemen Houthi/government areas receive red/green waves, explicit facility/equipment names receive glyphs, news goes into glass Alerts cards, former library becomes Maps2D/3D. Ordinary attribution remains; source/date metadata is retained. See docs/ISWN_REFERENCE_MAP_CONTRACT_2026-10-15.md.
+
+VERIFY: Current candidate local tests/build and Chrome verification are recorded in the change review. Real local API returned200 with7,508 public reference features across9layers;174 dated annotations (Regions2024-06-02), overall map publication dateunknown. Chrome showed no atlas/library dashboard, no reference counts, red/green Yemen areas and glyphs, glass news cards, and working2D/3D selection. No live production claim.
+
+BLOCKERS: Candidate not merged/deployed; central workflow inactive until reviewed default-branch release. Local preview uses memory cache; production shared persistence must be confirmed. Existing WORLD PR132/Vercel deployment and SHA gates still apply.
+
+NEXT: Review the final stacked PR after PR132, complete CI and release gates, verify shared cache and deployed/API scheduler, then verify APP iframe and production SHA. Do not treat repeated source retrieval as new field evidence.
+
+FINAL VERIFY: 948 tests PASS,18 explicitly skipped; Next production build and TypeScript PASS; targeted new-helper/parser/API/presentation ESLint PASS. Chrome DOM: no atlas dashboard,0 library buttons,8 glass news cards, no horizontal overflow.2D/3D selection exercised, final Yemen red/green areas and facility glyphs shown. No production deployment or automatic schedule activation performed.

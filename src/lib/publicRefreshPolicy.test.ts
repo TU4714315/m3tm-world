@@ -15,6 +15,10 @@ describe('public WORLD regional refresh schedule', () => {
     expect(PUBLIC_REFRESH_MS.africanNeighboringConflictArchive).toBe(12 * 60 * 60 * 1000);
     expect(PUBLIC_REFRESH_MS.ukraineConflictArchive).toBe(DAY);
   });
+  it('checks reference atlas metadata every 15 minutes while preserving the frontline cadence', () => {
+    expect(PUBLIC_REFRESH_MS.referenceAtlasCheck15min).toBe(15 * 60_000);
+    expect(PUBLIC_REFRESH_MS.worldwidePublishedFrontlines).toBe(DAY);
+  });
   it('only shows the highest severity-coded public cyber indicators', () => {
     const sample = [
       { id: 'minor', severity: 5 },

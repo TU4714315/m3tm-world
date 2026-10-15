@@ -4,6 +4,8 @@ import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
+import { editorialClusterLayer, registerEditorialMapSymbols, territoryWave } from '@/lib/map-symbols';
+import { publishedAreaAffiliation, publishedEquipmentSymbol } from '@/lib/publishedMapPresentation';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
@@ -25,6 +27,8 @@ import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
+import { referenceAtlasFeatures, referenceAtlasDate, type ReferenceAtlasKind } from '@/lib/referenceAtlasView';
+import type { AtlasSnapshot } from '@/lib/iswnAtlas';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -42,6 +46,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 interface WorldMapProps {
   data: any;
   activeLayers: Record<string, boolean>;
+  referenceAtlasLayerId?: string;
+  referenceAtlasKind?: ReferenceAtlasKind;
   onEntityClick?: (entity: any) => void;
   onReady?: () => void;
   onMouseCoords?: (coords: { lat: number; lng: number }) => void;
@@ -119,7 +125,7 @@ const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 const DOUBLE_RIGHT_MS = 500;
 const DOUBLE_RIGHT_SLOP_PX = 12;
 
-function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
+function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', referenceAtlasKind = 'all', onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -400,6 +406,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-green', isGhost ? phantomPurple : '#26A69A', 10);
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
+      registerEditorialMapSymbols(map);
+      map.addImage('territory-wave-red', territoryWave('#CB6E71'));
+      map.addImage('territory-wave-green', territoryWave('#63AA91'));
 
       const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
       // Clusters group only the *visual* symbol footprints. Public records
@@ -407,6 +416,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
         ...publicClusterOptions(s),
       }));
+      // Reference annotations stay separate from event and frontline sources.
+      map.addSource('reference-atlas-points', { type: 'geojson', data: EMPTY_FC,
+        attribution: '<a href="https://english.iswnews.com/" target="_blank" rel="noopener noreferrer">ISWN · reference annotations</a>',
+      });
+      map.addSource('reference-atlas-areas', { type: 'geojson', data: EMPTY_FC });
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
 
@@ -416,22 +430,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         const c = document.createElement('canvas');
         c.width = s; c.height = s;
         const ctx = c.getContext('2d')!;
-        ctx.fillStyle = color;
+        ctx.fillStyle = '#101B25';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
-        ctx.moveTo(s/2, 1);
-        ctx.lineTo(s - 1, s - 1);
-        ctx.lineTo(1, s - 1);
+        ctx.moveTo(s/2, 1); ctx.lineTo(s - 2, 6); ctx.lineTo(s - 3, 14);
+        ctx.lineTo(s/2, s - 1); ctx.lineTo(3, 14); ctx.lineTo(2, 6);
         ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 11px sans-serif';
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#E1E7E9';
+        ctx.font = 'bold 10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('!', s/2, s - 4);
+        ctx.fillText('!', s/2, s - 5);
         map.addImage(id, { width: s, height: s, data: new Uint8Array(ctx.getImageData(0, 0, s, s).data) });
       };
-      createWarningIcon('warn-icon', '#D32F2F');
-      createWarningIcon('warn-orange', '#E65100');
-      createWarningIcon('warn-yellow', '#F9A825');
+      createWarningIcon('warn-icon', '#C68F87');
+      createWarningIcon('warn-orange', '#C2AE88');
+      createWarningIcon('warn-yellow', '#A1B7BF');
 
       // Compact semantic badges for incidents and conflict reports.  The old
       // red dots were too small on satellite imagery and made unrelated event
@@ -440,7 +455,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const createMapBadge = (
         id: string,
         color: string,
-        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'unrest'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic',
+        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'unrest'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic'|'tank'|'radar'|'base',
       ) => {
         if (map.hasImage(id)) return;
         const size = 28;
@@ -480,6 +495,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         };
 
         switch (kind) {
+          case 'tank':
+            ctx.strokeRect(6,16,16,6); ctx.strokeRect(10,11,9,5); line(16,11,23,8);
+            line(8,19,20,19); dot(9,19,1); dot(19,19,1); break;
+          case 'radar':
+            line(11,21,17,21); line(c,21,c,15); line(8,8,18,18);
+            ctx.beginPath(); ctx.arc(14,11,7,.5,2.7); ctx.stroke();
+            ctx.beginPath(); ctx.arc(16,8,5,-1.3,.4); ctx.stroke(); break;
+          case 'base':
+            ctx.strokeRect(7,11,14,11); line(7,11,7,7); line(12,11,12,7); line(17,11,17,7); line(21,11,21,7);
+            ctx.strokeRect(12,17,4,5); break;
           case 'air':
             line(c,5,c,22); line(6,13,22,13); line(9,18,c,15); line(19,18,c,15); break;
           case 'heavy':
@@ -538,9 +563,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       };
 
       [
-        ['evt-air','#FF1744','air'], ['evt-heavy','#FF6D00','heavy'], ['evt-bomb','#FF3D3D','bomb'],
-        ['evt-clash','#F4511E','clash'], ['evt-mass','#C62828','mass'], ['evt-assault','#E53935','assault'],
-        ['evt-conflict','#FF5252','conflict'], ['evt-unrest','#FFB300','unrest'], ['evt-other','#9B978E','generic'],
+        ['evt-air','#B8A8A0','air'], ['evt-heavy','#BFAE91','heavy'], ['evt-bomb','#BE9792','bomb'],
+        ['evt-clash','#B3A697','clash'], ['evt-mass','#C68F87','mass'], ['evt-assault','#B8A49E','assault'],
+        ['evt-conflict','#BFA39C','conflict'], ['evt-unrest','#BCB49A','unrest'], ['evt-other','#A8B2B6','generic'],
         // Same silhouettes with neutral accents for machine-coded one-publisher reports.
         ['evt-air-prelim','#91AEBF','air'], ['evt-heavy-prelim','#91AEBF','heavy'],
         ['evt-bomb-prelim','#91AEBF','bomb'], ['evt-clash-prelim','#91AEBF','clash'],
@@ -550,9 +575,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         ['incident-eq','#FF7043','quake'], ['incident-fl','#42A5F5','flood'], ['incident-tc','#AB47BC','cyclone'],
         ['incident-vo','#EF5350','volcano'], ['incident-wf','#FF9800','wildfire'], ['incident-dr','#FDD835','drought'],
         ['incident-other','#D32F2F','generic'],
-        ['alert-air-defence','#42A5F5','shield'], ['alert-drone','#AB47BC','drone'], ['alert-missile','#FF7043','missile'],
-        ['alert-strike','#EF5350','strike'], ['alert-ground','#FFA726','ground'], ['alert-maritime','#26C6DA','maritime'],
-        ['alert-equipment','#FFCA28','equipment'], ['alert-other','#FF8A65','generic'],
+        ['alert-air-defence','#91ACBA','shield'], ['alert-drone','#A9A8BB','drone'], ['alert-missile','#BBA99B','missile'],
+        ['alert-strike','#BE9792','strike'], ['alert-ground','#BFAE91','ground'], ['alert-maritime','#91B4BA','maritime'],
+        ['alert-equipment','#BBB39B','equipment'], ['alert-other','#A8B2B6','generic'],
+        ['facility-airfield','#A6BCC6','air'], ['facility-port','#95B5BA','maritime'],
+        ['facility-base','#B6B9B5','base'], ['facility-tank','#B6B9B5','tank'],
+        ['facility-artillery','#B6B9B5','heavy'], ['facility-radar','#A5B8C6','radar'],
+        ['facility-missile','#B9AAA3','missile'],
       ].forEach(([id,color,kind]) => createMapBadge(id, color, kind as any));
 
 
@@ -571,14 +600,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
-        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.05,0.12], 'circle-blur': 0.8,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'conflict-event-halo', type: 'circle', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], paint: {
         'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,8, 45,11, 75,14, 100,18],
         'circle-color': ['match',['get','eventCategory'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
           'armed_clash','#F4511E', 'mass_violence','#C62828', 'assault','#E53935', '#FF5252'],
-        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.045,['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.04, 0.4,0.08, 1,0.16]],
+        'circle-opacity': 0,
         'circle-blur': 0.65,
       }});
       map.addLayer({ id: 'conflict-event-icons', type: 'symbol', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], layout: {
@@ -683,6 +712,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'line-dasharray':[3,2],
       }});
 
+
+      // Named historical areas use the owner's legend; no actor is inferred from colour.
+      map.addLayer({ id: 'reference-atlas-fill', type: 'fill', source: 'reference-atlas-areas', paint: {
+        'fill-color': ['match', ['get','affiliation'], 'houthi','#BB555F', 'government','#44987A', '#A6B8C8'],
+        'fill-opacity': ['match', ['get','affiliation'], 'houthi',.12, 'government',.12, .025],
+      }});
+      map.addLayer({ id: 'reference-atlas-wave', type: 'fill', source: 'reference-atlas-areas',
+        filter: ['in', ['get','affiliation'], ['literal',['houthi','government']]], paint: {
+          'fill-pattern': ['match', ['get','affiliation'], 'houthi','territory-wave-red', 'territory-wave-green'], 'fill-opacity': .7,
+      }});
+      map.addLayer({ id: 'reference-atlas-outline', type: 'line', source: 'reference-atlas-areas', paint: {
+        'line-color': ['match', ['get','affiliation'], 'houthi','#CD7A80', 'government','#79B99D', '#A6B8C8'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.65, 8, 1.15], 'line-opacity': 0.65,
+      }});
+      map.addLayer({ id: 'reference-atlas-dots', type: 'symbol', source: 'reference-atlas-points', filter: ['!', ['has', 'point_count']], layout: {
+        'icon-image': ['concat', 'facility-', ['get','symbol']],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 2, .7, 8, .95],
+        'icon-allow-overlap': false, 'icon-padding': 3,
+      }});
 
       // Day/Night
       map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': isGhost ? '#0D0030' : '#000022', 'fill-opacity': 0.22 }});
@@ -848,31 +896,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       /* ── GDELT 2.0 Events — coloured by CAMEO QuadClass so cooperation and
          conflict are separable at a glance, sized by article volume. ── */
       // Regional clusters stand for report counts, not confirmed strikes.
-      map.addLayer({ id:'gdelt-event-clusters',type:'circle',source:'gdelt-events',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],17,10,22,50,28],
-        'circle-color':'#AF7937','circle-opacity':0.87,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#F7D997',
-      }});
-      map.addLayer({ id:'gdelt-event-cluster-count',type:'symbol',source:'gdelt-events',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#211406','text-halo-width':1.2}});
-      map.addLayer({ id:'civil-unrest-clusters',type:'circle',source:'civil-unrest',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],16,10,21,50,27],
-        'circle-color':'#9D832C','circle-opacity':0.86,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#FFE08F',
-      }});
-      map.addLayer({ id:'civil-unrest-cluster-count',type:'symbol',source:'civil-unrest',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#211406','text-halo-width':1.2}});
+      map.addLayer(editorialClusterLayer('gdelt-event-clusters', 'gdelt-events'));
+      map.addLayer(editorialClusterLayer('civil-unrest-clusters', 'civil-unrest'));
       map.addLayer({ id: 'gdelt-event-halo', type: 'circle', source: 'gdelt-events', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['get','articles'], 1,8, 10,11, 50,15, 200,20],
         'circle-color': ['match',['get','event_category'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
           'armed_clash','#F4511E', 'mass_violence','#C62828', 'assault','#E53935',
           'material_conflict','#FF5252', '#9B978E'],
-        'circle-opacity': 0.10, 'circle-blur': 0.68,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'gdelt-event-icons', type: 'symbol', source: 'gdelt-events', filter:['!',['has','point_count']], layout: {
         'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],
@@ -1037,24 +1069,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       }, paint: { 'text-color': '#EC407A', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
 
       // News clusters count source reports, not independently verified incidents.
-      map.addLayer({ id:'app-news-clusters',type:'circle',source:'app-news',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],18,10,24,50,30],
-        'circle-color':'#238D89','circle-opacity':0.88,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#A7F6EF',
-      }});
-      map.addLayer({ id:'app-news-cluster-count',type:'symbol',source:'app-news',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#08292A','text-halo-width':1.2}});
+      map.addLayer(editorialClusterLayer('app-news-clusters', 'app-news'));
       // Only published M3TM.APP news with source-provided, generalized location.
       map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,16, 10,22],
-        'circle-color': '#5CD9CE', 'circle-opacity': 0.11, 'circle-blur': 1,
+        'circle-color': '#A5BEC5', 'circle-opacity': 0, 'circle-blur': 0,
       }});
-      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,7, 10,10],
-        'circle-color': '#5CD9CE', 'circle-opacity': 0.86,
-        'circle-stroke-width': 1.3, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.45,
+      map.addLayer({ id: 'app-news-dots', type: 'symbol', source: 'app-news', filter:['!',['has','point_count']], layout: {
+        'icon-image': 'editorial-report', 'icon-size': ['interpolate',['linear'],['zoom'], 1,.65, 5,.85, 10,1],
+        'icon-allow-overlap': false, 'icon-padding': 3,
       }});
       map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', filter:['!',['has','point_count']], minzoom: 4, layout: {
         'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
@@ -1069,7 +1092,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'air_defence','#42A5F5', 'drone','#AB47BC', 'missile','#FF7043',
           'strike','#EF5350', 'ground','#FFA726', 'maritime','#26C6DA',
           'equipment','#FFCA28', '#FF8A65'],
-        'circle-opacity': 0.13, 'circle-blur': 1,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'field-alert-icons', type: 'symbol', source: 'field-alerts', layout: {
         'icon-image': ['match',['get','category'],
@@ -1573,8 +1596,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
+    const CLICKABLE_LAYERS = new Set(['reference-atlas-dots','reference-atlas-clusters','reference-atlas-fill','reference-atlas-outline','conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
+      'gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -2045,6 +2068,38 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية ${htmlEsc(String(p.cell_degrees || 20))}° · نافذة زمنية ساعة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''} · لا أسماء/معرفات/مسارات فردية.</div>
       </div>`);
     });
+
+    map.on('click', 'reference-atlas-clusters', e => {
+      const feature = e.features?.[0];
+      const clusterId = Number(feature?.properties?.cluster_id);
+      if (!feature || !Number.isFinite(clusterId) || feature.geometry.type !== 'Point') return;
+      const source = map.getSource('reference-atlas-points') as maplibregl.GeoJSONSource | undefined;
+      const coordinates = feature.geometry.coordinates.slice(0, 2) as [number, number];
+      // Keep expansion on the world copy that was actually clicked.
+      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      void source?.getClusterExpansionZoom(clusterId).then(zoom => {
+        map.easeTo({ center: coordinates, zoom: Math.min(zoom, 10), duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400 });
+      }).catch(() => {});
+    });
+    const onReferenceAtlasClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature?.properties) return;
+      const p = feature.properties;
+      const side = p.affiliation === 'houthi' ? 'منطقة الحوثيين' : p.affiliation === 'government' ? 'منطقة الحكومة' : '';
+      const kinds: Record<string, string> = { tank: 'دبابة · تصنيف معلن', artillery: 'مدفعية · تصنيف معلن', radar: 'رادار · تصنيف معلن', missile: 'منشأة صواريخ', airfield: 'مطار / قاعدة جوية', port: 'ميناء / منشأة بحرية', base: 'منشأة عسكرية' };
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(`<div dir="rtl" style="padding:10px;color:#DEE7EB;background:#0C1922;font-size:12px;line-height:1.8;border-radius:12px;">
+        <strong>${htmlEsc(p.name || 'معلم')}</strong><div>${htmlEsc(side || kinds[p.symbol] || 'منطقة منشورة')}</div>
+        ${p.sourcePublishedAt ? `<time style="font-size:10px;opacity:.65">${htmlEsc(referenceAtlasDate(p.sourcePublishedAt))}</time>` : ''}
+      </div>`).addTo(map);
+    };
+    map.on('click', 'reference-atlas-dots', onReferenceAtlasClick);
+    map.on('click', 'reference-atlas-fill', onReferenceAtlasClick);
+
+    for (const layer of ['reference-atlas-dots', 'reference-atlas-clusters', 'reference-atlas-fill']) {
+      map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+    }
 
     const onFrontlineClick = (e: any) => {
       if (!e.features?.length) return;
@@ -3094,6 +3149,32 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   }, [mapReady, data.frontlines, (activeLayers as any).frontlines, setGeo]);
 
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const snapshot = data.reference_atlas as AtlasSnapshot | undefined;
+    const features = activeLayers.reference_atlas
+      ? referenceAtlasFeatures(snapshot, referenceAtlasLayerId, referenceAtlasKind).map(feature => ({
+          ...feature,
+          properties: { ...feature.properties, affiliation: publishedAreaAffiliation(feature.properties.name),
+            symbol: publishedEquipmentSymbol(feature.properties.name), atlasStatus: snapshot?.status, atlasFetchedAt: snapshot?.fetchedAt },
+        })) : [];
+    setGeo('reference-atlas-points', activeLayers.reference_atlas_points !== false ? features.filter(feature => feature.geometry.type === 'Point' && feature.properties.symbol) : []);
+    setGeo('reference-atlas-areas', features.filter(feature => feature.geometry.type !== 'Point'));
+  }, [mapReady, data.reference_atlas, activeLayers.reference_atlas, activeLayers.reference_atlas_points, referenceAtlasLayerId, referenceAtlasKind, setGeo]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !activeLayers.reference_atlas || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let phase = 0;
+    const timer = window.setInterval(() => {
+      if (document.hidden || !map.hasImage('territory-wave-red')) return;
+      phase += .13;
+      map.updateImage('territory-wave-red', territoryWave('#CB6E71', phase));
+      map.updateImage('territory-wave-green', territoryWave('#63AA91', phase));
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [mapReady, activeLayers.reference_atlas]);
+
   // The page's /api/conflicts loader is the single authority. Do not issue
   // a parallel fetch here or invent event markers during source outages.
 
@@ -3171,8 +3252,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Clearing the 3D layer is what actually turns satellites off.
     if (!anySat) { satRowsRef.current = []; satLayerRef.current?.setPoints([]); }
     setVis(['gdelt-incident-halo','gdelt-incident-icons'], activeLayers.global_incidents);
-    setVis(['gdelt-event-halo','gdelt-event-icons','gdelt-event-clusters','gdelt-event-cluster-count'], (activeLayers as any).gdelt_events);
-    setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters','civil-unrest-cluster-count'], (activeLayers as any).civil_unrest);
+    setVis(['gdelt-event-halo','gdelt-event-icons','gdelt-event-clusters'], (activeLayers as any).gdelt_events);
+    setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
 
@@ -3199,12 +3280,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
-    setVis(['app-news-glow','app-news-dots','app-news-label','app-news-clusters','app-news-cluster-count'], (activeLayers as any).app_news);
+    setVis(['app-news-glow','app-news-dots','app-news-label','app-news-clusters'], (activeLayers as any).app_news);
     setVis(['country-boundary-reference','country-boundary-contested'], (activeLayers as any).country_borders);
     setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-halo','conflict-event-icons','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
     setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);
+    setVis(['reference-atlas-fill','reference-atlas-wave','reference-atlas-outline'], activeLayers.reference_atlas);
+    setVis(['reference-atlas-clusters','reference-atlas-dots'], activeLayers.reference_atlas && activeLayers.reference_atlas_points !== false);
 
     setVis(['balloon-dots','balloon-label'], activeLayers.balloons);
     setVis(['rad-glow','rad-dots','rad-label'], activeLayers.radiation);

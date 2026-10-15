@@ -65,7 +65,7 @@ describe('versioned WORLD layer bookmarks', () => {
       cctv: false,
     };
     const params = serializeLayerState(selected, new URLSearchParams('surface=public&foo=bar'));
-    expect(params.get('layers_v')).toBe('4');
+    expect(params.get('layers_v')).toBe('5');
     expect(params.get('surface')).toBe('public');
     expect(params.get('foo')).toBe('bar');
     expect(restoreLayerState(defaults, params)).toEqual(selected);
@@ -73,5 +73,11 @@ describe('versioned WORLD layer bookmarks', () => {
 
   it('does not modify defaults when the URL has no layer preference', () => {
     expect(restoreLayerState(defaults, new URLSearchParams('surface=public'))).toBe(defaults);
+  });
+  it('introduces published areas into older views but preserves a new explicit off choice', () => {
+    const state = { ...defaults, reference_atlas: true };
+    expect(restoreLayerState(state, new URLSearchParams('layers_v=4&layers=flights')).reference_atlas).toBe(true);
+    const off = serializeLayerState({ ...state, reference_atlas: false }, new URLSearchParams());
+    expect(restoreLayerState(state, off).reference_atlas).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
 import AiOverview from './AiOverview';
+import PriorityNewsCards from './PriorityNewsCards';
 
 interface LiveAlertsProps {
   data: any;
@@ -98,8 +99,8 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
     });
   });
 
-  const filtered = filter === 'all' ? alerts.filter(a => a.type !== 'feed') :
-    filter === 'news' ? alerts.filter(a => a.type === 'news') :
+  const filtered = filter === 'all' ? alerts.filter(a => a.type === 'quake') :
+    filter === 'news' ? [] :
     filter === 'quakes' ? alerts.filter(a => a.type === 'quake') :
     alerts.filter(a => a.type === 'feed');
 
@@ -167,6 +168,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
               ))}
             </div>
 
+            {(filter === 'all' || filter === 'news') && <div className="min-h-0 overflow-y-auto"><PriorityNewsCards items={data.news} onLocate={onLocate} /></div>}
             {/* One-click AI overview of the current alert picture */}
             <div className={`flex-shrink-0 ${maximized ? 'px-6 pt-3' : 'px-3 pt-2'}`}>
               <AiOverview mode="alerts" payload={data} accent="#FF4081" />
@@ -237,7 +239,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
                 );
               })}
               </div>
-              {filtered.length === 0 && (
+              {filtered.length === 0 && filter !== 'all' && filter !== 'news' && (
                 <div className="text-center py-4 text-[11px] font-mono text-[var(--text-muted)]">
                   لا توجد تنبيهات ضمن هذا المرشح
                 </div>

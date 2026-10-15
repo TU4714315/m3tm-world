@@ -1,0 +1,31 @@
+name: Refresh published reference atlas
+
+on:
+  schedule:
+    # Lightweight checks discover recent major publisher reports. The server
+    # downloads the full map only every 12h or for an unseen qualifying report.
+    - cron: '3,18,33,48 * * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [major_published_event]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: published-reference-atlas
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check source cadence and refresh due snapshots
+        env:
+          REFERENCE_ATLAS_ORIGIN: ${{ vars.REFERENCE_ATLAS_ORIGIN || 'https://m3tm-world-recovery.onrender.com' }}
+        run: node tools/refresh-reference-atlas.mjs

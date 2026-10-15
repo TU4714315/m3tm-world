@@ -4,6 +4,7 @@
  * payload into a public map: the raw SDK, exact military tracks and internal
  * tools are not public-layer inputs.
  */
+import { publicReferenceAtlas } from './publicReferenceAtlas';
 type PublicRecord = Record<string, unknown>;
 const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 const vesselIsMilitary = (value: unknown): boolean => {
@@ -407,6 +408,7 @@ export function buildPublicLayerData(data: PublicRecord, embeddedLiveFeeds: unkn
     country_boundaries_meta: data.country_boundaries_meta || null,
     frontlines: data.frontlines || { type: 'FeatureCollection', features: [] },
     frontlines_meta: data.frontlines_meta || null,
+    reference_atlas: publicReferenceAtlas(data.reference_atlas),
     earthquakes: list(data.earthquakes),
     sdk_entities: [
       ...publicAirSdkEntities(data.commercial_flights, data.private_flights, data.private_jets),

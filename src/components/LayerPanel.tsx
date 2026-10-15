@@ -120,6 +120,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
       { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
+      { key: 'reference_atlas', label: 'مناطق ومعالم', description: 'مناطق النفوذ المنشورة والمعالم المصنفة', dataKey: 'reference_atlas.features.features' },
       { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
       { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'رموز مميزة حسب النوع: ضربة، مسيّرة، صاروخ، دفاع جوي، قتال بري، حدث بحري أو معدات؛ كلها كما يذكرها الناشر وبإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', description: 'رمز مختلف للزلزال والفيضان والإعصار والبركان والحريق والجفاف عند توفر نوع الحدث من المصدر', dataKey: 'gdelt' },

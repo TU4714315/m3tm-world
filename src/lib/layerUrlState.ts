@@ -1,5 +1,5 @@
 /** The URL format must evolve without making newly added public layers invisible in old bookmarks. */
-export const LAYER_URL_SCHEMA = '4';
+export const LAYER_URL_SCHEMA = '5';
 
 /** Defaults added in earlier schemas must only be migrated for bookmarks that
  * predate that schema. A v3 bookmark can contain an intentional off-choice for a
@@ -30,7 +30,8 @@ export function restoreLayerState<T extends Record<string, boolean>>(
     const migratedDefault =
       (schema < 3 && V3_DEFAULT_ON_LAYERS.has(key) && defaults[key])
       || (schema < 4 && V4_DEFAULT_ON_LAYERS.has(key) && defaults[key]);
-    (restored as Record<string, boolean>)[key] = active.has(key) || migratedDefault;
+    const newPublishedAreas = schema < 5 && key === 'reference_atlas' && defaults[key];
+    (restored as Record<string, boolean>)[key] = active.has(key) || migratedDefault || newPublishedAreas;
   }
   return restored;
 }
