@@ -2076,7 +2076,6 @@ export default function Dashboard() {
                 <button type="button" aria-label="إغلاق الطبقات" className="p-1 text-white/70"
                   onClick={() => setShowPublicEmbedLayers(false)}><X className="w-4 h-4" /></button>
               </div>
-              <p className="mb-2 text-[10px] text-white/50">إتاحة الطبقة لا تعني توفر بيانات مصدرها الآن؛ تظهر أعداد العناصر بعد وصول البيانات.</p>
               <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}

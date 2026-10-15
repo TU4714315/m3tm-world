@@ -204,7 +204,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-[11px] md:text-[12px] font-mono font-bold tracking-widest truncate text-white uppercase" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>{camera.name}</h3>
-                    <p className="text-[9px] md:text-[9px] font-mono text-[var(--gold-primary)] uppercase tracking-wider opacity-80">{camera.city}, {camera.country} • المصدر: {camera.source}</p>
+                    <p className="text-[9px] md:text-[9px] font-mono text-[var(--gold-primary)] uppercase tracking-wider opacity-80">{camera.city}, {camera.country}</p>
                   </div>
                 </div>
                 
@@ -266,8 +266,8 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
             ) : view === 'offline' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-30 backdrop-blur-sm p-4 text-center">
                 <CameraOff className="w-6 h-6 mb-3 opacity-50 text-[var(--text-muted)]" />
-                <p className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">{gone ? 'الكاميرا مسحوبة من المصدر' : 'الكاميرا غير متصلة'}</p>
-                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">{gone ? 'لم تعد منشورة عند المصدر' : 'المشغّل أوقف هذا البث'}</p>
+                <p className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">{gone ? 'الكاميرا غير متاحة' : 'الكاميرا غير متصلة'}</p>
+                <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 max-w-[80%] uppercase">{gone ? 'لم يعد البث متاحًا' : 'المشغّل أوقف هذا البث'}</p>
                 {/* No ACCESS TERMINAL button: the page it would open is either
                     showing the same 'offline' banner we just read, or a 404. */}
               </div>
@@ -283,7 +283,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   className="mt-4 px-4 py-2 rounded text-[10px] font-mono font-bold tracking-widest transition-all hover:bg-white/10"
                   style={{ border: '1px solid var(--border-primary)', color: 'var(--gold-primary)' }}
                 >
-                  فتح المصدر
+                  فتح البث
                 </a>
               </div>
             ) : error ? (
@@ -386,7 +386,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
                   <span className="text-[9px] text-[var(--text-muted)] font-mono tracking-widest">الحالة</span>
                   {/* Nothing is being received locally for an external feed — don't claim otherwise. */}
                   <span className={`text-[9px] font-mono tracking-widest ${externalOnly ? 'text-[var(--gold-primary)]' : 'text-[var(--alert-green)]'}`}>
-                    {view === 'offline' ? (gone ? 'محذوفة من المصدر' : 'متوقفة عند المصدر') : externalOnly ? 'مستضافة خارج المنصة' : error ? 'تعذّر التحميل' : loading ? 'جارٍ التحميل' : 'معروض'}
+                    {view === 'offline' ? (gone ? 'غير متاحة' : 'متوقفة') : externalOnly ? 'مستضافة خارج المنصة' : error ? 'تعذّر التحميل' : loading ? 'جارٍ التحميل' : 'معروض'}
                   </span>
                 </div>
               </div>

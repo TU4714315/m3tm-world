@@ -94,7 +94,7 @@ export default function MenaPulse({ data, news, publishedAt, onFocus }: {
         <div className="rounded-lg border border-white/10 bg-transparent p-2"><strong className="text-base text-white/90">{other.toLocaleString('ar-SA')}</strong><p className="text-[10px]">تقارير غير جوية</p></div>
       </div>
       <p className="mt-2 text-[10px] leading-5 text-slate-300">
-        {sourceAge !== null ? `آخر نشر مصدر معروف: قبل ${sourceAge.toLocaleString('ar-SA')} دقيقة.` : 'وقت نشر المصدر غير مؤكد.'}
+        {sourceAge !== null ? `آخر نشر للتقارير: قبل ${sourceAge.toLocaleString('ar-SA')} دقيقة.` : 'وقت النشر غير متاح.'}
         {' '}الأعداد تغطية صحفية مُرمّزة، لا حصيلة وقائع مؤكدة. ذكر الحوثيين لا يثبت المسؤولية.
         عُمان دولة مستقلة في العرض ولا تُصنّف تلقائيًا ضمن أي تحالف.
       </p>
@@ -102,7 +102,7 @@ export default function MenaPulse({ data, news, publishedAt, onFocus }: {
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
           <strong className="text-cyan-100">النزوح المدني — اليمن</strong>
           <a href="https://dtm.iom.int/yemen" target="_blank" rel="noopener noreferrer"
-             className="underline underline-offset-2 text-cyan-200 hover:text-cyan-100">المصدر الرسمي IOM DTM</a>
+             className="underline underline-offset-2 text-cyan-200 hover:text-cyan-100">تقارير النزوح</a>
         </div>
         <p className="text-[10px] leading-5 text-slate-300">بلاغات من الأخبار المنشورة خلال ٧ أيام، لا تعكس بالضرورة إجمالي النازحين أو المواقع الآنية لمخيماتهم.</p>
         {humanitarian.displacement.length ? (
@@ -112,7 +112,7 @@ export default function MenaPulse({ data, news, publishedAt, onFocus }: {
               <span className="block text-[10px] text-slate-400">{item.source} · {new Date(item.published).toLocaleDateString('ar-SA')} · بلاغ ناشر</span>
             </li>)}
           </ul>
-        ) : <p className="text-[10px] text-slate-400">لا توجد تقارير نزوح مطابقة في التغذية الحالية؛ راجع مصدر IOM المباشر.</p>}
+        ) : <p className="text-[10px] text-slate-400">لا توجد تقارير نزوح مطابقة في التغذية الحالية.</p>}
         <div className="rounded-lg border border-amber-300/20 bg-transparent px-2 py-1.5 text-[11px]">
           <strong className="text-amber-100">تغيّر السيطرة — أرشيف عام مؤخر</strong>
           <p className="mt-1 text-slate-300">{humanitarian.historicalControl.length.toLocaleString('ar-SA')} تقارير منشورة أقدم من ٧٢ ساعة تشير إلى تغيّر السيطرة. لا تنشئ المنصة منها خطوط تقدم أو مواقع قوات، ولا تعتبرها إثباتًا لتغيّر السيطرة.</p>

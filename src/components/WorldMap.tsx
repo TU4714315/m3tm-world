@@ -1589,7 +1589,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <div><span style="color:#5C5A54;">العمق</span><br/><span style="color:#E8E6E0;">${p.depth||'—'} كم</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}, ${coords[0].toFixed(3)}</span></div>
         </div>
-        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 ${p.source === 'NIGGG-BAS' ? 'NIGGG-BAS' : 'تفاصيل المصدر'}</a>
+        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 تفاصيل الحدث</a>
       </div>`);
     });
 
@@ -1757,7 +1757,6 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       const accent = EVENT_COLOR[String(p.event_category)] ?? '#9B978E';
       const src = urlSafe(p.url);
       const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
       const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
       <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
@@ -1774,12 +1773,11 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
-          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
           <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
           <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
           <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
-        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
       </div>`);
     })
@@ -1821,7 +1819,6 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       const accent = '#FFB300';
       const src = urlSafe(p.url);
       const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
       const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
       <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
@@ -1838,12 +1835,11 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
-          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
           <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
           <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
           <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
-        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
       </div>`);
     });
@@ -1876,7 +1872,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             <span style="opacity:0.6;">التاريخ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start || '').slice(0, 16).replace('T', ' '))}</span>
           </div>
           <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#6E7777;">
-            ${htmlEsc(source)} · بلاغ منشور لا يعني تحققًا مستقلاً من M3TM.WORLD ولا يثبت انقطاعًا شاملاً للشبكة.
+            بلاغ منشور لا يعني تحققًا مستقلاً من M3TM.WORLD ولا يثبت انقطاعًا شاملاً للشبكة.
           </div>
           ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
         </div>`);
@@ -1902,7 +1898,6 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <span style="opacity:0.6;">بدأ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start).slice(0, 16).replace('T', ' '))}</span>
           ${p.end ? `<span style="opacity:0.6;">انتهى</span><span style="color:#E8E6E0;">${htmlEsc(String(p.end).slice(0, 16).replace('T', ' '))}</span>` : ''}
         </div>
-        <div style="margin-top:8px;font-size:9px;color:#5C5A54;">${htmlEsc(source)}</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">تفاصيل الرصد</a>` : ''}
       </div>`);
     });
@@ -1929,7 +1924,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
           </div>
           <div style="margin-top:8px;font-size:9px;color:#6E7777;line-height:1.5;">
-            ${htmlEsc(source)} · الحصة من بنية C2 المرصودة في العينة العامة. البلد يصف موقع البنية المرصودة ولا يمثل إسنادًا لهوية أو بلد المهاجم.
+            الحصة من بنية C2 المرصودة في العينة العامة. البلد يصف موقع البنية المرصودة ولا يمثل إسنادًا لهوية أو بلد المهاجم.
           </div>
         </div>`);
         return;
@@ -1947,7 +1942,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;line-height:1.5;">
-          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر · ${htmlEsc(source)}
+          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر
         </div>
       </div>`);
     });
@@ -1990,20 +1985,16 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       const coords = (e.features[0].geometry as any).coordinates;
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
       const isEvent = p.kind === 'event';
-      const sourceLine = isEvent
-        ? `${htmlEsc(p.sourceLabel || p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
-        : 'منطقة سياقية';
       const strength = Math.max(0, Math.min(100, Number(p.reportingStrength) || 0));
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
         ${isEvent && p.reportedActors ? `<div style="font-size:10px;color:#D5DCE0;margin-bottom:7px;">جهات وردت في ترميز الخبر (دون إثبات المسؤولية): ${htmlEsc(p.reportedActors)}</div>` : ''}
         ${!isEvent && Number(p.acledPublishedUpdates10d)>0
-            ? `<div style="font-size:10px;color:#B8CFE0;margin-bottom:7px;">ACLED: ${htmlEsc(String(p.acledPublishedUpdates10d))} سجلًا منشورًا أو مُحدّثًا في آخر ١٠ أيام (وقائع آخر ٣٥ يومًا)، منها ${htmlEsc(String(p.acledReports7d||0))} وقائع في آخر ٧ أيام. مؤشرات إقليمية مجمّعة · acleddata.com</div>`
+            ? `<div style="font-size:10px;color:#B8CFE0;margin-bottom:7px;">${htmlEsc(String(p.acledPublishedUpdates10d))} سجلًا منشورًا أو مُحدّثًا في آخر ١٠ أيام (وقائع آخر ٣٥ يومًا)، منها ${htmlEsc(String(p.acledReports7d||0))} وقائع في آخر ٧ أيام. مؤشرات إقليمية مجمّعة</div>`
             : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
           <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
-          <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
           ${isEvent ? `<div><span style="color:#5C5A54;">قوة التغطية</span><br/><span style="color:#E8E6E0;">${strength}/100</span></div>` : ''}
           ${isEvent && p.ageHours !== null && p.ageHours !== undefined ? `<div><span style="color:#5C5A54;">عمر البلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageHours))} ساعة</span></div>` : ''}
           ${isEvent && (p.ageHours === null || p.ageHours === undefined) && p.ageDays !== null && p.ageDays !== undefined ? `<div><span style="color:#5C5A54;">عمر الحدث</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageDays))} يوم · دقة زمنية ${htmlEsc(String(p.timePrecision || '—'))}</span></div>` : ''}
@@ -2108,8 +2099,6 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid rgba(255,209,102,.28);">
         <div style="color:#FFD166;font-size:12px;font-weight:700;margin-bottom:6px;">خط/منطقة جبهة منشورة</div>
         <div style="font-size:10px;color:#E8E6E0;line-height:1.5;">هندسة سياقية من لقطة منشورة للعامة، وليست موضعًا تكتيكيًا لحظيًا.</div>
-        <div style="font-size:9px;color:#A8AAA5;margin-top:7px;">المصدر: ${htmlEsc(p.source || 'DeepStateMap.Live')}</div>
-        ${p.source_label ? `<div style="font-size:8px;color:#7E817C;margin-top:3px;">وصف المصدر: ${htmlEsc(p.source_label)}</div>` : ''}
       </div>`);
     };
     map.on('click', 'frontlines-fill', onFrontlineClick);
@@ -2117,23 +2106,13 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
 
 
     // ── M3TM.WORLD SDK link click ──
-    const SDK_SOURCE_URLS: Record<string, string> = {
-      'AIS Maritime': 'https://www.marinetraffic.com',
-      'AIS Stream': 'https://aisstream.io',
-      'AIS → Lattice': 'https://aisstream.io',
-      'ADS-B / OpenSky': 'https://opensky-network.org',
-      'ADS-B → Lattice': 'https://opensky-network.org',
-      'Naval Public Data': 'https://www.odni.gov',
-    };
     ['sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
       map.on('click', layer, e => {
         if (!e.features?.length) return;
         const p = e.features[0].properties as any;
         const coords = e.lngLat;
-        const srcUrl = p.url || SDK_SOURCE_URLS[p.source] || 'https://m3tm.world';
         const domainLabel = p.domain === 'SEA' ? '⚓ مسار بحري' : p.domain === 'AIR' ? '✈ ممر جوي' : '🛡 بيانات عامة';
         const domainColor = p.domain === 'SEA' ? '#4FC3F7' : p.domain === 'AIR' ? '#B3E5FC' : '#81D4FA';
-        const linkStyle = 'text-decoration:none;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.05em;';
         popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid ${domainColor}40;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
             <div style="width:8px;height:8px;border-radius:50%;background:${domainColor};box-shadow:0 0 8px ${domainColor};"></div>
@@ -2143,9 +2122,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             <div><span style="color:#5C5A54;">من</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.fromName || 'نقطة البداية')}</span></div>
             <div><span style="color:#5C5A54;">إلى</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.toName || 'الوجهة')}</span></div>
             <div><span style="color:#5C5A54;">المجال</span><br/><span style="color:${domainColor};">${p.domain === 'SEA' ? 'بحري' : p.domain === 'AIR' ? 'جوي' : 'عام'}</span></div>
-            <div><span style="color:#5C5A54;">المصدر</span><br/><a href="${urlSafe(srcUrl)}" target="_blank" style="color:${domainColor};text-decoration:underline;cursor:pointer;">${htmlEsc(p.source === 'Naval Public Data' ? 'مصدر بحري' : (p.source || 'M3TM.WORLD'))}</a></div>
           </div>
-          <a href="${urlSafe(srcUrl)}" target="_blank" style="${linkStyle}color:${domainColor};border:1px solid ${domainColor}40;background:${domainColor}18;display:inline-block;margin-top:4px;">فتح المصدر ↗</a>
         </div>`);
       });
     });
@@ -2174,7 +2151,6 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           <span style="font-size:7px;color:#5C5A54;letter-spacing:0.15em;">الشدة ${p.severity || '?'}/10</span>
           <div style="flex:1;height:3px;border-radius:2px;background:linear-gradient(90deg, ${sevColor}, ${sevColor}00);opacity:0.5;"></div>
         </div>
-        <div style="margin-top:8px;font-size:7px;color:#5C5A54;text-align:center;letter-spacing:0.1em;">المصدر: ABUSE.CH FEODO TRACKER</div>
       </div>`);
     });
 

@@ -55,7 +55,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'بيانات M3TM.WORLD العامة',
     icon: Network,
     layers: [
-      { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'كابلات ثابتة؛ السفن حسب توفر AIS' },
+      { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'الكابلات والملاحة البحرية' },
       { key: 'sdk_naval', label: 'رصد الأحداث', dataKey: 'gdelt', description: 'أحداث عامة محددة الموقع' },
     ],
   },
@@ -66,7 +66,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'sdk_air', label: 'الطيران المدني الإضافي', dataKey: 'commercial_flights', description: 'مشاهدات طيران مدنية دورية؛ يفعّل العرض الجوي فقط' },
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
-      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع؛ عدم الظهور لا يعني عدم وجود طائرة، ولا تُستنتج مواقع غير مرصودة' },
+      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مواقع طائرات منفردة' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
     ],
@@ -77,7 +77,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Ship,
     layers: [
       { key: 'maritime', label: 'الملاحة البحرية العامة', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
-      { key: 'naval_activity', label: 'نشاط بحري عسكري عام', dataKey: 'naval_activity', description: 'تجميع إقليمي من AIS عام عند توفره؛ لا أسماء سفن أو MMSI أو سرعة/اتجاه أو مسارات دقيقة' },
+      { key: 'naval_activity', label: 'نشاط بحري عسكري عام', dataKey: 'naval_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مسارات سفن منفردة' },
     ],
   },
   {
@@ -86,9 +86,9 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Satellite,
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
-      { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'تجميع إقليمي واسع من TLE عامة؛ لا أسماء ولا NORAD IDs ولا مسارات فردية دقيقة' },
-      { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
+      { key: 'sat_comms', label: 'أقمار الاتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مسارات أقمار منفردة' },
+      { key: 'sat_navigation', label: 'أقمار الملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
     ],
@@ -119,16 +119,16 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'country_borders', label: 'الحدود الجغرافية المرجعية', dataKey: 'country_boundaries.features', description: 'Natural Earth 1:110m: خطوط عامة ثابتة، وخطوط متنازع عليها متقطعة؛ ليست مرجعًا سياديًا أو حدود نزاع لحظية' },
-      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
-      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
+      { key: 'country_borders', label: 'الحدود الجغرافية المرجعية', dataKey: 'country_boundaries.features', description: 'حدود عامة؛ المتنازع عليها متقطعة' },
+      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق النزاع والأحداث المنشورة', dataKey: 'conflict_zones,conflict_live_events' },
+      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'كثافة التقارير الحديثة', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
       { key: 'reference_atlas', label: 'مناطق ومعالم', description: 'مناطق النفوذ المنشورة والمعالم المصنفة', dataKey: 'reference_atlas.features.features' },
-      { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
+      { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'روابط بين الأحداث؛ ليست مسارات حركة فعلية', dataKey: 'reported_routes' },
       { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'رموز مميزة حسب النوع: ضربة، مسيّرة، صاروخ، دفاع جوي، قتال بري، حدث بحري أو معدات؛ كلها كما يذكرها الناشر وبإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', description: 'رمز مختلف للزلزال والفيضان والإعصار والبركان والحريق والجفاف عند توفر نوع الحدث من المصدر', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO مع رموز مستقلة للأسلحة الجوية والثقيلة والتفجيرات والاشتباكات والاعتداءات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
-      { key: 'civil_unrest', label: 'احتجاجات واضطرابات مُبلّغ عنها', description: 'أحداث CAMEO 14 المنشورة والمحددة الموقع؛ لا تُعامل الاحتجاجات تلقائيًا كعنف', dataKey: 'civil_unrest' },
+      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'أحداث مصنفة ومواقع إقليمية عامة', dataKey: 'gdelt_events' },
+      { key: 'civil_unrest', label: 'احتجاجات واضطرابات مُبلّغ عنها', description: 'احتجاجات واضطرابات منشورة', dataKey: 'civil_unrest' },
     ],
   },
   {
@@ -137,7 +137,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Network,
     layers: [
       { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'رصد بنية التهديدات الشبكية', description: 'مشاهدات عامة مُجمعة على مستوى البلد من Feodo/Cloudflare، دون مسارات هجوم أو IP فردي', dataKey: 'cf_attack_origins' },
+      { key: 'cyber_attacks', label: 'رصد بنية التهديدات الشبكية', description: 'مؤشرات تهديد مجمّعة؛ لا تحدد هوية المهاجم', dataKey: 'cf_attack_origins' },
     ],
   },
   {
@@ -145,8 +145,8 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'Cloudflare Radar عند تهيئته؛ وإلا أحداث سيبرانية منشورة من GDELT CAMEO 176. لا يُفترض أن كل بلاغ يمثل انقطاعًا شاملاً.', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'Cloudflare Layer 3 عند تهيئته؛ وإلا تجميع بلدي لبنية C2 المرصودة من abuse.ch/Feodo. البلد هو موقع البنية المرصودة وليس إسنادًا لهوية المهاجم.', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
+      { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'اضطرابات شبكة منشورة؛ لا تثبت انقطاعًا شاملاً', dataKey: 'cf_outages', requires: 'cloudflare' },
+      { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'بنية تهديد مرصودة؛ لا تحدد هوية المهاجم', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
@@ -157,7 +157,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
       { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
       { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
-      { key: 'terrain_etopo_2022', label: 'NOAA ETOPO 2022 · تضاريس وأعماق', description: 'تظليل ملون من بيانات NOAA الأحدث للعرض العالمي؛ لا يغيّر ارتفاعات الخريطة ثلاثية الأبعاد ولا يصلح للملاحة', dataKey: '' },
+      { key: 'terrain_etopo_2022', label: 'تضاريس وأعماق', description: 'تظليل التضاريس والأعماق؛ غير مخصص للملاحة', dataKey: '' },
     ],
   },
 ];
@@ -255,9 +255,6 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
       {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
-      <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
-      <p className="mt-1 text-white/35">المصدر الحالي: AWS Mapzen / Tilezen Terrarium، وليس DEM حديثًا تلقائي التحديث.</p>
-      <a className="mt-1 inline-block underline underline-offset-2 text-[var(--gold-primary)]" href="/terrain-sources" target="_blank" rel="noopener noreferrer">اعتمادات المصادر والبدائل الأحدث</a>
     </div>
   ) : null;
 
@@ -320,7 +317,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
           </label>
           <input id="world-layer-search" type="search" value={mobileSearch}
             onChange={event => setMobileSearch(event.target.value)}
-            placeholder="ابحث عن طبقة أو مصدر..."
+            placeholder="ابحث عن طبقة..."
             className="mb-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-xs text-white outline-none placeholder:text-white/45 focus:border-cyan-300/60"
           />
           <div role="group" aria-label="تصفية مجموعات الطبقات"
