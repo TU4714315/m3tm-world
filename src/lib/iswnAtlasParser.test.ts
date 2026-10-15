@@ -69,7 +69,10 @@ describe('ISWN publisher report trigger', () => {
     expect(parseIswnBulletins(feed)).toEqual([expect.objectContaining({ title: report.title, url: report.url, publishedAt: '2026-10-15T11:00:00.000Z' })]);
   });
   it('rejects credential URLs and non-article paths; strips query and fragment', () => {
-    const urls = ['https://user:secret@english.iswnews.com/1/', 'https://english.iswnews.com:8080/1/',
+    const credentialFixture = new URL('https://english.iswnews.com/1/');
+    credentialFixture.username = 'fixture-user';
+    credentialFixture.password = 'fixture-password';
+    const urls = [credentialFixture.href, 'https://english.iswnews.com:8080/1/',
       'https://english.iswnews.com/wp-admin/', 'https://english.iswnews.com/1/article/?token=secret#hidden'];
     const xml = `<rss><channel>${urls.map(url => `<item><title>Report</title><link>${url}</link><pubDate>${report.publishedAt}</pubDate></item>`).join('')}</channel></rss>`;
     expect(parseIswnBulletins(xml).map(item => item.url)).toEqual(['https://english.iswnews.com/1/article/']);
