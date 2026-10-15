@@ -2,6 +2,16 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — Saudi public fallback and release evidence (2026-10-15 UTC)
+
+**DONE:** Continued merged WORLD #129/#130 and APP #410/#412 from clean main `3269189`. Civilian density now excludes Saudi source coordinates before binning: a Saudi border observation previously moved to an unmasked cell center. Durable cache namespace advances to v2 to avoid reusing old mixed cells. Flight totals/fallback counters and satellite public category/object/cell counters now match the returned masked lists. Health reports `RENDER_GIT_COMMIT` on Render, retaining Vercel fallback. All historical dirty checkouts remain untouched.
+
+**VERIFY:** Local 910 tests PASS / 18 skipped, TypeScript PASS, Next production build PASS. New regressions cover mixed Saudi/Yemen border cells, Saudi-only empty fallback, satellite response counts, masked flight counts, and lightweight host deployment identity. Focused lint PASS after removing the aggregate helper's old `any` types; legacy flight/satellite route-wide lint is not claimed. Live public snapshot at 2026-10-15T06:03Z: APP 160 news items, zero Saudi geotag violations, 25 Saudi articles retained, 15 Yemen articles with published geotags; WORLD news 96 rows and internal-query GDELT 578 rows with zero Saudi rows. `/world/` loads and visibly paints the WORLD iframe.
+
+**BLOCKERS:** New patch is not yet deployed. Existing Render health returns `deployment.sha=null`; no exact deployed commit claimed. Live flight summary timed out at 40 seconds. APP feed remains fresh but degraded (43/102 sources succeeded, target 45). Subscriber-only Saudi indicators are not implemented: APP must enforce a specific authorized entitlement server-side; login or iframe query parameters are insufficient. Vercel's old PR #129 status reports account deployment blocked; no account/billing changes made.
+
+**NEXT:** Review this branch and required CI; verify actual Render deployed SHA after an authorized release. Keep provider reachability, Arabic translation SLA, and subscriber authorization as distinct follow-up work; do not lower health thresholds or expose private indicators to make a check pass.
+
 ## CHECKPOINT — CCTV delayed cache recovery (2026-10-13)
 **TASK:** Render logged a West Asia CCTV 12-second region timeout followed by a successfully completed OpenCCTV catalogue fetch about ten seconds later. The timed-out request placed the region in a 300-second cooldown that hid the newly cached cameras from subsequent requests.
 **DONE (PR #121, pending merge):** Clear the regional cooldown as soon as a late provider result returns non-empty data already retained by `sourceCache`. Keep the cooldown when a late result is empty, including the concurrent-request case where another request has not reached its own timeout yet. Added tests for both late success and overlapping late empty results. Scope is `src/app/api/cctv/route.ts` and its route tests; no map, camera-stream, or Shodan changes.

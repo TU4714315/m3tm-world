@@ -303,7 +303,7 @@ export async function GET(request: Request) {
     platform: 'M3TM.WORLD',
     version: '0.1.0',
     deployment: {
-      sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+      sha: process.env.RENDER_GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || null,
       environment: process.env.VERCEL_ENV || process.env.NODE_ENV || null,
     },
     uptime: process.uptime ? Math.round(process.uptime()) : 0,

@@ -349,15 +349,16 @@ export async function GET() {
       ? 'no-store, max-age=0'
       : 'public, s-maxage=120, stale-while-revalidate=300';
 
-    // Count by category
+    const visible = maskSaudiPublicIndicators({ satellites: publicSatellites, military_satellite_activity: militaryProjection.activity });
+
+    // Counts describe the same public objects as the returned lists.
     const categoryCounts: Record<string, number> = {};
-    for (const s of publicSatellites) {
+    for (const s of visible.satellites) {
       categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
     }
 
     const timestamp = new Date().toISOString();
 
-    const visible = maskSaudiPublicIndicators({ satellites: publicSatellites, military_satellite_activity: militaryProjection.activity });
     return NextResponse.json({
       satellites: visible.satellites,
       total: visible.satellites.length,
@@ -369,9 +370,9 @@ export async function GET() {
         status: publicSatellites.length || militaryProjection.summary.catalog_objects ? 'active' : 'empty',
         provider: source,
         raw_tle_count: allSats.length,
-        public_individual_objects: publicSatellites.length,
+        public_individual_objects: visible.satellites.length,
         military_catalog_objects: militaryProjection.summary.catalog_objects,
-        military_public_cells: militaryProjection.activity.length,
+        military_public_cells: visible.military_satellite_activity.length,
         timestamp,
       },
       source,

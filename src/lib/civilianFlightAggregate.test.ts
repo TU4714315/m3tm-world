@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { inSaudiPublicBoundary } from './publicCountryVisibility';
 import {
   boundCivilianFlightAggregate,
   buildCivilianFlightAggregate,
@@ -12,10 +13,10 @@ describe('public civilian flight degraded aggregate', () => {
   it('bins civilian observations into coarse 2-degree cells without identifiers', () => {
     const cells = buildCivilianFlightAggregate({
       commercial: [
-        { lat: 24.1, lng: 46.2, callsign: 'SECRET-A', icao24: 'abc123' },
-        { lat: 24.7, lng: 46.8, callsign: 'SECRET-B', icao24: 'def456' },
+        { lat: 15.1, lng: 44.2, callsign: 'SECRET-A', icao24: 'abc123' },
+        { lat: 15.7, lng: 44.8, callsign: 'SECRET-B', icao24: 'def456' },
       ],
-      private: [{ lat: 25.1, lng: 47.1, registration: 'PRIVATE' }],
+      private: [{ lat: 15.3, lng: 45.1, registration: 'PRIVATE' }],
       jets: [{ lat: 40.7, lng: -74.0, callsign: 'JET-1' }],
     }, now);
 
@@ -28,9 +29,32 @@ describe('public civilian flight degraded aggregate', () => {
     expect(cells.every(cell => cell.cell_degrees === 2 && cell.precision === 'coarse-2deg')).toBe(true);
   });
 
+  it('excludes Saudi border observations before a shared Yemen cell is aggregated', () => {
+    const saudi = { lat: 17.3, lng: 45.8 };
+    const yemen = { lat: 17.0, lng: 45.5 };
+    expect(inSaudiPublicBoundary(saudi.lat, saudi.lng)).toBe(true);
+    expect(inSaudiPublicBoundary(yemen.lat, yemen.lng)).toBe(false);
+    const cells = buildCivilianFlightAggregate({
+      commercial: [yemen], private: [saudi], jets: [saudi],
+    }, now);
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toMatchObject({ lat: 17, lng: 45, total: 1, commercial: 1, private: 0, jets: 0 });
+  });
+
+  it('does not create fallback cells or map markers from Saudi-only observations', () => {
+    const cells = buildCivilianFlightAggregate({
+      commercial: [{ lat: 24.7136, lng: 46.6753 }],
+      private: [{ lat: 17.3, lng: 45.8 }], jets: [],
+    }, now);
+    expect(cells).toEqual([]);
+    const stale = staleCivilianFlightAggregate({ cells, observed_at: new Date(now).toISOString() }, now + 60_000);
+    expect(stale).toEqual([]);
+    expect(civilianFlightMapFeatures(stale)).toEqual([]);
+  });
+
   it('ages a durable last-good snapshot instead of pretending it is live', () => {
     const live = buildCivilianFlightAggregate({
-      commercial: [{ lat: 24.1, lng: 46.2 }],
+      commercial: [{ lat: 15.1, lng: 44.2 }],
       private: [],
       jets: [],
     }, now - 10 * 60_000);
@@ -85,9 +109,9 @@ describe('public civilian flight degraded aggregate', () => {
 
   it('projects only the civilian categories the user actually enabled', () => {
     const cell = buildCivilianFlightAggregate({
-      commercial: Array.from({length:4},()=>({lat:24.1,lng:46.2})),
-      private: [{lat:24.1,lng:46.2}],
-      jets: [{lat:24.1,lng:46.2}],
+      commercial: Array.from({length:4},()=>({lat:15.1,lng:44.2})),
+      private: [{lat:15.1,lng:44.2}],
+      jets: [{lat:15.1,lng:44.2}],
     }, now)[0];
     const privateOnly = civilianFlightMapFeatures([cell], { commercial:false, private:true, jets:false });
     expect(privateOnly[0].properties).toMatchObject({ total:1, commercial:0, private:1, jets:0 });

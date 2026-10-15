@@ -235,7 +235,7 @@ const PUBLIC_MILITARY_MIN_GROUP = 2;
 const PUBLIC_MILITARY_TIME_BUCKET_MS = 30 * 60 * 1000;
 const PUBLIC_MILITARY_CACHE_KEY = 'm3tm:public:military-activity:v2';
 const PUBLIC_MILITARY_CACHE_TTL_SECONDS = 60 * 60;
-const PUBLIC_CIVILIAN_CACHE_KEY = 'm3tm:public:civilian-flight-aggregate:v1';
+const PUBLIC_CIVILIAN_CACHE_KEY = 'm3tm:public:civilian-flight-aggregate:v2';
 const PUBLIC_CIVILIAN_CACHE_TTL_SECONDS = 45 * 60;
 
 interface PublicMilitaryActivityCell {

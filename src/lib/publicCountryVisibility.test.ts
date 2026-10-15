@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { inSaudiPublicBoundary, isSaudiPublicIndicator, maskSaudiPublicIndicators, maskSaudiPublicNewsLocation } from './publicCountryVisibility';
 
 describe('Saudi-only public observation visibility', () => {
+  it('publishes flight counts from the visible lists, including stale fallback cells', () => {
+    const source = {
+      commercial_flights: [{ lat: 24.7, lng: 46.7 }, { lat: 15.4, lng: 44.2 }],
+      private_flights: [], private_jets: [], total: 5,
+      civilian_flight_activity: [{ lat: 25, lng: 47 }, { lat: 15, lng: 45 }],
+      civilian_flight_activity_meta: { public_total: 2, fallback_cells: 2, fallback_active: true },
+      flight_source_status: { public_total: 2, status: 'degraded' },
+    };
+    const visible = maskSaudiPublicIndicators(source);
+    expect(visible.commercial_flights).toHaveLength(1);
+    expect(visible.total).toBe(1);
+    expect(visible.civilian_flight_activity_meta).toEqual({ public_total: 1, fallback_cells: 1, fallback_active: true });
+    expect(visible.flight_source_status).toEqual({ public_total: 1, status: 'degraded', civilian_fallback_cells: 1, military_public_cells: 0 });
+    expect(source.total).toBe(5);
+    expect(source.civilian_flight_activity_meta.public_total).toBe(2);
+  });
   it('retains cited public headlines but strips Saudi API coordinates', () => {
     const saudi = { title: 'خبر منشور', link: 'https://example.org', coords: [24.7136, 46.6753], coords_default: false, location_basis: 'published-feed-coordinate' };
     const yemen = { title: 'خبر اليمن', coords: [15.3694, 44.191], coords_default: false, location_basis: 'published-feed-coordinate' };

@@ -1,3 +1,5 @@
+import { inSaudiPublicBoundary } from './publicCountryVisibility';
+
 export const PUBLIC_CIVILIAN_CELL_DEG = 2;
 export const PUBLIC_CIVILIAN_MIN_CACHE_TOTAL = 100;
 export const PUBLIC_CIVILIAN_MAX_CELLS = 600;
@@ -80,18 +82,20 @@ export function boundCivilianFlightAggregate(
   return selected;
 }
 
-export function buildCivilianFlightAggregate(
-  groups: Record<CivilianFlightGroup, any[]>,
+export function buildCivilianFlightAggregate<T extends { lat?: unknown; lng?: unknown }>(
+  groups: Record<CivilianFlightGroup, T[]>,
   observedAtMs = Date.now(),
 ): PublicCivilianFlightCell[] {
   const buckets = new Map<string, {
     lat: number; lng: number; total: number; commercial: number; private: number; jets: number;
   }>();
-  for (const [group, flights] of Object.entries(groups) as Array<[CivilianFlightGroup, any[]]>) {
+  for (const [group, flights] of Object.entries(groups) as Array<[CivilianFlightGroup, T[]]>) {
     for (const flight of flights || []) {
       const lat = Number(flight?.lat);
       const lng = Number(flight?.lng);
-      if (!validCoordinate(lat, lng)) continue;
+      // Filter the observation before binning: a border cell's center can lie
+      // outside Saudi Arabia even when its underlying observation is inside.
+      if (!validCoordinate(lat, lng) || inSaudiPublicBoundary(lat, lng)) continue;
       const latIndex = Math.floor((lat + 90) / PUBLIC_CIVILIAN_CELL_DEG);
       const lngIndex = Math.floor((lng + 180) / PUBLIC_CIVILIAN_CELL_DEG);
       const centerLat = Math.max(-89, Math.min(89, -90 + latIndex * PUBLIC_CIVILIAN_CELL_DEG + PUBLIC_CIVILIAN_CELL_DEG / 2));

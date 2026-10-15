@@ -150,6 +150,19 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
     }
   }
   const rows = result.liveEvents;
+  if (Array.isArray(result.commercial_flights) && Array.isArray(result.private_flights) && Array.isArray(result.private_jets)) {
+    const publicTotal = result.commercial_flights.length + result.private_flights.length + result.private_jets.length;
+    if (typeof result.total === 'number') result.total = publicTotal;
+    const civilianMeta = record(result.civilian_flight_activity_meta);
+    if (civilianMeta) {
+      result.civilian_flight_activity_meta = { ...civilianMeta, public_total: publicTotal,
+        fallback_cells: Array.isArray(result.civilian_flight_activity) ? result.civilian_flight_activity.length : 0 };
+    }
+    const flightStatus = record(result.flight_source_status);
+    if (flightStatus) result.flight_source_status = { ...flightStatus, public_total: publicTotal,
+      civilian_fallback_cells: Array.isArray(result.civilian_flight_activity) ? result.civilian_flight_activity.length : 0,
+      military_public_cells: Array.isArray(result.military_activity) ? result.military_activity.length : 0 };
+  }
   if (Array.isArray(rows) && 'categoryCounts' in result) {
     const categories: Record<string, number> = {};
     for (const row of rows) {
