@@ -21,7 +21,10 @@ describe('bounded public rain index', () => {
     expect(request).toHaveBeenCalledWith('https://api.rainviewer.com/public/weather-maps.json', expect.objectContaining({ redirect: 'error', cache: 'no-store', signal: expect.any(AbortSignal) }));
   });
   it('rejects lookalike, credential-bearing and path-bearing tile hosts', async () => {
-    for (const host of ['https://tilecache.rainviewer.com.attacker.net', 'https://example.net', 'https://user:pass@tilecache.rainviewer.com', 'https://tilecache.rainviewer.com/override']) {
+    const withCredentials = new URL('https://tilecache.rainviewer.com');
+    withCredentials.username = 'test-user';
+    withCredentials.password = 'test-only';
+    for (const host of ['https://tilecache.rainviewer.com.attacker.net', 'https://example.net', withCredentials.href, 'https://tilecache.rainviewer.com/override']) {
       vi.resetModules();
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(index(host)))));
       const { GET } = await import('./route');

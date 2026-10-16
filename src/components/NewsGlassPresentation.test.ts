@@ -61,7 +61,7 @@ describe('shared glass news presentation', () => {
     expect(html).not.toContain('<b>');
   });
   it('renders unsafe publisher URLs as text without an external link', () => {
-    for (const link of ['javascript:alert(1)', 'https://user:secret@news.org/story', 'http://127.0.0.1/story']) {
+    for (const link of ['javascript:alert(1)', 'https://user:test-only@example.org/story', 'http://127.0.0.1/story']) {
       const card = cards([story({ link })]);
       const bar = ticker([story({ link })]);
       expect(card).not.toContain('<a ');
