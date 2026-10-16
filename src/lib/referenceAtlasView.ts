@@ -1,6 +1,6 @@
 import type { AtlasSnapshot } from './iswnAtlas';
 
-export type ReferenceAtlasKind = 'all' | 'reference_point' | 'reference_area';
+export type ReferenceAtlasKind = 'all' | 'reference_point' | 'reference_area' | 'reference_line';
 
 export function referenceAtlasStateLabel(snapshot: Pick<AtlasSnapshot, 'status'> | null | undefined, fetchFailed = false): string {
   if (fetchFailed) return 'تعذر الفحص · لقطة محفوظة إن توفرت';

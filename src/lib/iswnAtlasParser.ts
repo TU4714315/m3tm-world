@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { inSaudiPublicBoundary } from './publicCountryVisibility';
+import { geometryIntersectsSaudi } from './publicGeometryBoundary';
 import { ISWN_MAP_URL, type AtlasBulletin, type AtlasCollection, type AtlasGeometry, type AtlasPosition } from './iswnAtlas';
 
 export const MAX_KML_BYTES = 6 * 1024 * 1024;
@@ -84,8 +85,16 @@ export function parseIswnKml(xml: string): AtlasCollection {
       const holes = list(p.innerBoundaryIs).map(ring);
       if (outer && holes.every(hole => hole !== null)) result.push({ type: 'Polygon', coordinates: [outer, ...holes as AtlasPosition[][]] });
     }
+    for (const line of list(node.LineString)) {
+      const original = coordinates(object(line).coordinates);
+      if (!original || original.length < 2 || geometryIntersectsSaudi({ type: 'LineString', coordinates: original })) continue;
+      const generalized = original.map(position => position.map(value => Math.round(value * 4) / 4) as AtlasPosition)
+        .filter((position, index, positions) => index === 0 || position[0] !== positions[index - 1][0] || position[1] !== positions[index - 1][1]);
+      const geometry = { type: 'LineString' as const, coordinates: generalized };
+      if (generalized.length >= 2 && !geometryIntersectsSaudi(geometry)) result.push(geometry);
+    }
     for (const multi of list(node.MultiGeometry)) result.push(...geometries(object(multi), level + 1));
-    // LineString / gx:Track / NetworkLink / remote icons are intentionally ignored.
+    // Time-bearing gx:Track, NetworkLink and remote icons remain excluded.
     return result;
   }
   function walk(node: Node, layerName: string, path: string, sourceDate: string | null, depth = 0) {
@@ -98,7 +107,7 @@ export function parseIswnKml(xml: string): AtlasCollection {
       const shapes = geometries(placemark);
       // Keep each point independent; combine area parts while retaining holes.
       const areas = shapes.filter((shape): shape is Extract<AtlasGeometry, { type: 'Polygon' }> => shape.type === 'Polygon');
-      const combined: AtlasGeometry[] = shapes.filter(shape => shape.type === 'Point');
+      const combined: AtlasGeometry[] = shapes.filter(shape => shape.type === 'Point' || shape.type === 'LineString');
       if (areas.length === 1) combined.push(areas[0]);
       else if (areas.length > 1) combined.push({ type: 'MultiPolygon', coordinates: areas.map(area => area.coordinates) });
       for (const [index, geometry] of combined.entries()) {
@@ -110,9 +119,9 @@ export function parseIswnKml(xml: string): AtlasCollection {
         if (geometry.type !== 'Point') areaOccurrences.set(areaKey, occurrence + 1);
         const id = `iswn-${hash(`${areaKey}:${geometry.type === 'Point' ? geometry.coordinates.join(',') : occurrence}`)}`;
         features.push({ type: 'Feature', geometry, properties: { id, name, layerId, layerName,
-          kind: geometry.type === 'Point' ? 'reference_point' : 'reference_area', sourcePublishedAt: sourceDate,
+          kind: geometry.type === 'Point' ? 'reference_point' : geometry.type === 'LineString' ? 'reference_line' : 'reference_area', sourcePublishedAt: sourceDate,
           sourceUrl: ISWN_MAP_URL, attribution: 'Islamic World News (ISWN) — publisher map claim',
-          precision: geometry.type === 'Point' ? 'regional' : 'published_area' } });
+          precision: geometry.type === 'Point' ? 'regional' : geometry.type === 'LineString' ? 'generalized_line' : 'published_area' } });
       }
     }
     for (const [index, candidate] of list(node.Folder).entries()) {

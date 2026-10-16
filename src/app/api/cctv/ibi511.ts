@@ -74,6 +74,14 @@ export interface Ibi511Source {
   source: string;
   /** Caption of last resort, when a row names neither a city nor a county. */
   state: string;
+  /** Defaults to the existing US deployments. */
+  country?: string;
+  /** Ontario uses city/region names in its county field. */
+  countySuffix?: string;
+  /** Alberta's public endpoint accepts at most fifty rows. */
+  pageSize?: number;
+  /** Public still-only deployments never expose a video URL. */
+  snapshotOnly?: boolean;
   /** Drops mis-geocoded rows — every one of these feeds has a few. */
   bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number };
 }
@@ -132,11 +140,11 @@ export function cameraLabel(rec: Ibi511Record): string | null {
 }
 
 /** Where the camera is, for the caption under its name. */
-export function cameraCity(rec: Ibi511Record, state: string): string {
+export function cameraCity(rec: Ibi511Record, state: string, countySuffix = ' County'): string {
   const city = rec.city?.trim();
   if (city && city !== 'N/A') return city;
   const county = rec.county?.trim();
-  if (county && county !== 'N/A') return `${county} County`;
+  if (county && county !== 'N/A') return `${county}${countySuffix}`;
   return state;
 }
 
@@ -169,7 +177,7 @@ export function mapIbi511Record(rec: Ibi511Record, cfg: Ibi511Source): CctvCamer
      serve fine, which is what those cameras show instead. Louisiana and
      Arizona set it on none. */
   const gated = img.isVideoAuthRequired === true;
-  const video = img.videoDisabled || gated ? undefined : hlsUrl(img.videoUrl);
+  const video = cfg.snapshotOnly || img.videoDisabled || gated ? undefined : hlsUrl(img.videoUrl);
   if (!snapshot && !video) return null;
 
   return {
@@ -177,8 +185,8 @@ export function mapIbi511Record(rec: Ibi511Record, cfg: Ibi511Source): CctvCamer
     lat,
     lng,
     name: cameraLabel(rec) || `${cfg.source} Camera ${rec.id}`,
-    city: cameraCity(rec, cfg.state),
-    country: 'US',
+    city: cameraCity(rec, cfg.state, cfg.countySuffix),
+    country: cfg.country ?? 'US',
     ...(snapshot ? { feed_url: snapshot } : {}),
     ...(video ? { stream_url: video, stream_type: 'hls' as const } : {}),
     source: cfg.source,
@@ -186,7 +194,7 @@ export function mapIbi511Record(rec: Ibi511Record, cfg: Ibi511Source): CctvCamer
 }
 
 async function fetchPage(cfg: Ibi511Source, start: number): Promise<{ rows: Ibi511Record[]; total: number }> {
-  const url = `${cfg.base}/List/GetData/Cameras?query=${buildQuery(start, PAGE_SIZE)}&lang=en`;
+  const url = `${cfg.base}/List/GetData/Cameras?query=${buildQuery(start, cfg.pageSize ?? PAGE_SIZE)}&lang=en`;
   const res = await stealthFetch(url, {
     signal: AbortSignal.timeout(15000),
     headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -213,8 +221,9 @@ export async function loadIbi511Cameras(cfg: Ibi511Source): Promise<CctvCamera[]
   };
   ingest(first.rows);
 
+  const pageSize = cfg.pageSize ?? PAGE_SIZE;
   const starts: number[] = [];
-  for (let s = PAGE_SIZE; s < first.total && s < PAGE_SIZE * MAX_PAGES; s += PAGE_SIZE) {
+  for (let s = pageSize; s < first.total && s < pageSize * MAX_PAGES; s += pageSize) {
     starts.push(s);
   }
 

@@ -1,0 +1,67 @@
+/* APEX geometry is deliberately non-literal: one decision core receives cyan
+   observation paths and emits gold decision paths. Red is reserved for alert. */
+.m3tm-brand-mark {
+  --m3tm-apex-cyan: var(--m3tm-theme-primary, #22D3D1);
+  --m3tm-apex-gold: var(--m3tm-theme-gold, #D4AF37);
+  --m3tm-apex-alert: var(--m3tm-theme-danger, #ff3547);
+  color: var(--m3tm-apex-cyan);
+  isolation: isolate;
+}
+
+/* Keep the public prop surface backward compatible without turning a normal
+   brand state red. `state=alert` is the only local red path. */
+.m3tm-brand-mark[data-tone="public"],
+.m3tm-brand-mark[data-tone="cyan"],
+.m3tm-brand-mark[data-tone="internal"],
+.m3tm-brand-mark[data-tone="operations"],
+.m3tm-brand-mark[data-tone="gold"],
+.m3tm-brand-mark[data-tone="red"] { --m3tm-apex-cyan: var(--m3tm-theme-primary, #22D3D1); }
+
+.m3tm-brand-mark__frame { width: 8.35rem; height: 5.35rem; }
+.m3tm-brand-mark[data-variant="mark"] .m3tm-brand-mark__frame {
+  width: 3.7rem;
+  height: 3.7rem;
+  border-radius: 15px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0));
+  border: 1px solid color-mix(in srgb, var(--m3tm-apex-cyan) 45%, transparent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .04), inset 0 0 18px rgba(0, 0, 0, .55);
+}
+
+.m3tm-brand-mark__halo {
+  inset: -12%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--m3tm-apex-cyan) 45%, transparent), transparent 64%);
+  opacity: .2;
+  filter: blur(10px);
+}
+
+.m3tm-brand-mark__svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .55));
+}
+
+.m3tm-brand-mark__field-l { opacity: .34; }
+.m3tm-brand-mark__field-r { opacity: .3; }
+.m3tm-brand-mark__stop-a { stop-color: var(--m3tm-apex-cyan); }
+.m3tm-brand-mark__stop-b { stop-color: var(--m3tm-apex-gold); }
+.m3tm-brand-mark__trace-l { stroke: var(--m3tm-apex-cyan); opacity: .82; }
+.m3tm-brand-mark__trace-r { stroke: var(--m3tm-apex-gold); opacity: .82; }
+.m3tm-brand-mark__core-shell { stroke: #d7e7e9; stroke-width: 1.1; }
+.m3tm-brand-mark__core-channel { fill: #0a1c22; stroke: #50727a; stroke-width: 1; }
+.m3tm-brand-mark__core { fill: var(--m3tm-apex-gold); stroke: #071116; stroke-width: 1.15; transform-box: fill-box; transform-origin: center; }
+.m3tm-brand-mark__runner-l { stroke: var(--m3tm-apex-cyan); stroke-dasharray: 12 120; stroke-dashoffset: 132; }
+.m3tm-brand-mark__runner-r { stroke: var(--m3tm-apex-gold); stroke-dasharray: 12 120; stroke-dashoffset: -132; }
+.m3tm-brand-mark__scan { stroke: var(--m3tm-apex-cyan); stroke-dasharray: 18 120; stroke-dashoffset: 138; opacity: .62; }
+.m3tm-brand-mark__wordmark { color: var(--m3tm-apex-cyan); }
+.m3tm-brand-mark__emergency { display: none; stroke: var(--m3tm-apex-alert); opacity: 0; }
+
+.m3tm-brand-mark[data-variant="mark"] .m3tm-brand-mark__trace-l,
+.m3tm-brand-mark[data-variant="mark"] .m3tm-brand-mark__trace-r,
+.m3tm-brand-mark[data-variant="mark"] .m3tm-brand-mark__field-l,
+.m3tm-brand-mark[data-variant="mark"] .m3tm-brand-mark__field-r { display: none; }
+
+@media (max-width: 420px) {
+  .m3tm-brand-mark__frame { width: 6.4rem; height: 4.2rem; }
+}

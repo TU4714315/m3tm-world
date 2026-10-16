@@ -92,10 +92,10 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
+  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
   sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
-  live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
+  live_news: true, earthquakes: false, fires: true, weather: false, wind: false, rain: false, wind_controls: true, rain_controls: true, radiation: false,
   infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reference_atlas: true, reported_routes: true, day_night: false,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
@@ -110,7 +110,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
       'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
-      'country_borders',
+      'country_borders', 'flights', 'wind_controls', 'rain_controls',
     ].includes(key) && ![
       // Defer expensive catalogs, raster overlays and slower optional sources
       // until the operator explicitly enables them. Keep MENA events, alerts,
@@ -126,7 +126,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime', 'naval_activity',
   'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
-  'cctv', 'cctv_previews', 'live_news', 'fires', 'weather',
+  'cctv', 'cctv_previews', 'live_news', 'fires', 'weather', 'wind', 'rain', 'wind_controls', 'rain_controls',
   'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas',
   'reported_routes', 'global_incidents', 'gdelt_events', 'civil_unrest', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval',
@@ -972,7 +972,7 @@ export default function Dashboard() {
         () => {
           const sourceStatus = dataRef.current.flight_source_status;
           return hasUsableCivilianFlightData({
-            publicTotal: Number(sourceStatus?.public_total ?? 0),
+            publicTotal: Number(sourceStatus?.public_total ?? ((dataRef.current.commercial_flights?.length ?? 0) + (dataRef.current.private_flights?.length ?? 0) + (dataRef.current.private_jets?.length ?? 0))),
             fallbackActive: sourceStatus?.civilian_fallback_active === true,
           });
         },
@@ -1719,6 +1719,7 @@ export default function Dashboard() {
           terrainFocus={terrainFocus}
           terrainRetry={terrainRetry}
           onTerrainStatusChange={setTerrainStatus}
+          onLayerOff={key => setActiveLayers(prev => ({ ...prev, [key]: false }))}
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'}
           satelliteVisual={satelliteVisual} 
           onEntityClick={handleEntityClick} 

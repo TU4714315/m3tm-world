@@ -6,6 +6,7 @@ export const ISWN_REFRESH_MS = 12 * 60 * 60 * 1000;
 export const ISWN_CHECK_MS = 15 * 60 * 1000;
 export type AtlasPosition = [number, number];
 export type AtlasGeometry = { type: 'Point'; coordinates: AtlasPosition }
+  | { type: 'LineString'; coordinates: AtlasPosition[] }
   | { type: 'Polygon'; coordinates: AtlasPosition[][] }
   | { type: 'MultiPolygon'; coordinates: AtlasPosition[][][] };
 export interface AtlasFeature {
@@ -13,8 +14,8 @@ export interface AtlasFeature {
   geometry: AtlasGeometry;
   properties: {
     id: string; name: string; layerId: string; layerName: string;
-    kind: 'reference_point' | 'reference_area'; sourcePublishedAt: string | null;
-    sourceUrl: string; attribution: string; precision: 'regional' | 'published_area';
+    kind: 'reference_point' | 'reference_area' | 'reference_line'; sourcePublishedAt: string | null;
+    sourceUrl: string; attribution: string; precision: 'regional' | 'published_area' | 'generalized_line';
   };
 }
 export interface AtlasCollection { type: 'FeatureCollection'; features: AtlasFeature[] }

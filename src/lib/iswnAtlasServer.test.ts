@@ -104,7 +104,7 @@ describe('reference atlas collection schedule', () => {
     const snapshot = await getReferenceAtlasSnapshot();
     expect(snapshot.featureCount).toBe(1);
     expect(snapshot.layers).toHaveLength(1);
-    const persisted = await durableGetJson<{ snapshot: unknown }>('m3tm:reference-atlas:iswn:v2');
+    const persisted = await durableGetJson<{ snapshot: unknown }>('m3tm:reference-atlas:iswn:v3');
     expect(JSON.stringify(persisted.value?.snapshot)).not.toContain('Masked');
     expect(JSON.stringify(persisted.value?.snapshot)).not.toContain('Saudi map');
   });

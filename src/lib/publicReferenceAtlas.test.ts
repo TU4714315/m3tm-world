@@ -14,6 +14,19 @@ const snapshot = {
   changes: { added: 1, removed: 0, changed: 0 },
 };
 describe('reference atlas public contract', () => {
+  it('retains generalized published lines through the browser projection without Saudi crossings or collapsed paths', () => {
+    const line = (id: string, coordinates: number[][]) => ({
+      ...annotation(id, 'yemen', 'Yemen map', []), geometry: { type: 'LineString', coordinates },
+    });
+    const result = publicReferenceAtlas({ ...snapshot, features: { type: 'FeatureCollection', features: [
+      line('published', [[44.1234, 13.2345], [44.321, 13.563]]),
+      line('crossing', [[30, 24], [60, 24]]), line('collapsed', [[44.01, 13.01], [44.02, 13.02]]),
+    ] } })!;
+    expect(result.featureCount).toBe(1);
+    expect(result.features.features[0].geometry).toEqual({ type: 'LineString', coordinates: [[44, 13.25], [44.25, 13.5]] });
+    expect(result.features.features[0].properties).toMatchObject({ kind: 'reference_line', precision: 'generalized_line' });
+    expect(result.layers[0].count).toBe(1);
+  });
   it('keeps retrieval time separate from unknown source date and strips private/HTML/exact point fields', () => {
     const result = publicReferenceAtlas(snapshot)!;
     expect(result.fetchedAt).toBe('2026-10-15T10:00:00.000Z');

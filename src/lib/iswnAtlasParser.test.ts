@@ -23,13 +23,27 @@ describe('ISWN reference KML parser', () => {
     expect(atlasLayers(output.features).map(layer => layer.count)).toEqual([1, 1]);
   });
 
-  it('preserves polygon holes and multiple polygons while omitting exact tracks and network links', () => {
+  it('preserves polygon holes, areas and generalized published lines while omitting timed tracks and network links', () => {
     const hole = '<innerBoundaryIs><LinearRing><coordinates>30.2,30.2 30.4,30.2 30.4,30.4 30.2,30.2</coordinates></LinearRing></innerBoundaryIs>';
     const output = parseIswnKml(kml(`<Placemark><name>Areas</name><MultiGeometry>${polygon(hole)}${polygon()}<LineString><coordinates>35,31 36,32</coordinates></LineString></MultiGeometry></Placemark><NetworkLink><Link><href>https://remote/kml</href></Link></NetworkLink>`));
-    expect(output.features).toHaveLength(1);
-    const geometry = output.features[0].geometry;
+    expect(output.features).toHaveLength(2);
+    expect(output.features.find(feature => feature.geometry.type === 'LineString')?.properties.kind).toBe('reference_line');
+    const geometry = output.features.find(feature => feature.geometry.type === 'MultiPolygon')!.geometry;
     expect(geometry.type).toBe('MultiPolygon');
     if (geometry.type === 'MultiPolygon') expect(geometry.coordinates.map(area => area.length)).toEqual([2, 1]);
+  });
+
+  it('generalizes static published lines, drops collapsed lines and suppresses Saudi crossings before and after rounding', () => {
+    const line = (name: string, coords: string) => `<Placemark><name>${name}</name><LineString><coordinates>${coords}</coordinates></LineString></Placemark>`;
+    const output = parseIswnKml(kml(point() + line('Published line', '44.1234,13.2345 44.321,13.563')
+      + line('Collapsed', '36.01,33.01 36.02,33.02')
+      + line('Saudi crossing', '30,24 60,24')
+      + line('Original Saudi point', '46.6753,24.7136 55,25')
+      + '<Placemark><gx:Track><gx:coord>44 13 0</gx:coord><gx:coord>45 14 0</gx:coord></gx:Track></Placemark>'));
+    const lines = output.features.filter(feature => feature.geometry.type === 'LineString');
+    expect(lines).toHaveLength(1);
+    expect(lines[0].geometry).toEqual({ type: 'LineString', coordinates: [[44, 13.25], [44.25, 13.5]] });
+    expect(lines[0].properties.precision).toBe('generalized_line');
   });
 
   it('omits Saudi points using original coordinates before generalization', () => {

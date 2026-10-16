@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
   CloudLightning, Ship, Network, Database, Ghost,
-  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal, LockKeyhole
+  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal, LockKeyhole, Shield, Route, Layers3
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
@@ -49,7 +49,7 @@ interface LayerGroupDef {
   layers: LayerDef[];
 }
 
-const LAYER_GROUPS: LayerGroupDef[] = [
+const LAYER_CATALOG: LayerGroupDef[] = [
   {
     label: 'عام',
     fullLabel: 'بيانات M3TM.WORLD العامة',
@@ -110,6 +110,10 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: CloudLightning,
     layers: [
       { key: 'fires', label: 'حرائق نشطة', dataKey: 'fires' },
+      { key: 'wind', label: 'الرياح', dataKey: '' },
+      { key: 'wind_controls', label: 'وقت الرياح', dataKey: '', parent: 'wind' },
+      { key: 'rain', label: 'الأمطار', dataKey: '' },
+      { key: 'rain_controls', label: 'وقت الأمطار', dataKey: '', parent: 'rain' },
       { key: 'weather', label: 'طقس شديد', dataKey: 'weather_events' },
     ],
   },
@@ -160,6 +164,28 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'terrain_etopo_2022', label: 'تضاريس وأعماق', description: 'تظليل التضاريس والأعماق؛ غير مخصص للملاحة', dataKey: '' },
     ],
   },
+];
+
+// Group the existing capabilities without changing their keys, data, or access policy.
+const definitions = LAYER_CATALOG.flatMap(group => group.layers);
+const selectLayers = (...keys: string[]) => keys.map(key => {
+  const layer = definitions.find(item => item.key === key);
+  if (!layer) throw new Error(`Unknown map layer: ${key}`);
+  return layer;
+});
+const militaryKeys = ['military_activity', 'naval_activity', 'sat_military'];
+const frontKeys = ['country_borders', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas', 'reported_routes'];
+const airKeys = ['sdk_air', 'flights', 'private', 'jets'];
+const seaSpaceKeys = ['sdk_sea', 'maritime', 'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science'];
+const displayKeys = LAYER_CATALOG.find(group => group.label === 'العرض')!.layers.map(layer => layer.key);
+const assigned = new Set([...militaryKeys, ...frontKeys, ...airKeys, ...seaSpaceKeys, ...displayKeys]);
+const LAYER_GROUPS: LayerGroupDef[] = [
+  { label: 'العسكري', fullLabel: 'العسكري', icon: Shield, layers: selectLayers(...militaryKeys) },
+  { label: 'خطوط وجبهات', fullLabel: 'خطوط وجبهات', icon: Route, layers: selectLayers(...frontKeys) },
+  { label: 'الطيران', fullLabel: 'الطيران', icon: Plane, layers: selectLayers(...airKeys) },
+  { label: 'البحر والفضاء', fullLabel: 'البحر والفضاء', icon: Satellite, layers: selectLayers(...seaSpaceKeys) },
+  { label: 'الأحداث', fullLabel: 'الأحداث', icon: Megaphone, layers: definitions.filter(layer => !assigned.has(layer.key)) },
+  { label: 'العرض', fullLabel: 'العرض', icon: Sun, layers: selectLayers(...displayKeys) },
 ];
 
 /* ── Minimal Toggle Switch ── */
@@ -261,7 +287,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   /** Switch a whole group at once. Provider availability never locks the toggle:
    *  an enabled layer with no configured provider remains an honest no-data state. */
   const toggleGroup = (layers: LayerDef[]) => {
-    const available = layers.filter(layer => hasMapAccess || !RESTRICTED_MAP_LAYERS.has(layer.key));
+    const available = layers.filter(layer => !layer.parent && (hasMapAccess || !RESTRICTED_MAP_LAYERS.has(layer.key)));
     if (!available.length) { onRequestAccess?.(); return; }
     const anyOn = available.some(l => activeLayers[l.key]);
     if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
@@ -279,7 +305,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
   })).filter(g => g.layers.length > 0);
   const normalizedSearch = mobileSearch.trim().toLocaleLowerCase('ar');
-  const visibleGroups = !isMobile ? availableGroups : availableGroups
+  const desktopGroups = [...availableGroups, { label: 'الكل', fullLabel: 'الكل', icon: Layers3, layers: availableGroups.flatMap(group => group.layers) }];
+  const visibleGroups = !isMobile ? desktopGroups : availableGroups
     .filter(group => mobileGroup === 'الكل' || group.label === mobileGroup)
     .map(group => ({
       ...group,
@@ -487,10 +514,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     width: 16,
                     height: 16,
                     color: groupActive
-                      ? 'rgba(255,255,255,0.75)'
+                      ? '#C9E5E8'
                       : isOpen
                         ? 'rgba(255,255,255,0.45)'
-                        : 'rgba(255,255,255,0.22)',
+                        : 'rgba(255,255,255,0.65)',
                     filter: groupActive ? 'drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'none',
                   }}
                 />
@@ -519,9 +546,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, x: -4, filter: 'blur(2px)' }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className={`absolute left-[52px] top-1/2 -translate-y-1/2 rounded-xl p-3 z-[100] pointer-events-auto ${group.label === 'شبكة وأحداث' ? 'w-[340px] max-w-[calc(100vw-72px)]' : 'min-w-[220px]'}`}
+                    className={`absolute left-[52px] top-1/2 -translate-y-1/2 rounded-xl p-3 z-[100] pointer-events-auto w-[300px] max-w-[calc(100vw-72px)] max-h-[min(70dvh,580px)] overflow-y-auto`}
                     style={{
-                      background: 'rgba(0,0,0,0.6)',
+                      background: 'rgba(10,23,35,0.42)',
                       backdropFilter: 'blur(40px) saturate(1.5)',
                       WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
                       border: '1px solid rgba(255,255,255,0.06)',

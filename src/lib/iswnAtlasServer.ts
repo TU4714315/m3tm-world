@@ -4,7 +4,7 @@ import { atlasLayers, calculateAtlasChanges, ISWN_CHECK_MS, ISWN_FEED_URL, ISWN_
   ISWN_PUBLISHER_URL, ISWN_REFRESH_MS, type AtlasSnapshot } from './iswnAtlas';
 import { isMajorIswnBulletin, MAX_FEED_BYTES, MAX_KML_BYTES, parseIswnBulletins, parseIswnKml } from './iswnAtlasParser';
 
-const CACHE_KEY = 'm3tm:reference-atlas:iswn:v2';
+const CACHE_KEY = 'm3tm:reference-atlas:iswn:v3';
 const RETENTION_SECONDS = 7 * 24 * 60 * 60;
 interface CacheState { snapshot: AtlasSnapshot; rssCheckedAt: number; lastAttemptAt: number; seenReportIds: string[] }
 let inFlight: Promise<AtlasSnapshot> | null = null;

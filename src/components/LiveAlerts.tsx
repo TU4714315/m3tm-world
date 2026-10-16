@@ -122,6 +122,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.5, duration: 0.6 }}
+      style={{ background: 'rgba(8,18,28,0.35)', borderColor: 'rgba(255,255,255,0.15)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.07),0 8px 24px rgba(0,0,0,.16)' }}
       className={`glass-panel flex flex-col overflow-hidden pointer-events-auto transition-all duration-300 ${maximized ? 'fixed inset-4 z-[9999] bg-[#0a0a09]/95 backdrop-blur-3xl' : 'shrink-0 h-[500px] max-h-[80vh] resize-y'}`}
     >
       {/* Header - Fixed Height, Never Shrinks */}
@@ -129,10 +130,10 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
         onClick={() => setExpanded(!expanded)}
         role="button"
         tabIndex={0}
-        className="flex-shrink-0 flex items-center justify-between px-3 py-2 hover:bg-[var(--hover-accent)] transition-colors cursor-pointer outline-none border-b border-[rgba(255,255,255,0.05)] bg-[rgba(0,0,0,0.3)]"
+        className="flex-shrink-0 flex items-center justify-between px-3 py-2 hover:bg-[var(--hover-accent)] transition-colors cursor-pointer outline-none border-b border-[rgba(255,255,255,0.05)] bg-white/[0.035]"
       >
         <div className="flex items-center gap-2">
-          <Radio className="w-3.5 h-3.5 text-[#FF4081]" />
+          <Newspaper className="w-3.5 h-3.5 text-slate-200" />
           <span className="hud-text text-[11px] text-[var(--text-primary)]">{filter === 'news' ? 'أهم الأخبار' : filter === 'quakes' ? 'تنبيهات الزلازل' : 'البث المباشر'}</span>
           <span className="gotham-tag gotham-tag--high" style={{ fontSize: '9px', padding: '1px 5px' }}>{filter === 'news' ? alerts.filter(a => a.type === 'news').length : filtered.length}</span>
           {hasMapAccess && <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 4px' }}>{BUILTIN_FEEDS.length} بث</span>}
@@ -153,7 +154,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className={`flex flex-col flex-1 min-h-0 ${maximized ? 'bg-[#0a0a09]' : 'bg-transparent'}`}
+            className={`flex flex-col flex-1 min-h-0 bg-transparent`}
           >
             {/* Filters - Fixed Height, Never Shrinks */}
             <div className={`flex-shrink-0 flex gap-1 ${maximized ? 'px-6 py-4 border-b border-[#2A2A28] bg-[#111111]' : 'px-3 py-2 border-b border-[rgba(255,255,255,0.05)]'}`}>

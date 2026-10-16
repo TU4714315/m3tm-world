@@ -18,6 +18,11 @@ function ring(v: unknown): v is [number, number][] {
 function geometry(value: unknown): AtlasGeometry | null {
   const g = row(value), c = g.coordinates;
   if (g.type === 'Point' && point(c)) return { type: 'Point', coordinates: c.map(n => Math.round(n * 4) / 4) as AtlasPosition };
+  if (g.type === 'LineString' && Array.isArray(c) && c.length >= 2 && c.length <= 20_000 && c.every(point)) {
+    const coordinates = c.map(position => position.map(n => Math.round(n * 4) / 4) as AtlasPosition)
+      .filter((position, index, positions) => index === 0 || position[0] !== positions[index - 1][0] || position[1] !== positions[index - 1][1]);
+    return coordinates.length >= 2 ? { type: 'LineString', coordinates } : null;
+  }
   if (g.type === 'Polygon' && Array.isArray(c) && c.length <= 64 && c.length && c.every(ring)) return { type: 'Polygon', coordinates: c };
   if (g.type === 'MultiPolygon' && Array.isArray(c) && c.length <= 128 && c.length
     && c.every(p => Array.isArray(p) && p.length > 0 && p.length <= 64 && p.every(ring))) return { type: 'MultiPolygon', coordinates: c as AtlasPosition[][][] };
@@ -34,16 +39,16 @@ export function publicReferenceAtlas(value: unknown): AtlasSnapshot | null {
     // Suppress original coordinates before generalization can move a border point.
     if (/saudi|السعودية/i.test(String(p.layerName || '')) || isSaudiPublicIndicator(f)) return [];
     const g = geometry(f.geometry);
-    if (!g || !text(p.id) || !text(p.layerId)) return [];
+    if (!g || !text(p.id) || !text(p.layerId) || isSaudiPublicIndicator({ geometry: g })) return [];
     // Geometry is validated above, so counting positions never follows attacker objects.
     const coordinateCount = JSON.stringify(g.coordinates).split('[').length - 1;
     remainingCoordinates -= coordinateCount;
     if (remainingCoordinates < 0) return [];
-    const kind = g.type === 'Point' ? 'reference_point' : 'reference_area';
+    const kind = g.type === 'Point' ? 'reference_point' : g.type === 'LineString' ? 'reference_line' : 'reference_area';
     return [{ type: 'Feature', id: text(p.id), geometry: g, properties: {
       id: text(p.id), name: text(p.name), layerId: text(p.layerId), layerName: text(p.layerName), kind,
       sourcePublishedAt: date(p.sourcePublishedAt), sourceUrl: SOURCE,
-      attribution: 'ISWN / Islamic World News', precision: kind === 'reference_point' ? 'regional' : 'published_area',
+      attribution: 'ISWN / Islamic World News', precision: kind === 'reference_point' ? 'regional' : kind === 'reference_line' ? 'generalized_line' : 'published_area',
     } }];
   });
   const rawLayers = Array.isArray(source.layers) ? source.layers : [];

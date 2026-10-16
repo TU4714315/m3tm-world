@@ -3,6 +3,10 @@
 import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import WindBar from './WindBar';
+import RainBar from './RainBar';
+import { DOCK } from './TimeBox';
+import { WIND_ATTRIBUTION } from '@/lib/wind-layer';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
 import { editorialClusterLayer, registerEditorialMapSymbols, territoryWave } from '@/lib/map-symbols';
 import { publishedAreaAffiliation, publishedEquipmentSymbol } from '@/lib/publishedMapPresentation';
@@ -59,6 +63,7 @@ interface WorldMapProps {
   terrainRetry?: number;
   terrainFocus?: number;
   onTerrainStatusChange?: (status: TerrainStatus) => void;
+  onLayerOff?: (key: string) => void;
 
   mapStyle?: string;
   satelliteVisual?: SatelliteVisualPreset;
@@ -125,7 +130,7 @@ const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 const DOUBLE_RIGHT_MS = 500;
 const DOUBLE_RIGHT_SLOP_PX = 12;
 
-function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', referenceAtlasKind = 'all', onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
+function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', referenceAtlasKind = 'all', onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, onLayerOff, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -714,12 +719,12 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
 
 
       // Named historical areas use the owner's legend; no actor is inferred from colour.
-      map.addLayer({ id: 'reference-atlas-fill', type: 'fill', source: 'reference-atlas-areas', paint: {
+      map.addLayer({ id: 'reference-atlas-fill', type: 'fill', source: 'reference-atlas-areas', filter: ['==', ['geometry-type'], 'Polygon'], paint: {
         'fill-color': ['match', ['get','affiliation'], 'houthi','#BB555F', 'government','#44987A', '#A6B8C8'],
         'fill-opacity': ['match', ['get','affiliation'], 'houthi',.12, 'government',.12, .025],
       }});
       map.addLayer({ id: 'reference-atlas-wave', type: 'fill', source: 'reference-atlas-areas',
-        filter: ['in', ['get','affiliation'], ['literal',['houthi','government']]], paint: {
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['in', ['get','affiliation'], ['literal',['houthi','government']]]], paint: {
           'fill-pattern': ['match', ['get','affiliation'], 'houthi','territory-wave-red', 'territory-wave-green'], 'fill-opacity': .7,
       }});
       map.addLayer({ id: 'reference-atlas-outline', type: 'line', source: 'reference-atlas-areas', paint: {
@@ -2080,14 +2085,15 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       const kinds: Record<string, string> = { tank: 'دبابة · تصنيف معلن', artillery: 'مدفعية · تصنيف معلن', radar: 'رادار · تصنيف معلن', missile: 'منشأة صواريخ', airfield: 'مطار / قاعدة جوية', port: 'ميناء / منشأة بحرية', base: 'منشأة عسكرية' };
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(`<div dir="rtl" style="padding:10px;color:#DEE7EB;background:#0C1922;font-size:12px;line-height:1.8;border-radius:12px;">
-        <strong>${htmlEsc(p.name || 'معلم')}</strong><div>${htmlEsc(side || kinds[p.symbol] || 'منطقة منشورة')}</div>
+        <strong>${htmlEsc(p.name || 'معلم')}</strong><div>${htmlEsc(side || kinds[p.symbol] || (p.kind === 'reference_line' ? 'خط مرجعي منشور · ليس مسار حركة' : 'منطقة منشورة'))}</div>
         ${p.sourcePublishedAt ? `<time style="font-size:10px;opacity:.65">${htmlEsc(referenceAtlasDate(p.sourcePublishedAt))}</time>` : ''}
       </div>`).addTo(map);
     };
     map.on('click', 'reference-atlas-dots', onReferenceAtlasClick);
     map.on('click', 'reference-atlas-fill', onReferenceAtlasClick);
+    map.on('click', 'reference-atlas-outline', onReferenceAtlasClick);
 
-    for (const layer of ['reference-atlas-dots', 'reference-atlas-clusters', 'reference-atlas-fill']) {
+    for (const layer of ['reference-atlas-dots', 'reference-atlas-clusters', 'reference-atlas-fill', 'reference-atlas-outline']) {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     }
@@ -2480,13 +2486,14 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     // The API currently carries only thousands of public civilian points, well
     // within a single MapLibre symbol layer. Fixed index sampling erased sparse
     // regions even when valid aircraft were present, so retain every valid row.
-    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
+    const commercialFlightLayer = activeLayers.flights || activeLayers.sdk_air;
+    setGeo('flights', commercialFlightLayer ? toFeatures(data.commercial_flights) : []);
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
-    const anyCivilianFlightLayer = activeLayers.flights || activeLayers.private || activeLayers.jets;
+    const anyCivilianFlightLayer = commercialFlightLayer || activeLayers.private || activeLayers.jets;
     setGeo('civilian-flight-activity',
       anyCivilianFlightLayer ? civilianFlightMapFeatures(data.civilian_flight_activity ?? [], {
-        commercial: activeLayers.flights,
+        commercial: commercialFlightLayer,
         private: activeLayers.private,
         jets: activeLayers.jets,
       }) : []);
@@ -3238,7 +3245,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
     setVis(['cyber-arcs-atmo','cyber-arcs-glow','cyber-arcs-core','cyber-arcs-flow','cyber-heads','cyber-impacts','cyber-labels'], (activeLayers as any).cyber_attacks);
     setVis(['day-night-fill'], activeLayers.day_night);
-    setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights);
+    setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights || activeLayers.sdk_air);
     setVis(['fl-private-halo','fl-private'], activeLayers.private);
     setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
     setVis(
@@ -4175,6 +4182,19 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedSat, clearSat]);
 
+  // Wind credit is active only while the overlay is enabled.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    if (!activeLayers.wind) {
+      if (map.getLayer('wind-credit')) map.removeLayer('wind-credit');
+      if (map.getSource('wind-credit')) map.removeSource('wind-credit');
+      return;
+    }
+    if (!map.getSource('wind-credit')) map.addSource('wind-credit', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: WIND_ATTRIBUTION });
+    if (!map.getLayer('wind-credit')) map.addLayer({ id: 'wind-credit', type: 'circle', source: 'wind-credit' });
+  }, [mapReady, activeLayers.wind, mapStyle]);
+
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
@@ -4191,7 +4211,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       )}
       {mapReady && mapLoadState === 'recovery' && (
         <div role="status" className="pointer-events-none absolute bottom-28 left-3 z-10 rounded-lg border border-white/15 bg-[#081322]/60 px-2 py-1 text-[10px] text-white/85">
-          خريطة بديلة · بيانات الخلفية من Esri
+          خريطة بديلة
         </div>
       )}
       {mapReady && mapRef.current && (
@@ -4219,6 +4239,10 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       )}
       {selectedSat && <SatelliteCard sat={selectedSat} onClose={clearSat} />}
       {mapReady && <MapControls mapRef={mapRef} onInteract={onFollowInterrupt} />}
+      {mapReady && (activeLayers.wind || activeLayers.rain) && <div className={DOCK}>
+        {activeLayers.wind && <WindBar mapRef={mapRef} controls={!!activeLayers.wind_controls} onOff={() => onLayerOff?.('wind')} />}
+        {activeLayers.rain && <RainBar mapRef={mapRef} mapStyle={mapStyle} controls={!!activeLayers.rain_controls} onOff={() => onLayerOff?.('rain')} />}
+      </div>}
     </>
   );
 }
