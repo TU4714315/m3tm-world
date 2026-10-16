@@ -4,8 +4,21 @@ import { describe, expect, it, vi } from 'vitest';
 import PriorityNewsCards from './PriorityNewsCards';
 import GlobalStatusBar from './GlobalStatusBar';
 import LayerPanel from './LayerPanel';
+import LiveAlerts from './LiveAlerts';
 
 describe('access-aware public map presentation', () => {
+  it('opens on news without inserting earthquake telemetry into the news list', () => {
+    const html = renderToStaticMarkup(createElement(LiveAlerts, {
+      data: { news: [{ title:'خبر منشور مستقل',source:'ناشر',link:'https://example.org/story' }],
+        earthquakes:[{ magnitude:7,place:'QUAKE_TELEMETRY_MUST_BE_SEPARATE',lat:10,lng:20 }] },
+      onLocate:vi.fn(),
+    }));
+    expect(html).toContain('خبر منشور مستقل');
+    expect(html).toContain('أهم الأخبار');
+    expect(html).toContain('الزلازل');
+    expect(html).not.toContain('QUAKE_TELEMETRY_MUST_BE_SEPARATE');
+    expect(html).not.toContain('زلزال بقوة');
+  });
   it('uses synthetic shapes rather than hidden real news in a restricted card', () => {
     const html = renderToStaticMarkup(createElement(PriorityNewsCards, {
       items: [{ title: 'PRIVATE_UNAPPROVED_HEADLINE', link: 'https://private.example/news', source: 'PRIVATE_SOURCE' }],

@@ -96,7 +96,7 @@ const DEFAULT_ACTIVE_LAYERS = {
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
   sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
   live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reference_atlas: true, reported_routes: true, day_night: true,
+  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reference_atlas: true, reported_routes: true, day_night: false,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
@@ -428,9 +428,9 @@ export default function Dashboard() {
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
   const [showMobileHudDetails, setShowMobileHudDetails] = useState(false);
-  const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
+  const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('bright');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
@@ -495,9 +495,9 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
-      // Embedded visitors should not pay for the satellite raster and globe
-      // projection before the simpler, source-backed map can first paint.
-      setMapStyle('dark');
+      // Start embedded visitors on the same clear imagery as the public map.
+
+      setMapStyle('satellite');
       setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
@@ -1871,7 +1871,7 @@ export default function Dashboard() {
         {/* One-touch regional operations layout, independent of source layers. */}
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
           <button type="button" onClick={() => {
-              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
+              selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
               if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
             }}
@@ -1880,12 +1880,12 @@ export default function Dashboard() {
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> رصد اليمن
           </button>
           <button type="button" onClick={() => {
-              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
+              selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
               if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
             }}
             className="rounded-md border border-cyan-300/45 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300"
-            title="خريطة داكنة مسطّحة، تركيز الشرق الأوسط، موجز الأدلة المنشورة — لا يغيّر المصادر">
+            title="الانتقال إلى الشرق الأوسط">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> مرصد الشرق الأوسط
           </button>
           {mapStyle === 'satellite' && <>
@@ -1983,7 +1983,7 @@ export default function Dashboard() {
               </button>
               <button type="button" aria-expanded={showMenaPulse}
                 onClick={() => {
-                  selectFlatMap(); setMapStyle('dark');
+                  selectFlatMap();
                   setShowMenaPulse(open => !open);
                   setShowPublicDisplayControls(false);
                   setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
@@ -1992,7 +1992,7 @@ export default function Dashboard() {
                 مرصد الشرق الأوسط
               </button>
               <button type="button" onClick={() => {
-                  selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
+                  selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
                   setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
                 }}
                 className="min-h-10 rounded-xl border border-amber-300/40 bg-transparent px-2 text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300"
@@ -2133,7 +2133,7 @@ export default function Dashboard() {
           </div>}
         </div>
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(!showAlerts); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="تنبيهات حية — زلازل ونزاعات وأخبار عاجلة" aria-label="التنبيهات" aria-expanded={showAlerts}>
+          <button onClick={() => { setShowAlerts(!showAlerts); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="أخبار وتنبيهات منفصلة" aria-label="التنبيهات" aria-expanded={showAlerts}>
             <AlertTriangle className={`w-4 h-4 ${showAlerts ? 'text-[#FF3D3D]' : 'text-white/60'}`} />
             {showAlerts && (
               <span

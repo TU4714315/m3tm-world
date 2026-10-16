@@ -29,8 +29,8 @@ const RISK_COLORS: Record<string, string> = {
 export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess = false, onRequestAccess }: LiveAlertsProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'news' | 'quakes' | 'feeds'>('all');
-  const filterLabels = { all: 'الكل', news: 'الأخبار', quakes: 'الزلازل', feeds: 'البث' } as const;
+  const [filter, setFilter] = useState<'news' | 'quakes' | 'feeds'>('news');
+  const filterLabels = { news: 'الأخبار', quakes: 'الزلازل', feeds: 'البث' } as const;
 
   // Built-in live feeds — verified video IDs (synced with /api/live-news)
   const BUILTIN_FEEDS = [
@@ -101,10 +101,8 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
     });
   });
 
-  const filtered = filter === 'all' ? alerts.filter(a => a.type === 'quake') :
-    filter === 'news' ? [] :
-    filter === 'quakes' ? alerts.filter(a => a.type === 'quake') :
-    alerts.filter(a => a.type === 'feed');
+  const filtered = filter === 'quakes' ? alerts.filter(a => a.type === 'quake')
+    : filter === 'feeds' ? alerts.filter(a => a.type === 'feed') : [];
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -135,8 +133,8 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
       >
         <div className="flex items-center gap-2">
           <Radio className="w-3.5 h-3.5 text-[#FF4081]" />
-          <span className="hud-text text-[11px] text-[var(--text-primary)]">{hasMapAccess ? 'تنبيهات مباشرة' : 'أخبار متاحة'}</span>
-          <span className="gotham-tag gotham-tag--high" style={{ fontSize: '9px', padding: '1px 5px' }}>{alerts.filter(a => a.type === 'news' || a.type === 'quake').length}</span>
+          <span className="hud-text text-[11px] text-[var(--text-primary)]">{filter === 'news' ? 'أهم الأخبار' : filter === 'quakes' ? 'تنبيهات الزلازل' : 'البث المباشر'}</span>
+          <span className="gotham-tag gotham-tag--high" style={{ fontSize: '9px', padding: '1px 5px' }}>{filter === 'news' ? alerts.filter(a => a.type === 'news').length : filtered.length}</span>
           {hasMapAccess && <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 4px' }}>{BUILTIN_FEEDS.length} بث</span>}
         </div>
         <div className="flex items-center gap-2">
@@ -159,7 +157,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
           >
             {/* Filters - Fixed Height, Never Shrinks */}
             <div className={`flex-shrink-0 flex gap-1 ${maximized ? 'px-6 py-4 border-b border-[#2A2A28] bg-[#111111]' : 'px-3 py-2 border-b border-[rgba(255,255,255,0.05)]'}`}>
-              {(['all', 'news', 'quakes', 'feeds'] as const).map(f => (
+              {(['news', 'quakes', 'feeds'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => { if (f === 'feeds' && !hasMapAccess) { onRequestAccess?.(); return; } setFilter(f); }}
@@ -172,7 +170,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
               ))}
             </div>
 
-            {(filter === 'all' || filter === 'news') && <div className="min-h-0 overflow-y-auto">
+            {filter === 'news' && <div className="min-h-0 overflow-y-auto">
               {!hasMapAccess && <p dir="rtl" className="px-3 pt-3 text-[10px] text-slate-400">الأخبار العامة متاحة بعد 12 ساعة من النشر.</p>}
               <PriorityNewsCards items={data.news} onLocate={onLocate} />
               {!hasMapAccess && <PriorityNewsCards restricted items={[]} onLocate={onLocate} onRequestAccess={onRequestAccess} />}
@@ -217,7 +215,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
                         </div>
                         <div className="flex items-center justify-between border-t border-[#2A2A28]/50 pt-1.5 mt-1.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-[#8A8880] uppercase tracking-wider">{alert.source}</span>
+                            {alert.type !== 'quake' && <span className="text-[10px] font-mono text-[#8A8880] uppercase tracking-wider">{alert.source}</span>}
                             {alert.time && (
                               <span className="text-[10px] font-mono text-[#5C5A54] flex items-center gap-1 border-l border-[#2A2A28] pl-2">
                                 <Clock className="w-2.5 h-2.5" />
@@ -248,7 +246,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
                 );
               })}
               </div>
-              {filtered.length === 0 && filter !== 'all' && filter !== 'news' && (
+              {filtered.length === 0 && filter !== 'news' && (
                 <div className="text-center py-4 text-[11px] font-mono text-[var(--text-muted)]">
                   لا توجد تنبيهات ضمن هذا المرشح
                 </div>
