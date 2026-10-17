@@ -33,12 +33,12 @@ describe('server map authority', () => {
     vi.advanceTimersByTime(1001);
     expect(await authorizeMapRequest(req)).toBeNull();
   });
-  it('filters direct news API responses after provider caches and always forbids CDN reuse', async () => {
+  it('publishes current news without a grant and forbids CDN reuse', async () => {
     const handler = withMixedMapPolicy('news', async () => Response.json({ news:[{title:'restricted-title',published:new Date().toISOString()}] },
       { headers:{'Cache-Control':'public, s-maxage=86400'} }));
     const response=await handler(request());
     expect(response.headers.get('cache-control')).toContain('no-store');
     expect(response.headers.get('vary')).toBe('Authorization, Cookie');
-    expect(await response.text()).not.toContain('restricted-title');
+    expect(await response.text()).toContain('restricted-title');
   });
 });

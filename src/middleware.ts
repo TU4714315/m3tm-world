@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest, NextFetchEvent } from 'next/server';
-import { restrictedMapEndpoint } from './lib/mapAccessPolicy';
+import { restrictedMapEndpoint, temporaryPublicMapEndpoint } from './lib/mapAccessPolicy';
 import { authorizeMapRequest, mapPrivateHeaders } from './lib/mapAccessServer';
 
 export async function middleware(request: NextRequest, event: NextFetchEvent) {
@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest, event: NextFetchEvent) {
       const scheduler = process.env.WORLD_MAP_REFRESH_TOKEN;
       const refreshOnly = url === '/api/reference-atlas' && scheduler && scheduler.length >= 32
         && request.headers.get('authorization') === `Bearer ${scheduler}`;
-      if (!refreshOnly && !await authorizeMapRequest(request)) {
+      if (!temporaryPublicMapEndpoint(url, request.method) && !refreshOnly && !await authorizeMapRequest(request)) {
         return NextResponse.json({ error: 'map_access_required' }, { status: 403, headers: mapPrivateHeaders });
       }
       const response = NextResponse.next();

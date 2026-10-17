@@ -118,13 +118,18 @@ describe('published map route authorization', () => {
   it('gates every API path including alternate media routes', () => {
     expect(config.matcher).toContain('/api/:path*');
   });
-  it('denies raw conflict data and camera streams regardless of query flags', async () => {
+  it('opens only reviewed published read routes without invitation or query flags', async () => {
     vi.stubEnv('M3TM_APP_SUPABASE_ANON_KEY','');
-    for (const path of ['/api/frontlines', '/api/reference-atlas', '/api/cctv/proxy', '/api/sdk/stream']) {
-      const response=await middleware(new NextRequest(`https://map.test${path}?surface=internal&access=owner`), {waitUntil:vi.fn()} as never);
-      expect(response.status).toBe(403);
+    for (const path of ['/api/frontlines', '/api/reference-atlas', '/api/cctv/proxy', '/api/gdelt-events', '/api/live-news']) {
+      const response=await middleware(new NextRequest(`https://map.test${path}`), {waitUntil:vi.fn()} as never);
+      expect(response.status).toBe(200);
       expect(response.headers.get('cache-control')).toContain('no-store');
     }
+    for (const path of ['/api/sdk/stream', '/api/region-dossier', '/api/reference-atlas/new-private-route']) {
+      const response=await middleware(new NextRequest(`https://map.test${path}?access=owner`), {waitUntil:vi.fn()} as never);
+      expect(response.status).toBe(403);
+    }
+    expect((await middleware(new NextRequest('https://map.test/api/cctv', {method:'POST'}), {waitUntil:vi.fn()} as never)).status).toBe(403);
   });
   it('limits the scheduler credential to the atlas collector', async () => {
     vi.stubEnv('WORLD_MAP_REFRESH_TOKEN','r'.repeat(40));
@@ -132,7 +137,7 @@ describe('published map route authorization', () => {
     const headers={Authorization:`Bearer ${'r'.repeat(40)}`};
     const event={waitUntil:vi.fn()} as never;
     expect((await middleware(new NextRequest('https://map.test/api/reference-atlas',{headers}),event)).status).toBe(200);
-    expect((await middleware(new NextRequest('https://map.test/api/cctv',{headers}),event)).status).toBe(403);
+    expect((await middleware(new NextRequest('https://map.test/api/region-dossier',{headers}),event)).status).toBe(403);
     expect((await middleware(new NextRequest('https://map.test/api/osint/shodan',{headers}),event)).status).toBe(403);
   });
   it('does not allow viewing credentials into raw SDK, enrichment or analysis tools', async () => {

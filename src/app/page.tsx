@@ -2,7 +2,7 @@
 import MapAccessGate from '@/components/MapAccessGate';
 import { createMapMemberExchange } from '@/lib/mapMemberExchange';
 import { useMapAccess } from '@/lib/useMapAccess';
-import { publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
+import { canViewPublishedMap, temporaryPublicMapEndpoint, publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
 
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -194,10 +194,13 @@ function ViewSegment({ active, onClick, title, icon: Icon, label, layoutId }: {
 
 export default function Dashboard() {
   const { hasMapAccess, accessModeRef, blockMemberResume, acceptMapAccess, clearMapAccess, mapAccessHeaders } = useMapAccess();
+  const hasPublishedMapAccess = canViewPublishedMap(hasMapAccess);
   const [showMapAccess, setShowMapAccess] = useState(false);
   const accessGeneration = useRef(0);
   const allowedRef = useRef(hasMapAccess);
   allowedRef.current = hasMapAccess;
+  const publishedRef = useRef(hasPublishedMapAccess);
+  publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
   const [dataVersion, setDataVersion] = useState(0);
   const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
@@ -248,7 +251,7 @@ export default function Dashboard() {
       }
       if (message.type !== 'm3tm:sync') return;
 
-      const items: EmbeddedNewsItem[] = allowedRef.current && Array.isArray(message.newsItems)
+      const items: EmbeddedNewsItem[] = publishedRef.current && Array.isArray(message.newsItems)
         ? message.newsItems.flatMap((item: EmbeddedNewsPayload) => {
             const latitude = toEmbeddedCoordinate(item?.latitude, -90, 90);
             const longitude = toEmbeddedCoordinate(item?.longitude, -180, 180);
@@ -532,8 +535,9 @@ export default function Dashboard() {
     setEmbeddedNewsItems([]); setEmbeddedRoute(null);
     setActiveCamera(null); setLiveFeedUrl('');
     setRegionDossier(null); setDossierLoading(false);
-    if (!hasMapAccess) { setShowSpaceCam(false); setShowMenaPulse(false); }
-  }, [hasMapAccess]);
+    if (!hasMapAccess) setShowMenaPulse(false);
+    if (!hasPublishedMapAccess) setShowSpaceCam(false);
+  }, [hasMapAccess, hasPublishedMapAccess]);
 
   useEffect(() => {
     const exchange = createMapMemberExchange({ mode: () => accessModeRef.current,
@@ -847,7 +851,8 @@ export default function Dashboard() {
     { skipWhenHidden = false }: { skipWhenHidden?: boolean } = {},
   ): Promise<boolean> => {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
-    if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])) return false;
+    if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
+      && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
     try {
       // Force the browser to bypass its local disk cache for real-time data
       const generation = accessGeneration.current;
@@ -1484,7 +1489,7 @@ export default function Dashboard() {
     return entities;
   }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
 
-  const embeddedLiveFeeds = useMemo(() => (hasMapAccess ? embeddedNewsItems : []).map(item => ({
+  const embeddedLiveFeeds = useMemo(() => (hasPublishedMapAccess ? embeddedNewsItems : []).map(item => ({
     bridge_id: item.id,
     name: item.title,
     city: '',
@@ -1503,7 +1508,7 @@ export default function Dashboard() {
           origin_lng: item.originLongitude,
         }
       : {}),
-  })), [embeddedNewsItems, hasMapAccess]);
+  })), [embeddedNewsItems, hasPublishedMapAccess]);
 
   // WORLD has no authenticated subscriber session. A query string such as
   // ?embed=1 (or surface=internal) MUST NOT switch it to raw/internal data.
@@ -2094,9 +2099,9 @@ export default function Dashboard() {
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto rounded-full border border-white/10 bg-[#05080d]/20 p-1 shadow-[0_14px_50px_rgba(0,0,0,0.25)] backdrop-blur-2xl">
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(false); if (hasMapAccess) setShowSpaceCam(v => !v); else setShowMapAccess(true); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
+          <button onClick={() => { setShowAlerts(false); if (hasPublishedMapAccess) setShowSpaceCam(v => !v); else setShowMapAccess(true); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
-            {hasMapAccess && showSpaceCam && (
+            {hasPublishedMapAccess && showSpaceCam && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[#00E5FF]"
@@ -2105,7 +2110,7 @@ export default function Dashboard() {
           </button>
           <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">الفضاء</span>
           <AnimatePresence>
-            {hasMapAccess && showSpaceCam && (
+            {hasPublishedMapAccess && showSpaceCam && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
                 <SpaceCam />
               </motion.div>
@@ -2552,7 +2557,7 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
-      {!hasMapAccess && <button type="button" onClick={() => setShowMapAccess(true)}
+      {!hasPublishedMapAccess && <button type="button" onClick={() => setShowMapAccess(true)}
         className="absolute top-20 left-4 z-[220] rounded-xl border border-amber-200/25 bg-black/45 px-4 py-2 text-xs text-amber-100 backdrop-blur-xl">كود الدعوة</button>}
       {showMapAccess && <MapAccessGate onClose={() => setShowMapAccess(false)} onAccess={grant => { acceptMapAccess(grant); setShowMapAccess(false); }} />}
       <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />

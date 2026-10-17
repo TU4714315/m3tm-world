@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import AiOverview from './AiOverview';
 import PriorityNewsCards from './PriorityNewsCards';
+import { canViewPublishedMap } from '@/lib/mapAccessPolicy';
 
 interface LiveAlertsProps {
   data: any;
@@ -27,6 +28,7 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess = false, onRequestAccess }: LiveAlertsProps) {
+  const canViewPublished = canViewPublishedMap(hasMapAccess);
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
   const [filter, setFilter] = useState<'news' | 'quakes' | 'feeds'>('news');
@@ -92,7 +94,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
   }
 
   // Built-in live feeds (always present)
-  if (hasMapAccess) BUILTIN_FEEDS.forEach(f => {
+  if (canViewPublished) BUILTIN_FEEDS.forEach(f => {
     alerts.push({
       type: 'feed', title: f.name,
       source: `${f.city}, ${f.country}`,
@@ -136,10 +138,10 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
           <Newspaper className="w-3.5 h-3.5 text-slate-200" />
           <span className="hud-text text-[11px] text-[var(--text-primary)]">{filter === 'news' ? 'أهم الأخبار' : filter === 'quakes' ? 'تنبيهات الزلازل' : 'البث المباشر'}</span>
           <span className="gotham-tag gotham-tag--high" style={{ fontSize: '9px', padding: '1px 5px' }}>{filter === 'news' ? alerts.filter(a => a.type === 'news').length : filtered.length}</span>
-          {hasMapAccess && <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 4px' }}>{BUILTIN_FEEDS.length} بث</span>}
+          {canViewPublished && <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 4px' }}>{BUILTIN_FEEDS.length} بث</span>}
         </div>
         <div className="flex items-center gap-2">
-          {hasMapAccess && <div className="w-1.5 h-1.5 rounded-full bg-[#FF4081] animate-osiris-pulse" />}
+          {canViewPublished && <div className="w-1.5 h-1.5 rounded-full bg-[#FF4081] animate-osiris-pulse" />}
           <button onClick={(e) => { e.stopPropagation(); setMaximized(!maximized); if (!expanded && !maximized) setExpanded(true); }} className="p-1.5 -m-0.5 rounded hover:text-white hover:bg-white/10 transition-colors" title={maximized ? 'استعادة الحجم' : 'تكبير'}>
             {maximized ? <Minimize2 className="w-3 h-3 text-[var(--text-muted)]" /> : <Maximize2 className="w-3 h-3 text-[var(--text-muted)]" />}
           </button>
@@ -161,22 +163,22 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed, hasMapAccess =
               {(['news', 'quakes', 'feeds'] as const).map(f => (
                 <button
                   key={f}
-                  onClick={() => { if (f === 'feeds' && !hasMapAccess) { onRequestAccess?.(); return; } setFilter(f); }}
-                  aria-disabled={f === 'feeds' && !hasMapAccess}
+                  onClick={() => { if (f === 'feeds' && !canViewPublished) { onRequestAccess?.(); return; } setFilter(f); }}
+                  aria-disabled={f === 'feeds' && !canViewPublished}
                   className={`px-3 py-1.5 rounded text-[11px] font-mono tracking-wider transition-all ${filter === f ? 'bg-[var(--cyan-primary)]/20 text-[var(--cyan-primary)] border border-[var(--cyan-primary)]/50' : 'text-[#8A8880] border border-transparent hover:text-[#E8E6E0] hover:bg-[#2A2A28]'}`}
                 >
                   {filterLabels[f]}
-                  {f === 'feeds' && !hasMapAccess && <LockKeyhole aria-hidden="true" className="ms-1 inline h-3 w-3" />}
+                  {f === 'feeds' && !canViewPublished && <LockKeyhole aria-hidden="true" className="ms-1 inline h-3 w-3" />}
                 </button>
               ))}
             </div>
 
             {filter === 'news' && <div className="min-h-0 overflow-y-auto">
-              {!hasMapAccess && <p dir="rtl" className="px-3 pt-3 text-[10px] text-slate-400">الأخبار العامة متاحة بعد 12 ساعة من النشر.</p>}
+              {!canViewPublished && <p dir="rtl" className="px-3 pt-3 text-[10px] text-slate-400">الأخبار العامة متاحة بعد 12 ساعة من النشر.</p>}
               <PriorityNewsCards items={data.news} onLocate={onLocate} />
-              {!hasMapAccess && <PriorityNewsCards restricted items={[]} onLocate={onLocate} onRequestAccess={onRequestAccess} />}
+              {!canViewPublished && <PriorityNewsCards restricted items={[]} onLocate={onLocate} onRequestAccess={onRequestAccess} />}
             </div>}
-            {filter === 'feeds' && !hasMapAccess && <PriorityNewsCards restricted items={[]} onLocate={onLocate} onRequestAccess={onRequestAccess} />}
+            {filter === 'feeds' && !canViewPublished && <PriorityNewsCards restricted items={[]} onLocate={onLocate} onRequestAccess={onRequestAccess} />}
             {/* One-click AI overview of the current alert picture */}
             {hasMapAccess && <div className={`flex-shrink-0 ${maximized ? 'px-6 pt-3' : 'px-3 pt-2'}`}>
               <AiOverview mode="alerts" payload={data} accent="#FF4081" />

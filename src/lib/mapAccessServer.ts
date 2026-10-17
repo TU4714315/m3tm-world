@@ -1,4 +1,4 @@
-import { publicMixedMapPayload } from './mapAccessPolicy';
+import { publicMixedMapPayload, publishedMapPayload, PUBLISHED_MAP_INVITATION_REQUIRED } from './mapAccessPolicy';
 import { archiveMapNews } from './delayedNewsArchive';
 
 const AUTH_URL = 'https://heibzaolhwlzqaweludm.supabase.co/functions/v1/viewer-access';
@@ -74,9 +74,11 @@ export function withMixedMapPolicy(kind: 'news' | 'flights' | 'satellites' | 'ma
     if (!response.ok) return new Response(response.body, { status: response.status, headers });
     try {
       const body = await response.json();
-      const news = kind === 'news' ? await archiveMapNews(body.news) : null;
+      const news = kind === 'news' && PUBLISHED_MAP_INVITATION_REQUIRED ? await archiveMapNews(body.news) : null;
       const stillAllowed = access && await authorizeMapRequest(request);
-      const visible = stillAllowed ? body : publicMixedMapPayload(kind, kind === 'news' ? { ...body, news } : body);
+      const publicBody = news ? { ...body, news } : body;
+      const visible = stillAllowed ? body : !PUBLISHED_MAP_INVITATION_REQUIRED
+        ? publishedMapPayload(kind, publicBody) : publicMixedMapPayload(kind, publicBody);
       return Response.json(visible, { status: response.status, headers });
     } catch { return Response.json({ error: 'map_unavailable' }, { status: 503, headers: mapPrivateHeaders }); }
   };

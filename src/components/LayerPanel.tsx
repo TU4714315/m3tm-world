@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
-import { RESTRICTED_MAP_LAYERS } from '@/lib/mapAccessPolicy';
+import { layerRequiresInvitation } from '@/lib/mapAccessPolicy';
 import { selectDataLayers } from '@/lib/layerBulkSelection';
 
 interface LayerPanelProps {
@@ -258,7 +258,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   }, [pinnedGroup]);
 
   const toggle = (key: string) => {
-    if (!hasMapAccess && RESTRICTED_MAP_LAYERS.has(key)) { onRequestAccess?.(); return; }
+    if (!hasMapAccess && layerRequiresInvitation(key)) { onRequestAccess?.(); return; }
     // Sub-layers cannot become active independently of their parent, even
     // during rapid clicks while React is applying queued state updates.
     const definitions = LAYER_GROUPS.flatMap(group => group.layers);
@@ -286,7 +286,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   ) : null;
 
   const selectGroup = (layers: LayerDef[], enabled: boolean) => {
-    const canSelect = (key: string) => hasMapAccess || !RESTRICTED_MAP_LAYERS.has(key);
+    const canSelect = (key: string) => hasMapAccess || !layerRequiresInvitation(key);
     if (!layers.some(layer => !layer.parent && !displayKeys.includes(layer.key) && canSelect(layer.key))) {
       onRequestAccess?.(); return;
     }
@@ -363,7 +363,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
             </div>
             <div className="flex flex-col gap-1">
               {group.layers.map((layer) => {
-                const locked = !hasMapAccess && RESTRICTED_MAP_LAYERS.has(layer.key);
+                const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                 const isLayerActive = !locked && activeLayers[layer.key];
                 const count = locked ? null : getCount(layer.dataKey, layer.catKey);
                 const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
@@ -472,7 +472,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         {visibleGroups.map((group) => {
           /* Sub-layers modify a parent rather than draw anything of their own,
              so they do not count towards the rail's reading. */
-          const counted = group.layers.filter(l => !l.parent && (hasMapAccess || !RESTRICTED_MAP_LAYERS.has(l.key)));
+          const counted = group.layers.filter(l => !l.parent && (hasMapAccess || !layerRequiresInvitation(l.key)));
           const groupActive = counted.some(l => activeLayers[l.key]);
           const isHovered = hoveredGroup === group.label;
           const Icon = group.icon;
@@ -582,7 +582,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {group.layers.map((layer) => {
-                        const locked = !hasMapAccess && RESTRICTED_MAP_LAYERS.has(layer.key);
+                        const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                         const isLayerActive = !locked && activeLayers[layer.key];
                         const count = locked ? null : getCount(layer.dataKey, layer.catKey);
                         const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];

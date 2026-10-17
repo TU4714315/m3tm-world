@@ -38,11 +38,12 @@ describe('access-aware public map presentation', () => {
     expect(html).toContain('https://example.org/report');
     expect(html).not.toContain('كود الدعوة');
   });
-  it('shows the restricted layer as locked and off even if a persisted selection was on', () => {
+  it('keeps published military layers selected and operable without an invitation', () => {
     const props = { data: {}, activeLayers: { military_activity: true, reference_atlas: true, flights: true }, setActiveLayers: vi.fn(), isMobile: true };
     const locked = renderToStaticMarkup(createElement(LayerPanel, props));
     const unlocked = renderToStaticMarkup(createElement(LayerPanel, { ...props, hasMapAccess: true }));
-    expect(locked).toMatch(/aria-disabled="true" aria-pressed="false" aria-label="نشاط جوي عسكري عام · كود الدعوة"/);
+    expect(locked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
+    expect(locked).not.toContain(" · كود الدعوة");
     expect(locked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="التجارية"/);
     expect(unlocked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
   });
