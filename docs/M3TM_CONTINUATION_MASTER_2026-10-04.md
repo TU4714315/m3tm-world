@@ -302,3 +302,14 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **VERIFY:** Full current-head WORLD CI, TypeScript, unit/build/privacy and APP frame gate first. After deployment, rerun the identical PR #139 read-only live browser benchmark on desktop/mobile/embedded, collect first usable map, TTFB, resources, JS heap and rAF proxy. Do not claim a gain or WebGL FPS before measurement. Validate style/3D switching, RTL, alerts and correct APP headline deep links.
 
 **BLOCKERS:** External ArcGIS/Carto tile latency, OpenSky 429, GDELT timeouts and separate viewer snapshot HTTP404 may persist. Do not display stale source data as live or invent missing regional events. Mixed local workspace must not be reset; untracked backup requires independent verification.
+
+
+## 2026-10-17 — Approved APP news ticker bounded recovery (#142)
+
+**Evidence:** Chromium live WORLD desktop after #141 (run 39070866442) had a working map but a truthful empty approved-news ticker; an independently queried live /api/news subsequently contained 94 items, including 42 feed_origin=m3tm-app and 52 independent-rss. This is an intermittent source timing/fetch condition, not evidence that external RSS should be rebranded as APP news.
+
+**DONE:** The WORLD public news loader now retries twice at 12 and 32 seconds after cold start only if no valid M3TM.APP-origin item is present, then returns to its existing 60-second refresh cycle. Retry windows are cancelled on unmount; hidden pages do not issue the extra requests. Original publisher provenance remains unchanged; neither empty nor failed cycles create synthetic articles. Unit tests guard valid approved input, external-only response, missing timestamps and bounded retry.
+
+**VERIFY:** Full current-head unit/build/privacy CI and read-only browser acceptance; if the approved feed remains empty because the original APP endpoint itself is empty or unreachable, the UI must continue to show honest no-news state. #139 still tracks live desktop alert-panel access and variable third-party map load.
+
+**BLOCKER:** No guarantee that every cold Render request receives fresh APP feed content; CDN/provider conditions may vary. This patch cannot convert unverified/older independent RSS items into approved M3TM.APP titles.
