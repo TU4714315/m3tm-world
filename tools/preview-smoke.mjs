@@ -183,6 +183,20 @@ try {
     }
     measurements.liveAssets = await evaluate("({mapTiles:performance.getEntriesByType('resource').filter(e=>/World_Imagery|cartocdn|tiles/.test(e.name)).length,viewport:window.innerWidth,overflow:document.documentElement.scrollWidth>window.innerWidth})");
     await check('No horizontal overflow in deployed WORLD viewport', "document.documentElement.scrollWidth <= window.innerWidth+2");
+    if (!smokeMobile && !url.includes('embed=1')) {
+      const firstLink = measurements.publishedWorld.headlineLinks?.[0]?.url;
+      if (firstLink) {
+        const beforeStory = await command('Page.captureScreenshot', { format: 'png' });
+        await writeFile(join(output, 'world-before-story.png'), Buffer.from(beforeStory.data, 'base64'));
+        const requestedId = new URL(firstLink).searchParams.get('story');
+        await command('Page.navigate', { url: firstLink });
+        for (let i=0; i<20 && !await evaluate("!!document.querySelector('[data-news-id]')"); i++) await pause(1000);
+        measurements.storyNavigation = await evaluate("({url:location.href,cards:document.querySelectorAll('[data-news-id]').length,selected:[...document.querySelectorAll('[data-news-id].is-linked')].map(e=>e.getAttribute('data-news-id'))})");
+        await check('Approved WORLD headline opens its exact public APP card', "(()=>{const id=new URLSearchParams(location.search).get('story');return id==="+JSON.stringify(requestedId)+"&&!![...document.querySelectorAll('[data-news-id].is-linked')].find(e=>e.getAttribute('data-news-id')===id)})()" );
+      } else {
+        checks.push({ name: 'A published APP headline is available for real deep-link verification', passed: false });
+      }
+    }
   } else if (scenario === 'recovery') {
     await check('Failed style shows recovery state', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'error' && document.body.innerText.includes('Retry map')`);
     await command('Network.setBlockedURLs', { urls: [] });
