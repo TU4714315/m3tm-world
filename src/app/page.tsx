@@ -4,7 +4,7 @@ import { createMapMemberExchange } from '@/lib/mapMemberExchange';
 import { useMapAccess } from '@/lib/useMapAccess';
 import { canViewPublishedMap, temporaryPublicMapEndpoint, publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
 import { stageMapLayers } from '@/lib/mapStartupLayers';
-import { needsApprovedAppNewsRetry } from '@/lib/appNewsRetry';
+import { needsApprovedAppNewsRetry, isSupersededNewsResponse } from '@/lib/appNewsRetry';
 
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -905,7 +905,7 @@ export default function Dashboard() {
     const endpointKey = url.split('?')[0];
     const newsSeq = endpointKey === '/api/news' ? ++newsRequestSequenceRef.current : null;
     // A newer failed retry never supersedes an older successful response.
-    const supersededNews = () => newsSeq !== null && newsSeq < latestAppliedNewsRequestRef.current;
+    const supersededNews = () => newsSeq !== null && isSupersededNewsResponse(newsSeq, latestAppliedNewsRequestRef.current);
     markEndpointStatus(endpointKey, 'loading');
     try {
       // Force the browser to bypass its local disk cache for real-time data
