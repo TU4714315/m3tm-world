@@ -42,6 +42,7 @@ import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/wo
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
 import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
+import MapStartupWatchdog from '@/components/MapStartupWatchdog';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -233,6 +234,8 @@ export default function Dashboard() {
   const [embeddedNewsItems, setEmbeddedNewsItems] = useState<EmbeddedNewsItem[]>([]);
   const [embeddedRoute, setEmbeddedRoute] = useState<EmbeddedRoute | null>(null);
   const worldMapReadyRef = useRef(false);
+  const [worldMapInitialized, setWorldMapInitialized] = useState(false);
+  const [mapStartupAttempt, setMapStartupAttempt] = useState(0);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -805,7 +808,17 @@ export default function Dashboard() {
     }
   }, [embedMode]);
 
+  const retryWorldMapStartup = useCallback(() => {
+    worldMapReadyRef.current = false;
+    setWorldMapInitialized(false);
+    if (deferredMapTimerRef.current) clearTimeout(deferredMapTimerRef.current);
+    deferredMapScheduledRef.current = false;
+    setDeferredMapReady(false);
+    setMapStartupAttempt(value => value + 1);
+  }, []);
+
   const handleWorldMapReady = useCallback(() => {
+    setWorldMapInitialized(true);
     worldMapReadyRef.current = true;
     if (!deferredMapScheduledRef.current) {
       deferredMapScheduledRef.current = true;
@@ -1798,7 +1811,7 @@ export default function Dashboard() {
       <div dir="ltr" className="absolute inset-0">
       <ErrorBoundary name="Map">
         <WorldMap
-          key={worldTheme}
+          key={worldTheme + ':' + mapStartupAttempt}
           data={sdkDisplayData}
           activeLayers={visibleRenderLayers}
           onReady={handleWorldMapReady}
@@ -1840,6 +1853,11 @@ export default function Dashboard() {
         />
       </ErrorBoundary>
       </div>
+      <MapStartupWatchdog
+        ready={worldMapInitialized}
+        attempt={mapStartupAttempt}
+        onRetry={retryWorldMapStartup}
+      />
 
       {/* ── DIRECTIONS — opens beside the right-hand tool rail ── */}
       <div
