@@ -8,7 +8,10 @@ const url = process.env.PREVIEW_URL || 'http://127.0.0.1:3001';
 const scenario = process.env.SMOKE_SCENARIO || 'startup';
 // A single read-only deployed APP check is permitted on an isolated CI runner.
 const liveAppProbe = process.env.CI === 'true' && scenario === 'app-frame' && new URL(url).href === 'https://m3tm.app/';
-if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname) && !liveAppProbe) {
+const liveWorldProbe = process.env.CI === 'true' && scenario === 'world-live' &&
+  new URL(url).origin === 'https://m3tm-world-recovery.onrender.com';
+const smokeMobile = process.env.SMOKE_MOBILE === '1';
+if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname) && !liveAppProbe && !liveWorldProbe) {
   throw new Error('This smoke test only accepts localhost previews.');
 }
 const profile = await mkdtemp(join(tmpdir(), 'osiris-smoke-'));
@@ -104,7 +107,7 @@ const deadline = setTimeout(() => {
   console.error('Browser test timed out');
   chrome.kill();
   process.exitCode = 1;
-}, liveAppProbe ? 130_000 : 100_000);
+}, liveAppProbe || liveWorldProbe ? 165_000 : 100_000);
 try {
   const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await command('Target.attachToTarget', { targetId, flatten: true }));
@@ -123,7 +126,7 @@ try {
       && event.data?.source==='m3tm-world' && event.data?.type==='m3tm:ready' && event.data?.version===1) window.__publishedWorldReady.push({origin:event.origin,at:Date.now()});
   });` });
   if (scenario === 'recovery') await command('Network.setBlockedURLs', { urls: [`${new URL(url).origin}/dark-matter-style.json*`] });
-  await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile'
+  await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile' || smokeMobile
     ? { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
     : { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await command('Page.navigate', { url });
@@ -145,6 +148,36 @@ try {
     await check('Deployed APP receives map-ready from its exact WORLD frame', `window.__publishedWorldReady?.length>0 && !document.querySelector('[data-testid="m3tm-world-unavailable"]')`);
     await check('Published frame remains on its fixed trusted origin', `document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src==='https://m3tm-world-recovery.onrender.com/?embed=1&surface=public'`);
     await check('Published news has one publisher link per card', `(()=>{const cards=[...document.querySelectorAll('.gate1-news-panel article')];return cards.length>0 && cards.every(card=>card.querySelectorAll('a').length===1)})()`);
+  } else if (liveWorldProbe) {
+    // A real Chromium loads the public deployed WORLD runtime. No API fixtures
+    // and no internal credentials. Keep external-source failures observable.
+    for (let i = 0; i < 25 && !await evaluate("!!document.querySelector('.world-news-ticker')"); i++) await pause(1000);
+    const state = await evaluate("({headlineLinks:[...document.querySelectorAll('.world-news-ticker a[href*=\"story=\"]')].map(a=>({url:a.href,title:a.textContent.trim()})),tickerText:document.querySelector('.world-news-ticker')?.innerText?.slice(0,1200),canvas:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),embed:document.querySelector('.world-news-ticker')?.getAttribute('data-embed'),title:document.title})");
+    measurements.publishedWorld = state;
+    await check('Published WORLD renders the branded expanded ticker', "document.querySelector('.world-news-ticker')?.innerText.includes('M3TM')");
+    await check('Ticker links only to M3TM.APP internal story URLs', "(()=>{const links=[...document.querySelectorAll('.world-news-ticker a')];return links.length>0 && links.every(a=>a.href.startsWith('https://m3tm.app/news'))})()");
+    await check('WORLD uses a real MapLibre canvas, not a placeholder', "!![...document.querySelectorAll('.maplibregl-canvas')].find(c=>c.width>0&&c.height>0)");
+    await check('Public WORLD stays separate from private OSINT', "!document.body.innerText.includes('Scan Target') && !document.body.innerText.includes('Port Scanner')");
+    await check('Arabic right-to-left document direction', "document.documentElement.dir==='rtl' || document.querySelector('main')?.getAttribute('dir')==='rtl' || getComputedStyle(document.body).direction==='rtl'");
+    if (!smokeMobile && !url.includes('embed=1')) {
+      const hasDesktopStyle = await evaluate("!!document.querySelector('button[title=\"الوضع الليلي\"]') && !!document.querySelector('button[title=\"عرض الأقمار الصناعية\"]')");
+      checks.push({name:'Both geographic and satellite controls are present',passed:hasDesktopStyle});
+      if (hasDesktopStyle) {
+        await click('الوضع الليلي'); await pause(3800);
+        await check('Night basemap switch changes active control without dropping canvas', "document.querySelector('button[title=\"الوضع الليلي\"]')?.getAttribute('aria-pressed')==='true' && document.querySelectorAll('.maplibregl-canvas').length===1");
+        await click('عرض الأقمار الصناعية'); await pause(3800);
+        await check('Satellite switch restores active map without dropping canvas', "document.querySelector('button[title=\"عرض الأقمار الصناعية\"]')?.getAttribute('aria-pressed')==='true' && document.querySelectorAll('.maplibregl-canvas').length===1");
+      }
+      const toggle = await evaluate("document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')");
+      measurements.alertToggleBefore = toggle ?? null;
+      if (toggle != null) {
+        await click('تنبيهات ميدانية منشورة'); await pause(350);
+        await check('Field-alert layer switch changes state', "document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')!==`${JSON.stringify(toggle)}`);
+        await click('تنبيهات ميدانية منشورة');
+      } else checks.push({name:'Public field-alert switch is reachable',passed:false});
+    }
+    measurements.liveAssets = await evaluate("({mapTiles:performance.getEntriesByType('resource').filter(e=>/World_Imagery|cartocdn|tiles/.test(e.name)).length,viewport:window.innerWidth,overflow:document.documentElement.scrollWidth>window.innerWidth})");
+    await check('No horizontal overflow in deployed WORLD viewport', "document.documentElement.scrollWidth <= window.innerWidth+2");
   } else if (scenario === 'recovery') {
     await check('Failed style shows recovery state', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'error' && document.body.innerText.includes('Retry map')`);
     await command('Network.setBlockedURLs', { urls: [] });
