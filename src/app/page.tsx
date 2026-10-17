@@ -42,6 +42,7 @@ import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/wo
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
 import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
+import MapStartupWatchdog from '@/components/MapStartupWatchdog';
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -233,6 +234,7 @@ export default function Dashboard() {
   const [embeddedNewsItems, setEmbeddedNewsItems] = useState<EmbeddedNewsItem[]>([]);
   const [embeddedRoute, setEmbeddedRoute] = useState<EmbeddedRoute | null>(null);
   const worldMapReadyRef = useRef(false);
+  const [worldMapInitialized, setWorldMapInitialized] = useState(false);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -805,7 +807,15 @@ export default function Dashboard() {
     }
   }, [embedMode]);
 
+  const retryWorldMapStartup = useCallback(() => {
+    // A failed Next.js lazy chunk may cache its rejected import promise.
+    // Reload only after a user clicks: this resets the chunk loader,
+    // ErrorBoundary and MapLibre runtime together, with no redirect.
+    window.location.reload();
+  }, []);
+
   const handleWorldMapReady = useCallback(() => {
+    setWorldMapInitialized(true);
     worldMapReadyRef.current = true;
     if (!deferredMapScheduledRef.current) {
       deferredMapScheduledRef.current = true;
@@ -1840,6 +1850,11 @@ export default function Dashboard() {
         />
       </ErrorBoundary>
       </div>
+      <MapStartupWatchdog
+        ready={worldMapInitialized}
+        attempt={0}
+        onRetry={retryWorldMapStartup}
+      />
 
       {/* ── DIRECTIONS — opens beside the right-hand tool rail ── */}
       <div

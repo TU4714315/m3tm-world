@@ -313,3 +313,12 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **VERIFY:** Full current-head unit/build/privacy CI and read-only browser acceptance; if the approved feed remains empty because the original APP endpoint itself is empty or unreachable, the UI must continue to show honest no-news state. #139 still tracks live desktop alert-panel access and variable third-party map load.
 
 **BLOCKER:** No guarantee that every cold Render request receives fresh APP feed content; CDN/provider conditions may vary. This patch cannot convert unverified/older independent RSS items into approved M3TM.APP titles.
+
+
+## 2026-10-17 — MapLibre asynchronous chunk hydration watchdog (#143)
+
+**Evidence:** Production APP iframe Chromium run 39075201684 had a loaded WORLD child document, 374×398 viewport, 20 Next page scripts and WebGL2 supported, but zero map containers or canvas after prolonged waiting. Therefore absent `m3tm:ready` can occur *before* `WorldMap` mounts; its internal 14+15 second style fallback cannot catch this case. Direct WORLD embed can pass in separate runs, so this is intermittent, not evidence of universal failure.
+
+**Change:** Add a client-side pre-MapLibre watchdog starting on visible frames. After 45s without true map ready, display a truthful, dismissible-on-late-success delay overlay and explicit manual whole-frame reload button. This explicitly resets failed lazy-import promises and a latched ErrorBoundary; it does not start a recurring retry, fabricate a map, enable hidden layers or change APP authentication. Hidden tabs do not count down, and elapsed visible time is preserved across tab switches. On explicit restart, reset map instance key and staged heavy visuals, preserve user choices and all original source attribution. Unit fake timer checks cover visibility, manual retry and late success.
+
+**Gate:** CI/unit/typecheck/privacy; real Chromium before/after in standalone desktop/mobile and APP embedded. A watchdog proves no indefinite silent spinner, not that the lazy chunk has loaded or that FPS improved. Track missing initial canvas as outstanding until repeated runs show no evidence of stall.
