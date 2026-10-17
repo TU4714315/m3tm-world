@@ -172,7 +172,7 @@ try {
       measurements.alertToggleBefore = toggle ?? null;
       if (toggle != null) {
         await click('تنبيهات ميدانية منشورة'); await pause(350);
-        await check('Field-alert layer switch changes state', "document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')!==`${JSON.stringify(toggle)}`);
+        await check('Field-alert layer switch changes state', "document.querySelector('button[aria-label=\\\"تنبيهات ميدانية منشورة\\\"]')?.getAttribute('aria-pressed')!=="+JSON.stringify(toggle));
         await click('تنبيهات ميدانية منشورة');
       } else checks.push({name:'Public field-alert switch is reachable',passed:false});
     }
