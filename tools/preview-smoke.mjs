@@ -163,10 +163,11 @@ try {
         const canvas=root?.querySelector('.maplibregl-canvas');
         return Number.isFinite(camera.lat) && Number.isFinite(camera.lng) && canvas?.width>0 && canvas?.height>0;
       })()`);
-      await check('Globe projection is actually initialized', `document.querySelector('[data-map-projection]')?.dataset.mapProjection === 'globe'`);
+      await check('Lightweight flat projection is actually initialized', `document.querySelector('[data-map-projection]')?.dataset.mapProjection === 'mercator'`);
     } else {
       await check('Fresh map finishes loading', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready'`);
-      await check('Globe projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'globe'`);
+      await check('Lightweight flat projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'mercator'`);
+      await check('3D globe remains available for explicit selection', `!!document.querySelector('button[title="كرة ثلاثية الأبعاد"]')`);
     }
     await check('Terrain is not fetched during startup', `!performance.getEntriesByType('resource').some(r => r.name.includes('elevation-tiles-prod'))`);
     if (scenario === 'yemen') {
