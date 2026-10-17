@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MapAccessGrant } from '@/components/MapAccessGate';
+import { shouldPollMapAccess } from './mapAccessPollPolicy';
 
 export function useMapAccess() {
   const [hasMapAccess, setAllowed] = useState(false);
@@ -32,6 +33,7 @@ export function useMapAccess() {
   const headers = useCallback((): Record<string, string> => token.current ? { Authorization: `Bearer ${token.current}` } : {}, []);
   useEffect(() => {
     let disposed = false;
+    let lastAnonymousCheck = Date.now();
     const check = async () => {
       const started = sequence.current;
       try {
@@ -52,8 +54,15 @@ export function useMapAccess() {
     };
     void check();
     const timer = setInterval(() => {
-      if (expiry.current && expiry.current <= Date.now()) clear();
-      else void check();
+      if (expiry.current && expiry.current <= Date.now()) {
+        clear();
+        return;
+      }
+      const now = Date.now();
+      const hasGrant = expiry.current > 0 || Boolean(token.current);
+      if (!shouldPollMapAccess(hasGrant, document.hidden, now, lastAnonymousCheck)) return;
+      if (!hasGrant) lastAnonymousCheck = now;
+      void check();
     }, 10_000);
     return () => { disposed = true; clearInterval(timer); if (expiryTimer.current) clearTimeout(expiryTimer.current); };
   }, [clear, headers]);
