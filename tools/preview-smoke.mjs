@@ -107,7 +107,7 @@ const deadline = setTimeout(() => {
   console.error('Browser test timed out');
   chrome.kill();
   process.exitCode = 1;
-}, liveAppProbe || liveWorldProbe ? 165_000 : 100_000);
+}, liveAppProbe || liveWorldProbe ? 230_000 : 100_000);
 try {
   const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await command('Target.attachToTarget', { targetId, flatten: true }));
@@ -152,6 +152,10 @@ try {
     // A real Chromium loads the public deployed WORLD runtime. No API fixtures
     // and no internal credentials. Keep external-source failures observable.
     for (let i = 0; i < 25 && !await evaluate("!!document.querySelector('.world-news-ticker')"); i++) await pause(1000);
+    // Differentiate a delayed Next.js RSC/client bootstrap from a map failure.
+    for (let i = 0; i < 60 && !await evaluate("!![...document.querySelectorAll('.maplibregl-canvas')].find(c=>c.width>0&&c.height>0)"); i++) await pause(1000);
+    measurements.bootstrap = await evaluate("({state:document.readyState,scriptCount:document.scripts.length,externalScripts:[...document.scripts].map(s=>s.src).filter(Boolean).slice(0,18),hasNextData:!!document.getElementById('__NEXT_DATA__'),nextScripts:[...document.querySelectorAll('link[rel=modulepreload],link[rel=preload]')].length,reactRoot:!!document.getElementById('__next'),title:document.title,elapsedMs:Math.round(performance.now())})");
+    measurements.responseLedger = [...network.values()].filter(x => /_next|api\/news|maplibre/.test(x.url)).slice(0,28);
     const state = await evaluate("({headlineLinks:[...document.querySelectorAll('.world-news-ticker a[href*=\"story=\"]')].map(a=>({url:a.href,title:a.textContent.trim()})),tickerText:document.querySelector('.world-news-ticker')?.innerText?.slice(0,1200),canvas:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),embed:document.querySelector('.world-news-ticker')?.getAttribute('data-embed'),title:document.title})");
     measurements.publishedWorld = state;
     await check('Published WORLD renders the branded expanded ticker', "document.querySelector('.world-news-ticker')?.innerText.includes('M3TM')");
