@@ -29,16 +29,28 @@ export default function MapStartupWatchdog({
     if (ready) return;
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const pauseWhenHidden = () => {
+    let visibleStart = 0;
+    let visibleElapsed = 0;
+    const syncVisibility = () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = null;
-      if (!document.hidden) timeoutId = setTimeout(() => setTimedOut(isMapStartupDelayDue(ready, !document.hidden, waitMs, waitMs)), waitMs);
+      if (visibleStart) {
+        visibleElapsed += Date.now() - visibleStart;
+        visibleStart = 0;
+      }
+      if (document.hidden) return;
+      visibleStart = Date.now();
+      const remaining = Math.max(0, waitMs - visibleElapsed);
+      timeoutId = setTimeout(() => {
+        const elapsed = visibleElapsed + (Date.now() - visibleStart);
+        setTimedOut(isMapStartupDelayDue(ready, !document.hidden, elapsed, waitMs));
+      }, remaining);
     };
-    pauseWhenHidden();
-    document.addEventListener('visibilitychange', pauseWhenHidden);
+    syncVisibility();
+    document.addEventListener('visibilitychange', syncVisibility);
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
-      document.removeEventListener('visibilitychange', pauseWhenHidden);
+      document.removeEventListener('visibilitychange', syncVisibility);
     };
   }, [ready, attempt, waitMs]);
 
