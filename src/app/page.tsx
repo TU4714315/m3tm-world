@@ -205,6 +205,7 @@ export default function Dashboard() {
   const publishedRef = useRef(hasPublishedMapAccess);
   publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
+  const newsRequestSequenceRef = useRef(0);
   const [dataVersion, setDataVersion] = useState(0);
   const [endpointStatus, setEndpointStatus] = useState<Record<string, 'loading' | 'ok' | 'error'>>({});
   const markEndpointStatus = useCallback((endpoint: string, status: 'loading' | 'ok' | 'error') => {
@@ -901,15 +902,17 @@ export default function Dashboard() {
     if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
       && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
     const endpointKey = url.split('?')[0];
+    const newsSeq = endpointKey === '/api/news' ? ++newsRequestSequenceRef.current : null;
+    const supersededNews = () => newsSeq !== null && newsSeq !== newsRequestSequenceRef.current;
     markEndpointStatus(endpointKey, 'loading');
     try {
       // Force the browser to bypass its local disk cache for real-time data
       const generation = accessGeneration.current;
       const res = await fetch(url, { ...options, cache: 'no-store', headers: { ...options?.headers, ...mapAccessHeaders() } });
-      if (generation !== accessGeneration.current) return false;
+      if (generation !== accessGeneration.current || supersededNews()) return false;
       if (res.ok) {
         const json = await res.json();
-        if (generation !== accessGeneration.current) return false;
+        if (generation !== accessGeneration.current || supersededNews()) return false;
         const d = transform ? transform(json) : json;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
@@ -917,10 +920,13 @@ export default function Dashboard() {
         setBackendStatus('connected');
         return true;
       }
+      if (supersededNews()) return false;
       markEndpointStatus(endpointKey, 'error');
       return false;
     } catch (e) {
+      if (supersededNews()) return false;
       console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e);
+      if (supersededNews()) return false;
       markEndpointStatus(endpointKey, 'error');
       setBackendStatus('error');
       return false;
@@ -949,11 +955,27 @@ export default function Dashboard() {
     // An HTTP-200 response may contain only external RSS after an APP source
     // timeout. Make two bounded attempts for the approved APP ticker without
     // presenting the external rows as M3TM.APP news.
-    const approvedNewsRetryTimers = [12_000, 32_000].map((delay, attempt) =>
-      window.setTimeout(() => {
-        if (document.hidden || !needsApprovedAppNewsRetry(dataRef.current.news, attempt)) return;
-        void fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true });
-      }, delay));
+    let approvedNewsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let approvedNewsRetryCount = 0;
+    let approvedNewsPendingVisibility = false;
+    const runApprovedNewsRetry = () => {
+      if (document.hidden) {
+        approvedNewsPendingVisibility = true;
+        return;
+      }
+      approvedNewsPendingVisibility = false;
+      if (!needsApprovedAppNewsRetry(dataRef.current.news, approvedNewsRetryCount)) return;
+      approvedNewsRetryCount += 1;
+      void fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true });
+      if (approvedNewsRetryCount < 2) {
+        approvedNewsRetryTimer = window.setTimeout(runApprovedNewsRetry, 20_000);
+      }
+    };
+    const onNewsPageVisible = () => {
+      if (!document.hidden && approvedNewsPendingVisibility) runApprovedNewsRetry();
+    };
+    document.addEventListener('visibilitychange', onNewsPageVisible);
+    approvedNewsRetryTimer = window.setTimeout(runApprovedNewsRetry, 12_000);
     /* A cold start can time out every upstream quote and return an all-empty
        feed. Waiting a full poll interval to find out leaves the panel blank for
        15 minutes, so retry a few times up-front until instruments actually land. */
@@ -983,7 +1005,8 @@ export default function Dashboard() {
       clearTimeout(marketTimer);
       marketRetries.forEach(clearTimeout);
       clearTimeout(spaceTimer);
-      approvedNewsRetryTimers.forEach(clearTimeout);
+      if (approvedNewsRetryTimer) clearTimeout(approvedNewsRetryTimer);
+      document.removeEventListener('visibilitychange', onNewsPageVisible);
       intervals.forEach(clearInterval);
     };
   }, [fetchEndpoint, hasMapAccess]);
