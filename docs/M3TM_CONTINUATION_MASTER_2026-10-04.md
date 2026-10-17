@@ -322,3 +322,13 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **Change:** Add a client-side pre-MapLibre watchdog starting on visible frames. After 45s without true map ready, display a truthful, dismissible-on-late-success delay overlay and explicit manual whole-frame reload button. This explicitly resets failed lazy-import promises and a latched ErrorBoundary; it does not start a recurring retry, fabricate a map, enable hidden layers or change APP authentication. Hidden tabs do not count down, and elapsed visible time is preserved across tab switches. On explicit restart, reset map instance key and staged heavy visuals, preserve user choices and all original source attribution. Unit fake timer checks cover visibility, manual retry and late success.
 
 **Gate:** CI/unit/typecheck/privacy; real Chromium before/after in standalone desktop/mobile and APP embedded. A watchdog proves no indefinite silent spinner, not that the lazy chunk has loaded or that FPS improved. Track missing initial canvas as outstanding until repeated runs show no evidence of stall.
+
+## 2026-10-17 — Second-pass MapLibre source-write and bundle optimization
+
+MEASURED BASELINE: APP main 5641010c, WORLD Render main cc8f2582. PR #139 merged; real Chromium production run 39076719234 recorded WORLD first usable 20.674s desktop, 34.395s mobile, 34.636s standalone embed; responseStart 0.327s, 7.664s, 8.053s. Each is one run, not median/P95. SwiftShader rAF scheduling is not WebGL FPS.
+
+DONE ON BRANCH: Optional satellite cards, weather bars, CCTV/news previews are code-split instead of static map-bundle prerequisites. Dormant inactive preview components no longer mount. GeoJSON writes for identical small/medium values are skipped with exact full-payload comparisons stored in a WeakMap keyed to the actual MapLibre source; large payloads always update, and style replacement gets new source identity. Redundant layout visibility writes are skipped. Tests verify changed events and new sources.
+
+GATE: CI unit/build/privacy first, then deploy only under release policy and remeasure real Chromium desktop/mobile/APP iframe repeatedly (TTFB, first canvas, map-ready, network bytes, JS heap and rAF proxy). No speed or GPU FPS improvement is claimed until measured. Do not remove public events or bypass internal OSINT separation.
+
+EXTERNAL LIMITS: OpenSky 429 and GDELT timeouts need backoff and explicitly stale last-good data; memory-only atlas cache does not survive instance restart without configured Redis. Null atlas sourcePublishedAt must remain unknown rather than invented. Viewer snapshot HTTP404 needs backend-function/schema review before safe publish.
