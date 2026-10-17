@@ -7,6 +7,7 @@ import { priorityNews } from '@/lib/priorityNews';
 
 interface NewsTickerItem {
   id: string;
+  feed_origin?: string;
   title: string;
   published: string;
   source: string;
@@ -76,13 +77,14 @@ function decodeHtmlText(value: string): string {
 export default function GlobalStatusBar({ news = [], embed = false }: { news?: NewsTickerItem[]; embed?: boolean }) {
   // Preserve the ticker's time windows, ordering and limit. Reuse the card's
   // publisher-link and explicit-breaking rules only after selecting the rows.
-  const tickerItems = useMemo(() => sortImportantNews(news).flatMap(item => {
+  const tickerItems = useMemo(() => sortImportantNews(news.filter(item => item.feed_origin === 'm3tm-app')).flatMap(item => {
     const presentation = priorityNews([{ ...item, title: decodeHtmlText(item.title), source: decodeHtmlText(item.source) }])[0];
     return presentation ? [{ ...item, presentation }] : [];
   }), [news]);
   const reduceMotion = useReducedMotion();
 
   const hasTicker = tickerItems.length > 0;
+  const detailHref = (id: string) => `https://m3tm.app/news?story=${encodeURIComponent(id)}#news`;
 
   return (
     <motion.div
@@ -92,7 +94,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
       data-embed={embed ? "true" : "false"}
       className="world-news-ticker absolute bottom-0 left-0 right-0 z-[210] pointer-events-none"
     >
-      <div className="h-[32px] overflow-hidden border border-white/15 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,.07)] flex items-center text-[10px] backdrop-blur-xl relative">
+      <div className="min-h-[46px] overflow-hidden border border-white/15 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,.07)] flex items-center text-sm backdrop-blur-xl relative">
 
         {/* ── NEWS ── */}
         <div className="flex-shrink-0 h-full flex items-center pointer-events-auto">
@@ -104,7 +106,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
             className="h-full px-3 flex items-center gap-1.5 text-slate-200 hover:text-cyan-100 hover:bg-white/5 border-r border-white/10 transition-colors duration-200"
           >
             <Newspaper aria-hidden="true" className="h-3.5 w-3.5 text-slate-300" />
-            <span className="text-[9px] font-bold tracking-[0.12em]">أهم الأخبار</span>
+            <span className="text-[12px] font-bold tracking-[0.08em]">M3TM · أهم الأخبار</span>
           </a>
         </div>
 
@@ -129,12 +131,10 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
                     >
                       <Newspaper aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-slate-300" />
                       {item.presentation.breaking && <span className="rounded border border-[#FF4D4D]/30 bg-[#FF4D4D]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[#FF4D4D]">عاجل</span>}
-                      <span className="text-[11px] font-semibold text-slate-100">{item.presentation.title}</span>
-                      {item.presentation.url ? <a href={item.presentation.url} target="_blank" rel="noopener noreferrer"
+                      <a href={detailHref(item.id)} target="_blank" rel="noopener noreferrer"
                         tabIndex={repeatIdx === 0 ? undefined : -1}
-                        aria-label={repeatIdx === 0 ? `المصدر: ${item.presentation.source}` : undefined}
-                        className="rounded-sm text-[10px] text-slate-300 underline decoration-white/25 underline-offset-4 hover:text-cyan-100 focus-visible:outline-cyan-200">{item.presentation.source}</a>
-                        : <span className="text-[10px] text-slate-400">{item.presentation.source}</span>}
+                        aria-label={repeatIdx === 0 ? `قراءة تفاصيل الخبر في M3TM.APP: ${item.presentation.title}` : undefined}
+                        className="rounded-sm text-[13px] font-semibold leading-relaxed text-slate-100 hover:text-cyan-100 focus-visible:outline-cyan-200">{item.presentation.title}</a>
                       <span className="text-[9px] text-slate-400">{compactPublished(item.published)}</span>
                     </span>
                   ))}
@@ -150,7 +150,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
               className="pointer-events-auto h-full flex items-center justify-center gap-2 text-white/40 hover:text-white/70"
             >
               <Newspaper aria-hidden="true" className="h-3.5 w-3.5 text-slate-300" />
-              <span>لا توجد عناوين حديثة متاحة الآن — فتح أخبار M3TM.APP</span>
+              <span>لا توجد عناوين منشورة من M3TM.APP الآن — فتح المنصة الأساسية</span>
             </a>
           )}
         </div>
