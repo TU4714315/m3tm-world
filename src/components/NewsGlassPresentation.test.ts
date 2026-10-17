@@ -5,7 +5,7 @@ import PriorityNewsCards from './PriorityNewsCards';
 import GlobalStatusBar from './GlobalStatusBar';
 
 const story = (extra = {}) => ({
-  id: 'story', title: 'عنوان منشور واضح', source: 'ناشر الخبر',
+  id: 'story', feed_origin: 'm3tm-app', title: 'عنوان منشور واضح', source: 'ناشر الخبر',
   link: 'https://news.org/story', risk_score: 1,
   published: new Date(Date.now() - 13 * 3_600_000).toISOString(), ...extra,
 });
@@ -45,10 +45,12 @@ describe('shared glass news presentation', () => {
     expect(html).toMatch(/<a[^>]+href="https:\/\/news.org\/story"[^>]*>ناشر الخبر<\/a>/);
     expect(html).not.toContain('<b>');
   });
-  it('gives each ticker copy one publisher link, with only the first copy in the tab order', () => {
+  it('links four ticker copies to the corresponding APP story, never to the publisher', () => {
     const html = ticker([story()]);
-    expect(html.match(/href="https:\/\/news.org\/story"/g)).toHaveLength(4);
-    expect(html.match(/aria-label="المصدر: ناشر الخبر"/g)).toHaveLength(1);
+    expect(html.match(/href="https:\/\/m3tm.app\/news\?story=story#news"/g)).toHaveLength(4);
+    expect(html).not.toContain('https://news.org/story');
+    expect(html).not.toContain('>ناشر الخبر</');
+    expect(html.match(/aria-label="قراءة تفاصيل الخبر في M3TM.APP:/g)).toHaveLength(1);
     expect(html.match(/tabindex="-1"/g)).toHaveLength(3);
     expect(html).toContain('focus-within:[animation-play-state:paused]');
     expect(html).toContain('motion-reduce:animate-none');
@@ -67,8 +69,13 @@ describe('shared glass news presentation', () => {
       expect(card).not.toContain('<a ');
       expect(bar).not.toContain('aria-label="المصدر:');
       expect(card).toContain('ناشر الخبر');
-      expect(bar).toContain('ناشر الخبر');
+      expect(bar).not.toContain('ناشر الخبر');
     }
+  });
+  it('excludes independent RSS stories from the APP-only ticker', () => {
+    const html = ticker([story({ id: 'unapproved', feed_origin: 'independent-rss', title: 'RSS_ONLY_NOT_APPROVED' })]);
+    expect(html).not.toContain('RSS_ONLY_NOT_APPROVED');
+    expect(html).toContain('لا توجد عناوين منشورة من M3TM.APP');
   });
   it('retains ticker currentness windows and score ordering without archival padding', () => {
     const html = ticker([
