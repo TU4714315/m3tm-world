@@ -236,10 +236,17 @@ try {
       }
       // Desktop layer groups are intentionally collapsed. Open the published
       // conflict group through the visible control before testing a child.
-      await evaluate("(()=>{let b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(!b){window.dispatchEvent(new KeyboardEvent('keydown',{key:'l',bubbles:true}));}return true;})()");
-      await pause(250);
-      await evaluate("(()=>{const b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(b?.getAttribute('aria-expanded')!=='true')b?.click();return !!b;})()");
-      await pause(400);
+      // The layer panel can hydrate after a cold map start. Never toggle the
+      // global 'l' shortcut blindly: if already open that would close it.
+      let groupVisible = false;
+      for (let n=0; n<16; n++) {
+        groupVisible = await evaluate("!!document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]')");
+        if (groupVisible) break;
+        await pause(750);
+      }
+      if (groupVisible) await evaluate("(()=>{const b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(b.getAttribute('aria-expanded')!=='true')b.click()})()");
+      for (let n=0; n<8 && !await evaluate("!!document.querySelector('button[aria-label=\\\"تنبيهات ميدانية منشورة\\\"]')");n++) await pause(500);
+      measurements.alertPanelState = await evaluate("({panel:!!document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]'), fieldToggle:!!document.querySelector('button[aria-label=\\\"تنبيهات ميدانية منشورة\\\"]')})");
       const toggle = await evaluate("document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')");
       measurements.alertToggleBefore = toggle ?? null;
       if (toggle != null) {
