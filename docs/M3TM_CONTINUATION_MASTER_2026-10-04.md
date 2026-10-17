@@ -280,3 +280,14 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **VERIFY:** CI must run unit, TypeScript, build and privacy on this follow-up; only merge and deploy after all required checks and reviews. Previously validated APP #443 Pages SHA f4d4923bad682f1f215594653d0e8f86e4744255 remains unchanged.
 
 **NEXT/BLOCKER:** Ads-B upstream availability is external; OpenSky 429 cannot be fabricated away. Keep clear age/availability semantics and observe real aggregate availability after provider recovery. This is a display/provenance correction only, not proof that public military data is presently flowing.
+
+
+## 2026-10-17 — Narrow public map projection performance patch
+
+**EVIDENCE:** Live WORLD main e1138adc remains Render Live; Chromium acceptance WORLD #139 intermittently had slow initial MapLibre canvas, while direct WORLD/APP embed succeeded in other runs. The page has 24 initially enabled layers (of 49), starting as globe + satellite, while published atlas fetch can return 7544 reference features. Render app logs also showed source errors including OpenSky HTTP429, transport ECONNRESET and bounded frontlines retry. None individually proves an exclusive slowdown root cause.
+
+**CODE-LEVEL FINDING:** In `src/app/page.tsx`, `publicMapClientProjection(dataRef.current)` was invoked during *every* React rerender even when no source payload had changed; it allocates new regional aggregate arrays and a new masked object. `sdkDisplayData = useMemo(...,[data,embeddedLiveFeeds])` therefore always invalidated, needlessly processing map data when toggling panels, map view, backend status, or hover state.
+
+**NARROW FIX:** Memoize the public projection using `[hasMapAccess, dataVersion]`. Every dataRef write already advances dataVersion; permission changes always invalidate immediately. No changes to sources, precision, masking, access policy, 24 default layers, selected satellite/geographic mode, or polling cadence. Add test to prevent accidental regression.
+
+**GATE:** Run all required WORLD CI, security and runtime checks. Benchmark actual browser frame load/paint separately; a projection memoization does not prove tile latency, cold Render startup, GPU overload or provider errors disappeared. Do not touch mixed local workspace changes; use remote branch and exact-head PR.
