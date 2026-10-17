@@ -120,8 +120,8 @@ export function fusePublicNews(app: RoutedNews[], extra: RoutedNews[], limit=220
   return groups.map(g => ({
     ...g.item,
     publication_count:g.publishers.size,
-    evidence_stage:g.publishers.size > 1 ? 'multiple-publications-unverified' : 'published-report',
-    independent_confirmation:false,
+    evidence_stage:g.publishers.size > 1 ? 'multiple-publications-unverified' as const : 'published-report' as const,
+    independent_confirmation:false as const,
     evidence_links:[...g.publishers.values()],
     evidence_label:g.publishers.size > 1
       ? 'عدة جهات نشر؛ لا يعني تحققًا مستقلًا'
