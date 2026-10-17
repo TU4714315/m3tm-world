@@ -20,3 +20,8 @@ export function needsApprovedAppNewsRetry(
     && Number.isFinite(Date.parse(item.published))
     && Date.parse(item.published) <= Date.now() + 10 * 60_000);
 }
+
+/** A newer *failed* request cannot suppress an older successful response. */
+export function isSupersededNewsResponse(sequence: number, latestAppliedSequence: number): boolean {
+  return sequence < latestAppliedSequence;
+}
