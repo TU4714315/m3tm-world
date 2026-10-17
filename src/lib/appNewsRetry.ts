@@ -17,5 +17,6 @@ export function needsApprovedAppNewsRetry(
     && typeof item.id === 'string' && item.id.length > 0
     && typeof item.title === 'string' && item.title.trim().length > 0
     && typeof item.published === 'string'
-    && Number.isFinite(Date.parse(item.published)));
+    && Number.isFinite(Date.parse(item.published))
+    && Date.parse(item.published) <= Date.now() + 10 * 60_000);
 }
