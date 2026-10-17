@@ -62,6 +62,22 @@ describe('access-aware public map presentation', () => {
     }))).toContain('متوقفة');
   });
 
+  it('does not label a provider-level military feed outage as zero activity', () => {
+    const panel = (provider_healthy: boolean, military_activity: unknown[] = []) =>
+      renderToStaticMarkup(createElement(LayerPanel, {
+        data: { military_activity,
+          military_activity_meta: { source_mode: 'public-adsb-observations', provider_healthy } },
+        activeLayers: { military_activity: true },
+        setActiveLayers: vi.fn(),
+        isMobile: true,
+        endpointStatus: { '/api/flights': 'ok' },
+      }));
+    expect(panel(false)).toContain('تعذر تحديث المصدر');
+    expect(panel(true)).toContain('لا أحداث مؤهلة');
+    expect(panel(false, [{ id:'regional', lat:15, lng:45 }])).toContain('بيانات إقليمية سابقة');
+    expect(panel(false)).not.toContain('لا أحداث مؤهلة');
+  });
+
   it('keeps the bottom bar dedicated to news in both standalone and embedded views', () => {
     const news = [{ id: 'public', feed_origin: 'm3tm-app', title: 'خبر عام متاح', source: 'ناشر', risk_score: 1, published: new Date(Date.now() - 13 * 3_600_000).toISOString() }];
     for (const embed of [false, true]) {
