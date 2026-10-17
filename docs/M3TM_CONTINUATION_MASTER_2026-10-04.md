@@ -332,3 +332,14 @@ DONE ON BRANCH: Optional satellite cards, weather bars, CCTV/news previews are c
 GATE: CI unit/build/privacy first, then deploy only under release policy and remeasure real Chromium desktop/mobile/APP iframe repeatedly (TTFB, first canvas, map-ready, network bytes, JS heap and rAF proxy). No speed or GPU FPS improvement is claimed until measured. Do not remove public events or bypass internal OSINT separation.
 
 EXTERNAL LIMITS: OpenSky 429 and GDELT timeouts need backoff and explicitly stale last-good data; memory-only atlas cache does not survive instance restart without configured Redis. Null atlas sourcePublishedAt must remain unknown rather than invented. Viewer snapshot HTTP404 needs backend-function/schema review before safe publish.
+
+
+## 2026-10-17 — Scheduled reference atlas local-backoff recovery (replacement for outdated PR #145)
+
+**EVIDENCE:** GitHub Actions run 39078969029 checked out workflow SHA cc8f258247722f02cd23b491482eb7b62a5c20ef. It queried the independently deployed WORLD Render endpoint and received a stale reference snapshot with 7544 retained features, fetchedAt=2026-10-17T23:20:08.986Z, nextRefreshAt=2026-10-17T23:27:18.386Z, cacheBackend=memory, sourcePublishedAt=null. The GitHub SHA alone does not prove the separate Render deploy SHA. The two-minute retry interval is WORLD's own ISWN_CHECK_MS after an upstream fetch failed, NOT a policy imposed by the publisher.
+
+**DONE ON BRANCH:** A scheduled source-check retries just once no earlier than the locally advertised cooldown and at most 150 seconds out, preserving source-contract verification and nonzero exit if the second attempt remains stale/unavailable. Major-event dispatch never silently retries. Runner timeout is six minutes. The new helper and tests are added to required WORLD CI path filters, alongside four-case bounded retry policy coverage. No fabricated event dates, new endpoints, redis secrets or automatic external URLs.
+
+**BLOCKERS:** cacheBackend=memory is process-local and cannot survive Render restart; Redis/Upstash-compatible REST credentials are not configured. sourcePublishedAt stays unknown because per-feature publisher dates are unavailable. Do not label the 7544 reference features as independently verified events/current control. Subsequent failed source reads are an external provider issue rather than false evidence of a successful refresh.
+
+**NEXT/VERIFY:** After protected CI and release merge, inspect a newly scheduled workflow run with status and retryAttempted. Verify main SHA and Render live SHA independently. A stale final state remains a failure and should be surfaced, not concealed; do not redeploy Render solely for a GitHub scheduler change.
