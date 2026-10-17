@@ -208,7 +208,14 @@ export default function Dashboard() {
   const markEndpointStatus = useCallback((endpoint: string, status: 'loading' | 'ok' | 'error') => {
     setEndpointStatus(prev => prev[endpoint] === status ? prev : { ...prev, [endpoint]: status });
   }, []);
-  const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
+  // A new source payload increments dataVersion. Keep this expensive public
+  // boundary/aggregate projection stable across unrelated UI renders (mouse,
+  // map view, panels, status) so the MapLibre GeoJSON sources are not re-fed.
+  // Permission changes must always invalidate it to preserve the public gate.
+  const data = useMemo(
+    () => hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current),
+    [hasMapAccess, dataVersion],
+  );
 
   useEffect(() => {
     void recordWorldVisitOnce();
