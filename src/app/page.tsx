@@ -235,7 +235,6 @@ export default function Dashboard() {
   const [embeddedRoute, setEmbeddedRoute] = useState<EmbeddedRoute | null>(null);
   const worldMapReadyRef = useRef(false);
   const [worldMapInitialized, setWorldMapInitialized] = useState(false);
-  const [mapStartupAttempt, setMapStartupAttempt] = useState(0);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -809,12 +808,10 @@ export default function Dashboard() {
   }, [embedMode]);
 
   const retryWorldMapStartup = useCallback(() => {
-    worldMapReadyRef.current = false;
-    setWorldMapInitialized(false);
-    if (deferredMapTimerRef.current) clearTimeout(deferredMapTimerRef.current);
-    deferredMapScheduledRef.current = false;
-    setDeferredMapReady(false);
-    setMapStartupAttempt(value => value + 1);
+    // A failed Next.js lazy chunk may cache its rejected import promise.
+    // Reload only after a user clicks: this resets the chunk loader,
+    // ErrorBoundary and MapLibre runtime together, with no redirect.
+    window.location.reload();
   }, []);
 
   const handleWorldMapReady = useCallback(() => {
@@ -1811,7 +1808,7 @@ export default function Dashboard() {
       <div dir="ltr" className="absolute inset-0">
       <ErrorBoundary name="Map">
         <WorldMap
-          key={worldTheme + ':' + mapStartupAttempt}
+          key={worldTheme}
           data={sdkDisplayData}
           activeLayers={visibleRenderLayers}
           onReady={handleWorldMapReady}
@@ -1855,7 +1852,7 @@ export default function Dashboard() {
       </div>
       <MapStartupWatchdog
         ready={worldMapInitialized}
-        attempt={mapStartupAttempt}
+        attempt={0}
         onRetry={retryWorldMapStartup}
       />
 
