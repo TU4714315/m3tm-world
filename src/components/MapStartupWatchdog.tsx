@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 
+/** Pure policy: never report a timeout while the map is ready or tab hidden. */
+export function isMapStartupDelayDue(ready: boolean, visible: boolean, elapsedMs: number, waitMs: number): boolean {
+  return !ready && visible && elapsedMs >= waitMs;
+}
+
 /**
  * Covers failures that occur *before* the lazy WorldMap chunk mounts, when
  * MapLibre's own error UI cannot exist. The map keeps loading in the background
@@ -27,7 +32,7 @@ export default function MapStartupWatchdog({
     const pauseWhenHidden = () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = null;
-      if (!document.hidden) timeoutId = setTimeout(() => setTimedOut(true), waitMs);
+      if (!document.hidden) timeoutId = setTimeout(() => setTimedOut(isMapStartupDelayDue(ready, !document.hidden, waitMs, waitMs)), waitMs);
     };
     pauseWhenHidden();
     document.addEventListener('visibilitychange', pauseWhenHidden);
