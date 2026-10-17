@@ -250,3 +250,9 @@ DONE: Owner authorized merge/deploy. WORLD134 merged as e4d7092 (exact reviewed 
 FOLLOW-UP: Scheduled checks lacked the optional collector secret. Ordinary polling now uses the existing published-read API and still honors server403; explicit major-event dispatch requires a valid collector credential and stable id. Added7offline subprocess regressions. Added an isolated CI check of the deployed APPiframe handshake/news because BrowserUse pauses the document response in the user Chrome session.
 VERIFY:1043WORLDtests passed/20skips;7collector regressions and focused lint pass. Final TypeScript/build and new-head CI are pending at commit. Runtime files are unchanged by this follow-up; it updates the GitHub poller and observational browser harness only.
 NEXT: Merge follow-up after required checks; manually run scheduled poller and inspect deployed-frame screenshot/report. Record final release proof in task outputs.
+
+
+## 2026-10-17 - Live refresh timeout repair
+EVIDENCE: Main135 scheduled check39026356447 reached the deployed atlas endpoint but exceeded55s. Independent production browser39026038195 passed4/4iframe/news checks; other published APIs remain200. The atlas singleflight can remain pinned when an upstream fetch, stream read or body cancellation ignores abort.
+DONE: Add an explicit wall-clock race around the entire XML operation, abort its transport, release the collector singleflight and cancel rejected/oversized bodies without awaiting an uncooperative upstream. Last-good regions and fetchedAt remain intact on a failed refresh; subsequent checks can retry. No layer/access/provider removal.
+VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel and preserved last-good data. TypeScript/build and current-head CI are pending at commit. NEXT: merge reviewed fix, deploy exact commit on existing service and rerun the real scheduled poller before declaring synchronization verified.

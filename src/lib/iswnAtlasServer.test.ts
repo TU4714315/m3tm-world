@@ -25,6 +25,49 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); clearDurableMemoryCache(); });
 
 describe('reference atlas collection schedule', () => {
+  it('continues collecting the map when the report fetch ignores abort forever', async () => {
+    fetchMock.mockImplementation((url: string) => url === ISWN_FEED_URL
+      ? new Promise<Response>(() => {}) : Promise.resolve(new Response(map)));
+    const pending = getReferenceAtlasSnapshot();
+    await vi.advanceTimersByTimeAsync(8001);
+    expect((await pending).status).toBe('ok');
+    expect(mapCalls()).toBe(1);
+  });
+
+  it('releases singleflight after a stalled response body and allows a later retry', async () => {
+    fetchMock.mockImplementation(async (url: string) => url === ISWN_MAP_URL
+      ? new Response(new ReadableStream({ start() {}, cancel: () => new Promise(() => {}) }))
+      : new Response(currentFeed));
+    const pending = getReferenceAtlasSnapshot();
+    await vi.advanceTimersByTimeAsync(20001);
+    expect((await pending).status).toBe('unavailable');
+    fetchMock.mockImplementation(async (url: string) => new Response(url === ISWN_MAP_URL ? map : currentFeed));
+    await vi.advanceTimersByTimeAsync(ISWN_CHECK_MS);
+    expect((await getReferenceAtlasSnapshot()).status).toBe('ok');
+    expect(mapCalls()).toBe(2);
+  });
+
+  it('does not wait for an upstream HTML challenge to finish cancelling', async () => {
+    fetchMock.mockImplementation(async (url: string) => url === ISWN_MAP_URL
+      ? new Response(new ReadableStream({ start() {}, cancel: () => new Promise(() => {}) }),
+        { headers: { 'content-type': 'text/html' } }) : new Response(currentFeed));
+    expect((await getReferenceAtlasSnapshot()).status).toBe('unavailable');
+  });
+
+  it('retains the last-good regions and fetched time when a due map fetch never settles', async () => {
+    const first = await getReferenceAtlasSnapshot();
+    fetchMock.mockImplementation((url: string) => url === ISWN_MAP_URL
+      ? new Promise<Response>(() => {}) : Promise.resolve(new Response(currentFeed)));
+    await vi.advanceTimersByTimeAsync(ISWN_REFRESH_MS);
+    const pending = getReferenceAtlasSnapshot();
+    await vi.advanceTimersByTimeAsync(20001);
+    const failed = await pending;
+    expect(failed.status).toBe('stale');
+    expect(failed.fetchedAt).toBe(first.fetchedAt);
+    expect(failed.features).toEqual(first.features);
+    expect(failed.error).toBe('reference_source_refresh_failed');
+  });
+
   it('refreshes for a collector event outside the RSS check and schedule, consuming its id only once', async () => {
     await getReferenceAtlasSnapshot();
     vi.advanceTimersByTime(ISWN_CHECK_MS);

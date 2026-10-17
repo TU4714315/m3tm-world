@@ -14,15 +14,33 @@ let inFlight: Promise<AtlasSnapshot> | null = null;
 const mask = (snapshot: AtlasSnapshot): AtlasSnapshot => maskSaudiPublicIndicators({ reference_atlas: snapshot }).reference_atlas;
 
 async function boundedXml(url: string, maxBytes: number, timeout: number): Promise<string> {
-  const response = await fetch(url, { cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(timeout),
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('source_deadline_exceeded'));
+    }, timeout);
+  });
+  try {
+    // Bound the entire operation, including body reads/cancellation. An
+    // upstream stream ignoring abort must not pin the shared singleflight.
+    return await Promise.race([readXml(url, maxBytes, controller.signal), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+async function readXml(url: string, maxBytes: number, signal: AbortSignal): Promise<string> {
+  const response = await fetch(url, { cache: 'no-store', redirect: 'error', signal,
     headers: { Accept: 'application/xml, text/xml, application/vnd.google-earth.kml+xml' } });
   if (!response.ok || !response.body) throw new Error('upstream_unavailable');
   if (/text\/html/i.test(response.headers.get('content-type') ?? '')) {
-    await response.body.cancel();
+    void response.body.cancel().catch(() => {});
     throw new Error('unexpected_source_type');
   }
   if (Number(response.headers.get('content-length')) > maxBytes) {
-    await response.body.cancel();
+    void response.body.cancel().catch(() => {});
     throw new Error('source_size_limit');
   }
   const reader = response.body.getReader(), decoder = new TextDecoder();
@@ -32,7 +50,7 @@ async function boundedXml(url: string, maxBytes: number, timeout: number): Promi
       const part = await reader.read();
       if (part.done) break;
       bytes += part.value.byteLength;
-      if (bytes > maxBytes) { await reader.cancel(); throw new Error('source_size_limit'); }
+      if (bytes > maxBytes) { void reader.cancel().catch(() => {}); throw new Error('source_size_limit'); }
       text += decoder.decode(part.value, { stream: true });
     }
     return text + decoder.decode();
