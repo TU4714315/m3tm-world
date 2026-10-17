@@ -465,7 +465,7 @@ export default function Dashboard() {
   const [showPublicMapMarkers, setShowPublicMapMarkers] = useState(true);
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
-  const focusYemenMonitoring = () => {
+  const focusYemenMonitoring = (event: React.MouseEvent<HTMLButtonElement>) => {
     selectFlatMap();
     setShowMenaPulse(false);
     setMobilePanel(null);
@@ -473,7 +473,7 @@ export default function Dashboard() {
     setPublicEmbedQuiet(false);
     quietPublicLayersBeforeRef.current = null;
     setActiveLayers(previous => restoreYemenMapLayers(previous));
-    setFlyToLocation({ ...YEMEN_MAP_FOCUS, ts: Date.now() });
+    setFlyToLocation({ ...YEMEN_MAP_FOCUS, ts: event.timeStamp });
   };
   // This affects map rendering only, not source ingestion or the user's saved layer preferences.
   const displayedMapLayers = useMemo(() => {
