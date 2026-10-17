@@ -539,9 +539,10 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
-      // Start embedded visitors on the same clear imagery as the public map.
-
-      setMapStyle('satellite');
+      // Preserve the lightweight 2D/dark first-paint default in the APP
+      // iframe too. Previously this reset forced expensive ArcGIS satellite
+      // imagery during hydration even after the standalone performance fix.
+      // Users can still opt into satellite imagery and 3D explicitly.
       setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
