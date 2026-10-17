@@ -3,7 +3,7 @@ import { stageMapLayers } from './mapStartupLayers';
 
 const requested = Object.freeze({
   reference_atlas: true, conflict_density: true, frontlines: true,
-  reported_routes: true, cables: true, fires: true,
+  reported_routes: true, cables: true, sdk_sea: true, satellites: true, sat_comms: true, fires: true,
   conflict_zones: true, gdelt_events: true, app_news: true,
   alert_pins: true, military_activity: true, country_borders: true,
   naval_activity: true, day_night: false,
@@ -16,6 +16,7 @@ describe('progressive public visual startup', () => {
       alert_pins: true, military_activity: true, country_borders: true,
       naval_activity: true, day_night: false,
       reference_atlas: false, frontlines: false, conflict_density: false,
+      sdk_sea: false, satellites: false, sat_comms: false,
     });
     expect(requested.reference_atlas).toBe(true);
   });
@@ -24,6 +25,8 @@ describe('progressive public visual startup', () => {
     expect(ready).toBe(requested);
     expect(ready.reference_atlas).toBe(true);
     expect(ready.frontlines).toBe(true);
+    expect(ready.sdk_sea).toBe(true);
+    expect(ready.satellites).toBe(true);
   });
   it('never enables a layer the user disabled', () => {
     const req = { ...requested, app_news: false, frontlines: false, alert_pins: false };
