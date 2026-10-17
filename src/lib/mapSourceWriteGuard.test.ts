@@ -11,6 +11,14 @@ describe('public MapLibre GeoJSON update guard',()=>{
   expect(write(src,[feature(1,46),feature(2)])).toBe(true);
   expect(send.mock.lastCall?.[0].features).toHaveLength(2);
  });
+ it('passes very large regional feature arrays through unchanged, without deduplication',()=>{
+  const src={setData:vi.fn()},write=createMapSourceWriteGuard();
+  const rows=Array.from({length:2000},(_,i)=>feature(i));
+  expect(write(src,rows)).toBe(true);
+  expect(write(src,rows)).toBe(true);
+  expect(src.setData).toHaveBeenCalledTimes(2);
+  expect(src.setData.mock.lastCall?.[0].features).toBe(rows);
+ });
  it('always sends the first update to a replaced style/source',()=>{
   const write=createMapSourceWriteGuard(),a={setData:vi.fn()},b={setData:vi.fn()};
   write(a,[]);write(a,[]);
