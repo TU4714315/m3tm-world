@@ -31,3 +31,5 @@ The existing WORLD map powers standalone WORLD and the APP public iframe. This c
 ## Release boundary
 
 This is a review candidate stacked on the public Saudi boundary fix (PR132), not a production release. No secrets, account roles, billing or live deployment settings were changed. The existing Vercel account/deployment gate and production SHA limitation remain separate release constraints. Enable the scheduled job only through the reviewed default-branch release.
+
+- Operational follow-up: ordinary scheduled checks use the existing public read boundary without a collector secret. Explicit major-event dispatch still requires authentication and a stable id; restored server access restrictions remain authoritative.

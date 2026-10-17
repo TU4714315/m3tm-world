@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const url = process.env.PREVIEW_URL || 'http://127.0.0.1:3001';
-if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname)) {
+const scenario = process.env.SMOKE_SCENARIO || 'startup';
+// A single read-only deployed APP check is permitted on an isolated CI runner.
+const liveAppProbe = process.env.CI === 'true' && scenario === 'app-frame' && new URL(url).href === 'https://m3tm.app/';
+if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname) && !liveAppProbe) {
   throw new Error('This smoke test only accepts localhost previews.');
 }
 const profile = await mkdtemp(join(tmpdir(), 'osiris-smoke-'));
@@ -24,7 +27,6 @@ const network = new Map();
 const warnings = [];
 const checks = [];
 const measurements = {};
-const scenario = process.env.SMOKE_SCENARIO || 'startup';
 let sequence = 0;
 let buffer = '';
 let session;
@@ -102,7 +104,7 @@ const deadline = setTimeout(() => {
   console.error('Browser test timed out');
   chrome.kill();
   process.exitCode = 1;
-}, 100_000);
+}, liveAppProbe ? 130_000 : 100_000);
 try {
   const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await command('Target.attachToTarget', { targetId, flatten: true }));
@@ -116,6 +118,10 @@ try {
   if (['imagery', 'buildings', 'terrain-camera'].includes(scenario)) await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/geo*` }] });
   if (scenario === 'satellites') await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/satellites` }] });
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__previewLongTasks = []; new PerformanceObserver(list => { for (const e of list.getEntries()) window.__previewLongTasks.push({start: Math.round(e.startTime), ms: Math.round(e.duration)}); }).observe({type: 'longtask', buffered: true});` });
+  if (liveAppProbe) await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__publishedWorldReady=[]; window.addEventListener('message',event=>{
+    if(event.origin==='https://m3tm-world-recovery.onrender.com' && event.source===document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.contentWindow
+      && event.data?.source==='m3tm-world' && event.data?.type==='m3tm:ready' && event.data?.version===1) window.__publishedWorldReady.push({origin:event.origin,at:Date.now()});
+  });` });
   if (scenario === 'recovery') await command('Network.setBlockedURLs', { urls: [`${new URL(url).origin}/dark-matter-style.json*`] });
   await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile'
     ? { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
@@ -131,7 +137,15 @@ try {
   // Wait for asynchronous module workers, style loading and initial data layers.
   await new Promise(resolve => setTimeout(resolve, 25_000));
   if (process.env.PROFILE_TERRAIN) { await command('Profiler.enable'); await command('Profiler.start'); }
-  if (scenario === 'recovery') {
+  if (liveAppProbe) {
+    for (let i=0;i<85 && !await evaluate(`window.__publishedWorldReady?.length>0`);i++) await pause(1000);
+    measurements.publishedApp = await evaluate(`({frame:document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src,
+      readyMessages:window.__publishedWorldReady, unavailable:!!document.querySelector('[data-testid="m3tm-world-unavailable"]'),
+      newsCards:document.querySelectorAll('.gate1-news-panel article').length, visibility:document.visibilityState})`);
+    await check('Deployed APP receives map-ready from its exact WORLD frame', `window.__publishedWorldReady?.length>0 && !document.querySelector('[data-testid="m3tm-world-unavailable"]')`);
+    await check('Published frame remains on its fixed trusted origin', `document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src==='https://m3tm-world-recovery.onrender.com/?embed=1&surface=public'`);
+    await check('Published news has one publisher link per card', `(()=>{const cards=[...document.querySelectorAll('.gate1-news-panel article')];return cards.length>0 && cards.every(card=>card.querySelectorAll('a').length===1)})()`);
+  } else if (scenario === 'recovery') {
     await check('Failed style shows recovery state', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'error' && document.body.innerText.includes('Retry map')`);
     await command('Network.setBlockedURLs', { urls: [] });
     measurements.retryVisibility = await evaluate(`({hidden: document.hidden, state: document.visibilityState})`);
