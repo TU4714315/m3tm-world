@@ -9,7 +9,7 @@ describe('WORLD mobile ticker and uncluttered glass controls', () => {
   it('keeps the public ticker accessible on phones with an honest empty state', () => {
     expect(ticker).toContain('className="world-news-ticker');
     expect(ticker).not.toContain("'hidden md:block'");
-    expect(ticker).toContain('لا توجد عناوين حديثة متاحة الآن');
+    expect(ticker).toContain('لا توجد عناوين منشورة من M3TM.APP');
     expect(css).toContain('.world-news-ticker {');
     expect(css).toContain('safe-area-inset-bottom');
   });
