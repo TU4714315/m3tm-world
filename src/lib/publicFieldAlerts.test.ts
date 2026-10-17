@@ -6,8 +6,8 @@ const base = {
   location_basis: 'published-feed-coordinate',
   coords: [24.71, 46.67],
   source: 'Publisher',
-  published: '2026-09-30T18:00:00Z',
-  link: 'https://example.com/item',
+  published: new Date(Date.now() - 30 * 60_000).toISOString(),
+  link: 'https://reuters.com/item',
 };
 
 describe('generalized source-backed field alerts', () => {
@@ -31,6 +31,15 @@ describe('generalized source-backed field alerts', () => {
       { ...base, id: 'x', feed_origin: 'independent-fallback', title: 'airstrike reported' },
       { ...base, id: 'y', location_basis: 'keyword-context', title: 'missile reported' },
       { ...base, id: 'z', title: 'اقتصاد وأسواق اليوم' },
+    ])).toEqual([]);
+  });
+
+  it('requires a recent publication and safe original publisher URL', () => {
+    expect(buildPublicFieldAlerts([
+      { ...base, id: 'old', title: 'قصف منشور', published: '2020-01-01T00:00:00Z' },
+      { ...base, id: 'future', title: 'مسيّرة', published: new Date(Date.now() + 86_400_000).toISOString() },
+      { ...base, id: 'unsafe', title: 'صاروخ', link: 'https://127.0.0.1/admin' },
+      { ...base, id: 'broken', title: 'قصف', published: 'not-a-date' },
     ])).toEqual([]);
   });
 
