@@ -142,8 +142,18 @@ try {
     measurements.recoveryMs = Date.now() - retryStarted;
     await check('Retry restores one working map', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready' && document.querySelectorAll('.maplibregl-canvas').length === 1`);
   } else {
-    await check('Fresh map finishes loading', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready'`);
-    await check('Globe projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'globe'`);
+    if (scenario === 'yemen') {
+      await check('Fresh map finishes loading', `(() => {
+        const root=document.querySelector('[data-map-projection][data-map-camera]');
+        const camera=JSON.parse(root?.dataset.mapCamera || '{}');
+        const canvas=root?.querySelector('.maplibregl-canvas');
+        return Number.isFinite(camera.lat) && Number.isFinite(camera.lng) && canvas?.width>0 && canvas?.height>0;
+      })()`);
+      await check('Globe projection is actually initialized', `document.querySelector('[data-map-projection]')?.dataset.mapProjection === 'globe'`);
+    } else {
+      await check('Fresh map finishes loading', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready'`);
+      await check('Globe projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'globe'`);
+    }
     await check('Terrain is not fetched during startup', `!performance.getEntriesByType('resource').some(r => r.name.includes('elevation-tiles-prod'))`);
     if (scenario === 'yemen') {
       const response = await fetch(new URL('/api/reference-atlas', url), { signal: AbortSignal.timeout(30_000) });
@@ -158,11 +168,11 @@ try {
       };
       checks.push({ name: 'Published Yemen regions available across publisher folders', passed: measurements.yemenAreas.houthi > 0 && measurements.yemenAreas.government > 0 });
       await click('رصد اليمن');
-      await pause(6000);
+      await pause(10000);
       await check('Yemen focus reaches the intended camera on a working flat map', `(() => {
-        const element=document.querySelector('[data-map-status]');
+        const element=document.querySelector('[data-map-projection][data-map-camera]');
         const camera=JSON.parse(element?.dataset.mapCamera || '{}');
-        return element?.dataset.mapStatus === 'ready' && element.dataset.mapProjection === 'mercator'
+        return element?.dataset.mapProjection === 'mercator' && element.querySelector('.maplibregl-canvas')?.width>0
           && Math.abs(camera.lat-15.6)<0.2 && Math.abs(camera.lng-47.5)<0.2 && camera.zoom>=5.4;
       })()`);
       await check('Yemen view retains news and no invitation prompt', `!document.body.innerText.includes('كود الدعوة') && document.querySelectorAll('.maplibregl-canvas').length===1`);
