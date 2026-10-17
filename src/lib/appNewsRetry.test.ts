@@ -15,6 +15,7 @@ describe('public ticker bounded recovery', () => {
   });
   it('never treats a missing or invented publication timestamp as an approved headline',()=>{
     expect(needsApprovedAppNewsRetry([{...approved,published:'invalid'}],0)).toBe(true);
+    expect(needsApprovedAppNewsRetry([{...approved,published:new Date(Date.now()+20*60_000).toISOString()}],0)).toBe(true);
     expect(needsApprovedAppNewsRetry([{...approved,title:' '}],0)).toBe(true);
   });
 });
