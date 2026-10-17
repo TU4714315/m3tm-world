@@ -145,9 +145,10 @@ async function providerGET() {
       });
       if (published.ok) {
         const payload = await published.json() as { items?: unknown; fetchedAt?: unknown };
-        const fetchedAt = typeof payload.fetchedAt === 'string'
-          ? payload.fetchedAt
-          : new Date().toISOString();
+        // Missing feed metadata is unknown, not a synthetic fetch time.
+        const fetchedAt = typeof payload.fetchedAt === 'string' &&
+          Number.isFinite(Date.parse(payload.fetchedAt))
+          ? payload.fetchedAt : null;
         const rows: Record<string, unknown>[] = Array.isArray(payload.items)
           ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
           : [];
@@ -155,7 +156,11 @@ async function providerGET() {
         const news: RoutedNews[] = arabicRows.slice(0, 160).map((item) => {
           const lat = item.latitude;
           const lng = item.longitude;
-          const hasCoords = typeof lat === 'number' && typeof lng === 'number' &&
+          // Country and broad regional centroids are geographic context,
+          // not publisher coordinates for a specific field incident.
+          const incidentLocation = item.locationPrecision === 'exact' ||
+            item.locationPrecision === 'city';
+          const hasCoords = incidentLocation && typeof lat === 'number' && typeof lng === 'number' &&
             Number.isFinite(lat) && Math.abs(lat) <= 90 &&
             Number.isFinite(lng) && Math.abs(lng) <= 180;
           const severityScore: Record<string, number> = {
