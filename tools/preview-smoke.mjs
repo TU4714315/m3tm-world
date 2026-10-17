@@ -254,7 +254,7 @@ try {
       const toggleProbe = "(()=>[...document.querySelectorAll('button[aria-label]')].find(b=>b.getAttribute('aria-label')==='تنبيهات ميدانية منشورة')||null)()";
       for (let n=0; n<10 && !await evaluate("!!"+toggleProbe);n++) await pause(450);
       measurements.alertPanelState = await evaluate("({panel:!!"+groupProbe+", fieldToggle:!!"+toggleProbe+"})");
-      const toggle = await evaluate(toggleProbe+".getAttribute('aria-pressed')");
+      const toggle = await evaluate(toggleProbe+"?.getAttribute('aria-pressed')");
       measurements.alertToggleBefore = toggle ?? null;
       if (toggle != null) {
         await click('تنبيهات ميدانية منشورة'); await pause(350);
