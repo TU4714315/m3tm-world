@@ -1,3 +1,5 @@
+import { publicPublisherLink } from './publicPublisherLink';
+
 export type PublicFieldAlertCategory =
   | 'strike'
   | 'drone'
@@ -20,6 +22,7 @@ export interface PublicFieldAlert {
   precision: 'regional-0.5deg';
   provenance: 'M3TM.APP public feed';
   status: 'source-reported';
+  evidence: 'publisher-report';
 }
 
 const RULES: { category: PublicFieldAlertCategory; label_ar: string; rx: RegExp }[] = [
@@ -53,6 +56,13 @@ export function buildPublicFieldAlerts(value: unknown): PublicFieldAlert[] {
     const title = typeof item.title === 'string' ? item.title.trim() : '';
     const description = typeof item.description === 'string' ? item.description : '';
     if (!title) continue;
+    // A keyword is a category hint, never independent corroboration.
+    const published = typeof item.published === 'string' ? item.published : '';
+    const publishedMs = Date.parse(published);
+    if (!Number.isFinite(publishedMs) || publishedMs > Date.now() + 10 * 60_000 ||
+        publishedMs < Date.now() - 96 * 60 * 60_000) continue;
+    const url = publicPublisherLink(item.link);
+    if (!url) continue;
 
     const haystack = title + '\n' + description.slice(0, 1200);
     const rule = RULES.find(entry => entry.rx.test(haystack));
@@ -63,17 +73,13 @@ export function buildPublicFieldAlerts(value: unknown): PublicFieldAlert[] {
       : `${item.link || ''}:${item.published || ''}`;
     if (!id || seen.has(id)) continue;
 
-    let url = '';
-    const candidate = typeof item.link === 'string' ? item.link : '';
-    try { if (/^https?:\/\//i.test(candidate)) url = new URL(candidate).href; } catch {}
-
     result.push({
       id, title, url,
       source: typeof item.source === 'string' && item.source.trim() ? item.source : 'M3TM.APP',
-      published: typeof item.published === 'string' ? item.published : '',
+      published: new Date(publishedMs).toISOString(),
       lat: regional(lat), lng: regional(lng),
       category: rule.category, label_ar: rule.label_ar,
-      precision: 'regional-0.5deg', provenance: 'M3TM.APP public feed', status: 'source-reported',
+      precision: 'regional-0.5deg', provenance: 'M3TM.APP public feed', status: 'source-reported', evidence: 'publisher-report',
     });
     seen.add(id);
     if (result.length >= 160) break;
