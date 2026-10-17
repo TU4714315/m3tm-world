@@ -204,6 +204,10 @@ export default function Dashboard() {
   publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
   const [dataVersion, setDataVersion] = useState(0);
+  const [endpointStatus, setEndpointStatus] = useState<Record<string, 'loading' | 'ok' | 'error'>>({});
+  const markEndpointStatus = useCallback((endpoint: string, status: 'loading' | 'ok' | 'error') => {
+    setEndpointStatus(prev => prev[endpoint] === status ? prev : { ...prev, [endpoint]: status });
+  }, []);
   const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
 
   useEffect(() => {
@@ -752,7 +756,7 @@ export default function Dashboard() {
       }
     } catch { /* Keep the current map usable when the dossier is unavailable. */ }
     finally { if (generation === accessGeneration.current) setDossierLoading(false); }
-  }, [mapAccessHeaders]);
+  }, [mapAccessHeaders, markEndpointStatus]);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
     if (entity?.type === 'cctv') setActiveCamera(entity);
@@ -864,6 +868,8 @@ export default function Dashboard() {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
     if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
       && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
+    const endpointKey = url.split('?')[0];
+    markEndpointStatus(endpointKey, 'loading');
     try {
       // Force the browser to bypass its local disk cache for real-time data
       const generation = accessGeneration.current;
@@ -875,12 +881,15 @@ export default function Dashboard() {
         const d = transform ? transform(json) : json;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
+        markEndpointStatus(endpointKey, 'ok');
         setBackendStatus('connected');
         return true;
       }
+      markEndpointStatus(endpointKey, 'error');
       return false;
     } catch (e) {
       console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e);
+      markEndpointStatus(endpointKey, 'error');
       setBackendStatus('error');
       return false;
     }
@@ -2077,7 +2086,7 @@ export default function Dashboard() {
                 <button type="button" aria-label="إغلاق الطبقات" className="p-1 text-white/70"
                   onClick={() => setShowPublicEmbedLayers(false)}><X className="w-4 h-4" /></button>
               </div>
-              <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)}
+              <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} endpointStatus={endpointStatus} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
                 />
@@ -2087,7 +2096,7 @@ export default function Dashboard() {
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {!embedMode && showLayers && !isMobile && <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} endpointStatus={endpointStatus} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
 
 
 
@@ -2393,7 +2402,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
+                      <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} endpointStatus={endpointStatus} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>
@@ -2437,7 +2446,7 @@ export default function Dashboard() {
 
       {/* ── BOTTOM CURSOR INFO (desktop) ── */}
       {!embedMode && !isMobile && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-8 z-[200] pointer-events-auto" style={{ left: '72px' }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-[64px] z-[200] pointer-events-auto" style={{ left: '72px' }}>
           <div className="flex items-center gap-5 text-[9px] font-mono tracking-widest text-[var(--text-muted)] opacity-60">
             <div className="flex gap-2 items-center" title="إحداثيات المؤشر (مرّر فوق الخريطة)">
               <span>المؤشر</span>
@@ -2558,7 +2567,7 @@ export default function Dashboard() {
       <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />
 
       {/* Shortcut hint — more visible */}
-      {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
+      {!embedMode && <div className="desktop-only absolute bottom-[64px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
         اضغط <span className="text-[var(--gold-primary)]">؟</span> للاختصارات · <span className="text-[var(--gold-primary)]">F</span> ملء الشاشة · <span className="text-[var(--gold-primary)]">R</span> إعادة الضبط
       </div>}
 

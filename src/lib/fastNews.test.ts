@@ -41,6 +41,8 @@ describe('Fast independent source news',()=>{
     expect(out[0].coords).toEqual([25.5,45.5]);
     expect(out[0].feed_origin).toBe('m3tm-app');
     expect(out[0].publication_count).toBe(1);
+    expect(out[0].evidence_stage).toBe('published-report');
+    expect(out[0].independent_confirmation).toBe(false);
   });
   it('lists distinct publication venues for an exactly matching sourced headline without claiming independent verification',()=>{
     const first={...sample,title:'  تقرير  منشورٌ عن المنطقة ',published:'2026-10-06T12:00:00Z'};
@@ -53,6 +55,7 @@ describe('Fast independent source news',()=>{
       feed_origin:'m3tm-app',coords:[25.5,45.5],publication_count:2,
     });
     expect(out[0].evidence_label).toContain('لا يعني تحققًا');
+    expect(out[0]).toMatchObject({ evidence_stage:'multiple-publications-unverified', independent_confirmation:false });
     expect(out[0].evidence_links?.map(e=>e.url)).toEqual([
       'https://www.bbc.com/news/story-1','https://example.org/another-report',
     ]);

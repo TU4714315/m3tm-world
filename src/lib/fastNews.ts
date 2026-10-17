@@ -31,6 +31,9 @@ export type RoutedNews = {
   publication_count?: number;
   evidence_links?: Array<{ publisher: string; url: string }>;
   evidence_label?: string;
+  /** Publication plurality is not independent confirmation of an event. */
+  evidence_stage?: 'published-report' | 'multiple-publications-unverified';
+  independent_confirmation?: false;
 };
 
 export function publicArticleLink(raw: unknown, allowedHosts?: readonly string[]): string | null {
@@ -117,6 +120,8 @@ export function fusePublicNews(app: RoutedNews[], extra: RoutedNews[], limit=220
   return groups.map(g => ({
     ...g.item,
     publication_count:g.publishers.size,
+    evidence_stage:g.publishers.size > 1 ? 'multiple-publications-unverified' as const : 'published-report' as const,
+    independent_confirmation:false as const,
     evidence_links:[...g.publishers.values()],
     evidence_label:g.publishers.size > 1
       ? 'عدة جهات نشر؛ لا يعني تحققًا مستقلًا'

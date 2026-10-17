@@ -2623,5 +2623,5 @@ html[dir='rtl'] [dir='ltr'] {
 }
 
 @media (max-width: 767px) {
-  .world-mobile-map-hud { bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
+  .world-mobile-map-hud { bottom: calc(134px + env(safe-area-inset-bottom, 0px)) !important; }
 }
