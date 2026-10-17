@@ -1,4 +1,4 @@
-name: Verify published APP iframe
+name: Verify published APP and WORLD browser acceptance
 
 on:
   pull_request:
@@ -11,27 +11,53 @@ permissions:
   contents: read
 
 jobs:
-  published-frame:
-    # Observes the deployed APP/WORLD pair; never substitutes for candidate CI.
+  published-browser:
+    # Read-only acceptance against real published APP and WORLD, not fixtures.
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: app-desktop
+            url: https://m3tm.app/
+            scenario: app-frame
+            mobile: '0'
+          - id: app-mobile
+            url: https://m3tm.app/
+            scenario: app-frame
+            mobile: '1'
+          - id: world-desktop
+            url: https://m3tm-world-recovery.onrender.com/
+            scenario: world-live
+            mobile: '0'
+          - id: world-mobile
+            url: https://m3tm-world-recovery.onrender.com/
+            scenario: world-live
+            mobile: '1'
+          - id: world-embed
+            url: https://m3tm-world-recovery.onrender.com/?embed=1&surface=public
+            scenario: world-live
+            mobile: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check live map handshake and published news
+      - name: Real Chromium production checks
         env:
-          PREVIEW_URL: https://m3tm.app/
-          SMOKE_SCENARIO: app-frame
-          SMOKE_OUTPUT_DIR: published-app-proof
+          PREVIEW_URL: ${{ matrix.url }}
+          SMOKE_SCENARIO: ${{ matrix.scenario }}
+          SMOKE_MOBILE: ${{ matrix.mobile }}
+          SMOKE_OUTPUT_DIR: published-proof
         run: |
           export CHROME_PATH="$(command -v google-chrome)"
           node tools/preview-smoke.mjs
-      - name: Preserve public screenshot and report
+      - name: Preserve browser screenshots and check ledger
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: published-app-frame-proof
-          path: published-app-proof/*
-          retention-days: 3
+          name: published-browser-${{ matrix.id }}
+          path: published-proof/*
+          if-no-files-found: warn
+          retention-days: 5
