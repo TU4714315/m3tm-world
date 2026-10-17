@@ -329,6 +329,19 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     return found ? total : null;
   };
 
+  // An enabled switch is not evidence of observations. Expose the distinction
+  // only for layers whose event arrays are present in the public payload.
+  const observedKeys = new Set(['alert_pins', 'app_news', 'military_activity',
+    'naval_activity', 'gdelt_events', 'civil_unrest', 'conflict_zones']);
+  const layerObservationState = (key: string, count: number | null): string | null => {
+    if (!observedKeys.has(key)) return null;
+    if (!activeLayers[key]) return 'متوقفة';
+    const failure = data?.layer_errors?.[key] ?? data?.source_errors?.[key];
+    if (failure) return 'تعذر جلب المصدر';
+    if (count === null) return 'البيانات غير متاحة';
+    return count === 0 ? 'لا أحداث مؤهلة' : `${count.toLocaleString('ar-SA')} عنصر منشور`;
+  };
+
   /* ── MOBILE ── */
   if (isMobile) {
     return (
@@ -366,6 +379,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                 const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                 const isLayerActive = !locked && activeLayers[layer.key];
                 const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                const observationState = locked ? null : layerObservationState(layer.key, count);
                 const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
                 return (
                   <button
@@ -388,7 +402,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       
                     </span>
                     
-                    {count !== null && (
+                    {observationState ? (
+                      <span role="status" className="text-[10px] text-white/55">{observationState}</span>
+                    ) : count !== null && (
                       <span className="text-[10px] font-mono tabular-nums text-white/25">
                         {count.toLocaleString()}
                       </span>
@@ -585,6 +601,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                         const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                         const isLayerActive = !locked && activeLayers[layer.key];
                         const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                        const observationState = locked ? null : layerObservationState(layer.key, count);
                         const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
 
                         return (
@@ -611,7 +628,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                 </span>
                                 <span className="flex w-full items-center gap-2" dir="rtl">
                                   
-                                  {count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
+                                  {observationState ? <span role="status" className="text-[10px] text-white/55">{observationState}</span>
+                                    : count !== null && <span className="text-[10px] tabular-nums text-white/55">{count.toLocaleString()}</span>}
                                 </span>
                                 
                               </>
@@ -626,7 +644,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                                   
                                 </span>
                                 
-                                {count !== null && (
+                                {observationState ? <span role="status" className="text-[10px] text-white/55">{observationState}</span> :
+                                count !== null && (
                                   <span className={`text-[10px] font-mono tabular-nums transition-colors ${isLayerActive ? 'text-white/45' : 'text-white/20'}`}>
                                     {count.toLocaleString()}
                                   </span>
