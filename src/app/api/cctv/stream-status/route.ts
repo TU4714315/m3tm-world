@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { safeFetch } from '@/lib/ssrf-guard';
 
@@ -6,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /** rtsp.me shows this when the camera owner's quota is exhausted */
 const RTSP_BLOCKED = /temporarily limited|Top up/i;
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const url = new URL(req.url).searchParams.get('url');
 
   // Check the host, not the string. "https://evil.com/?x=rtsp.me/embed"
@@ -43,10 +44,12 @@ export async function GET(req: Request) {
       provider: 'rtsp.me',
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'private, no-store, max-age=0',
       },
     });
   } catch {
     return NextResponse.json({ available: null, blocked: null, provider: 'rtsp.me' }, { status: 502 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

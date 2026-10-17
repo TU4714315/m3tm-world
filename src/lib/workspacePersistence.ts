@@ -4,6 +4,7 @@ export const WORLD_WORKSPACE_STORAGE_KEY = 'm3tm:world:workspace:v1';
 
 export type WorldWorkspaceSnapshot = {
   version: 1;
+  presentationVersion?: 2;
   savedAt: string;
   activeLayers: Record<string, boolean>;
   projection: 'globe' | 'mercator';
@@ -35,11 +36,14 @@ export function parseWorldWorkspaceSnapshot(raw: string | null): WorldWorkspaceS
     return {
       version: 1,
       savedAt: value.savedAt,
-      activeLayers,
+      presentationVersion: 2,
+      activeLayers: value.presentationVersion === 2 ? activeLayers : {
+        ...activeLayers, terrain_etopo_2022: false, day_night: false,
+      },
       projection: value.projection,
-      mapStyle: value.mapStyle,
+      mapStyle: value.presentationVersion === 2 ? value.mapStyle : value.mapStyle === 'dark' ? 'satellite' : value.mapStyle,
       theme: value.theme,
-      satelliteVisual: value.satelliteVisual as SatelliteVisualPreset,
+      satelliteVisual: value.presentationVersion !== 2 && value.mapStyle === 'dark' ? 'bright' : value.satelliteVisual as SatelliteVisualPreset,
       view,
     };
   } catch {
@@ -60,7 +64,7 @@ export function saveWorldWorkspaceSnapshot(snapshot: Omit<WorldWorkspaceSnapshot
   if (typeof window === 'undefined') return null;
   const savedAt = new Date().toISOString();
   try {
-    window.localStorage.setItem(WORLD_WORKSPACE_STORAGE_KEY, JSON.stringify({ version: 1, savedAt, ...snapshot }));
+    window.localStorage.setItem(WORLD_WORKSPACE_STORAGE_KEY, JSON.stringify({ version: 1, savedAt, ...snapshot, presentationVersion: 2 }));
     return savedAt;
   } catch {
     return null;

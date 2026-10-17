@@ -3,7 +3,13 @@
 import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import * as maplibregl from 'maplibre-gl';
+import WindBar from './WindBar';
+import RainBar from './RainBar';
+import { DOCK } from './TimeBox';
+import { WIND_ATTRIBUTION } from '@/lib/wind-layer';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
+import { editorialClusterLayer, registerEditorialMapSymbols, territoryWave } from '@/lib/map-symbols';
+import { publishedAreaAffiliation, publishedEquipmentSymbol } from '@/lib/publishedMapPresentation';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
 import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
@@ -25,6 +31,8 @@ import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
+import { referenceAtlasFeatures, type ReferenceAtlasKind } from '@/lib/referenceAtlasView';
+import type { AtlasSnapshot } from '@/lib/iswnAtlas';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -42,6 +50,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 interface WorldMapProps {
   data: any;
   activeLayers: Record<string, boolean>;
+  referenceAtlasLayerId?: string;
+  referenceAtlasKind?: ReferenceAtlasKind;
   onEntityClick?: (entity: any) => void;
   onReady?: () => void;
   onMouseCoords?: (coords: { lat: number; lng: number }) => void;
@@ -53,6 +63,7 @@ interface WorldMapProps {
   terrainRetry?: number;
   terrainFocus?: number;
   onTerrainStatusChange?: (status: TerrainStatus) => void;
+  onLayerOff?: (key: string) => void;
 
   mapStyle?: string;
   satelliteVisual?: SatelliteVisualPreset;
@@ -119,7 +130,7 @@ const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 const DOUBLE_RIGHT_MS = 500;
 const DOUBLE_RIGHT_SLOP_PX = 12;
 
-function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
+function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', referenceAtlasKind = 'all', onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, onLayerOff, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -400,6 +411,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       createDot(map, 'dot-green', isGhost ? phantomPurple : '#26A69A', 10);
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
+      registerEditorialMapSymbols(map);
+      map.addImage('territory-wave-red', territoryWave('#CB6E71'));
+      map.addImage('territory-wave-green', territoryWave('#63AA91'));
 
       const sources = ['flights','civilian-flight-activity','military','military-activity','naval-activity','military-satellite-activity','jets','private-fl','selected-flight-track','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','app-news','field-alerts','public-boundaries','reported-routes','frontlines','conflict-zones', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'malware-new', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'civil-unrest', 'cf-outages', 'cf-attacks'];
       // Clusters group only the *visual* symbol footprints. Public records
@@ -407,6 +421,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC,
         ...publicClusterOptions(s),
       }));
+      // Reference annotations stay separate from event and frontline sources.
+      map.addSource('reference-atlas-points', { type: 'geojson', data: EMPTY_FC,
+        attribution: '<a href="https://english.iswnews.com/" target="_blank" rel="noopener noreferrer">ISWN · reference annotations</a>',
+      });
+      map.addSource('reference-atlas-areas', { type: 'geojson', data: EMPTY_FC });
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
 
@@ -416,22 +435,23 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         const c = document.createElement('canvas');
         c.width = s; c.height = s;
         const ctx = c.getContext('2d')!;
-        ctx.fillStyle = color;
+        ctx.fillStyle = '#101B25';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
-        ctx.moveTo(s/2, 1);
-        ctx.lineTo(s - 1, s - 1);
-        ctx.lineTo(1, s - 1);
+        ctx.moveTo(s/2, 1); ctx.lineTo(s - 2, 6); ctx.lineTo(s - 3, 14);
+        ctx.lineTo(s/2, s - 1); ctx.lineTo(3, 14); ctx.lineTo(2, 6);
         ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 11px sans-serif';
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#E1E7E9';
+        ctx.font = 'bold 10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('!', s/2, s - 4);
+        ctx.fillText('!', s/2, s - 5);
         map.addImage(id, { width: s, height: s, data: new Uint8Array(ctx.getImageData(0, 0, s, s).data) });
       };
-      createWarningIcon('warn-icon', '#D32F2F');
-      createWarningIcon('warn-orange', '#E65100');
-      createWarningIcon('warn-yellow', '#F9A825');
+      createWarningIcon('warn-icon', '#C68F87');
+      createWarningIcon('warn-orange', '#C2AE88');
+      createWarningIcon('warn-yellow', '#A1B7BF');
 
       // Compact semantic badges for incidents and conflict reports.  The old
       // red dots were too small on satellite imagery and made unrelated event
@@ -440,7 +460,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const createMapBadge = (
         id: string,
         color: string,
-        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'unrest'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic',
+        kind: 'air'|'heavy'|'bomb'|'clash'|'mass'|'assault'|'conflict'|'unrest'|'quake'|'flood'|'cyclone'|'volcano'|'wildfire'|'drought'|'shield'|'drone'|'missile'|'strike'|'ground'|'maritime'|'equipment'|'generic'|'tank'|'radar'|'base',
       ) => {
         if (map.hasImage(id)) return;
         const size = 28;
@@ -480,6 +500,16 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         };
 
         switch (kind) {
+          case 'tank':
+            ctx.strokeRect(6,16,16,6); ctx.strokeRect(10,11,9,5); line(16,11,23,8);
+            line(8,19,20,19); dot(9,19,1); dot(19,19,1); break;
+          case 'radar':
+            line(11,21,17,21); line(c,21,c,15); line(8,8,18,18);
+            ctx.beginPath(); ctx.arc(14,11,7,.5,2.7); ctx.stroke();
+            ctx.beginPath(); ctx.arc(16,8,5,-1.3,.4); ctx.stroke(); break;
+          case 'base':
+            ctx.strokeRect(7,11,14,11); line(7,11,7,7); line(12,11,12,7); line(17,11,17,7); line(21,11,21,7);
+            ctx.strokeRect(12,17,4,5); break;
           case 'air':
             line(c,5,c,22); line(6,13,22,13); line(9,18,c,15); line(19,18,c,15); break;
           case 'heavy':
@@ -538,9 +568,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       };
 
       [
-        ['evt-air','#FF1744','air'], ['evt-heavy','#FF6D00','heavy'], ['evt-bomb','#FF3D3D','bomb'],
-        ['evt-clash','#F4511E','clash'], ['evt-mass','#C62828','mass'], ['evt-assault','#E53935','assault'],
-        ['evt-conflict','#FF5252','conflict'], ['evt-unrest','#FFB300','unrest'], ['evt-other','#9B978E','generic'],
+        ['evt-air','#B8A8A0','air'], ['evt-heavy','#BFAE91','heavy'], ['evt-bomb','#BE9792','bomb'],
+        ['evt-clash','#B3A697','clash'], ['evt-mass','#C68F87','mass'], ['evt-assault','#B8A49E','assault'],
+        ['evt-conflict','#BFA39C','conflict'], ['evt-unrest','#BCB49A','unrest'], ['evt-other','#A8B2B6','generic'],
         // Same silhouettes with neutral accents for machine-coded one-publisher reports.
         ['evt-air-prelim','#91AEBF','air'], ['evt-heavy-prelim','#91AEBF','heavy'],
         ['evt-bomb-prelim','#91AEBF','bomb'], ['evt-clash-prelim','#91AEBF','clash'],
@@ -550,9 +580,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         ['incident-eq','#FF7043','quake'], ['incident-fl','#42A5F5','flood'], ['incident-tc','#AB47BC','cyclone'],
         ['incident-vo','#EF5350','volcano'], ['incident-wf','#FF9800','wildfire'], ['incident-dr','#FDD835','drought'],
         ['incident-other','#D32F2F','generic'],
-        ['alert-air-defence','#42A5F5','shield'], ['alert-drone','#AB47BC','drone'], ['alert-missile','#FF7043','missile'],
-        ['alert-strike','#EF5350','strike'], ['alert-ground','#FFA726','ground'], ['alert-maritime','#26C6DA','maritime'],
-        ['alert-equipment','#FFCA28','equipment'], ['alert-other','#FF8A65','generic'],
+        ['alert-air-defence','#91ACBA','shield'], ['alert-drone','#A9A8BB','drone'], ['alert-missile','#BBA99B','missile'],
+        ['alert-strike','#BE9792','strike'], ['alert-ground','#BFAE91','ground'], ['alert-maritime','#91B4BA','maritime'],
+        ['alert-equipment','#BBB39B','equipment'], ['alert-other','#A8B2B6','generic'],
+        ['facility-airfield','#A6BCC6','air'], ['facility-port','#95B5BA','maritime'],
+        ['facility-base','#B6B9B5','base'], ['facility-tank','#B6B9B5','tank'],
+        ['facility-artillery','#B6B9B5','heavy'], ['facility-radar','#A5B8C6','radar'],
+        ['facility-missile','#B9AAA3','missile'],
       ].forEach(([id,color,kind]) => createMapBadge(id, color, kind as any));
 
 
@@ -571,14 +605,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       map.addLayer({ id: 'conflict-zone-halo', type: 'circle', source: 'conflict-zones', filter: ['==',['get','kind'],'zone'], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,18, 4,28, 8,46],
         'circle-color': ['match', ['get','severity'], 'war','#D32F2F', 'high','#E65100', '#F9A825'],
-        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.05,0.12], 'circle-blur': 0.8,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'conflict-event-halo', type: 'circle', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], paint: {
         'circle-radius': ['interpolate',['linear'],['coalesce',['get','reportingStrength'],20], 0,8, 45,11, 75,14, 100,18],
         'circle-color': ['match',['get','eventCategory'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
           'armed_clash','#F4511E', 'mass_violence','#C62828', 'assault','#E53935', '#FF5252'],
-        'circle-opacity': ['case',['==',['get','dataState'],'cached-stale'],0.045,['interpolate',['linear'],['coalesce',['get','recencyWeight'],0.45], 0,0.04, 0.4,0.08, 1,0.16]],
+        'circle-opacity': 0,
         'circle-blur': 0.65,
       }});
       map.addLayer({ id: 'conflict-event-icons', type: 'symbol', source: 'conflict-zones', filter: ['all',['==',['get','kind'],'event'],['!=',['get','duplicateGdelt'],true]], layout: {
@@ -683,6 +717,25 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         'line-dasharray':[3,2],
       }});
 
+
+      // Named historical areas use the owner's legend; no actor is inferred from colour.
+      map.addLayer({ id: 'reference-atlas-fill', type: 'fill', source: 'reference-atlas-areas', filter: ['==', ['geometry-type'], 'Polygon'], paint: {
+        'fill-color': ['match', ['get','affiliation'], 'houthi','#BB555F', 'government','#44987A', '#A6B8C8'],
+        'fill-opacity': ['match', ['get','affiliation'], 'houthi',.12, 'government',.12, .025],
+      }});
+      map.addLayer({ id: 'reference-atlas-wave', type: 'fill', source: 'reference-atlas-areas',
+        filter: ['all', ['==', ['geometry-type'], 'Polygon'], ['in', ['get','affiliation'], ['literal',['houthi','government']]]], paint: {
+          'fill-pattern': ['match', ['get','affiliation'], 'houthi','territory-wave-red', 'territory-wave-green'], 'fill-opacity': .7,
+      }});
+      map.addLayer({ id: 'reference-atlas-outline', type: 'line', source: 'reference-atlas-areas', paint: {
+        'line-color': ['match', ['get','affiliation'], 'houthi','#CD7A80', 'government','#79B99D', '#A6B8C8'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.65, 8, 1.15], 'line-opacity': 0.65,
+      }});
+      map.addLayer({ id: 'reference-atlas-dots', type: 'symbol', source: 'reference-atlas-points', filter: ['!', ['has', 'point_count']], layout: {
+        'icon-image': ['concat', 'facility-', ['get','symbol']],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 2, .7, 8, .95],
+        'icon-allow-overlap': false, 'icon-padding': 3,
+      }});
 
       // Day/Night
       map.addLayer({ id: 'day-night-fill', type: 'fill', source: 'day-night', paint: { 'fill-color': isGhost ? '#0D0030' : '#000022', 'fill-opacity': 0.22 }});
@@ -848,31 +901,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       /* ── GDELT 2.0 Events — coloured by CAMEO QuadClass so cooperation and
          conflict are separable at a glance, sized by article volume. ── */
       // Regional clusters stand for report counts, not confirmed strikes.
-      map.addLayer({ id:'gdelt-event-clusters',type:'circle',source:'gdelt-events',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],17,10,22,50,28],
-        'circle-color':'#AF7937','circle-opacity':0.87,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#F7D997',
-      }});
-      map.addLayer({ id:'gdelt-event-cluster-count',type:'symbol',source:'gdelt-events',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#211406','text-halo-width':1.2}});
-      map.addLayer({ id:'civil-unrest-clusters',type:'circle',source:'civil-unrest',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],16,10,21,50,27],
-        'circle-color':'#9D832C','circle-opacity':0.86,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#FFE08F',
-      }});
-      map.addLayer({ id:'civil-unrest-cluster-count',type:'symbol',source:'civil-unrest',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#211406','text-halo-width':1.2}});
+      map.addLayer(editorialClusterLayer('gdelt-event-clusters', 'gdelt-events'));
+      map.addLayer(editorialClusterLayer('civil-unrest-clusters', 'civil-unrest'));
       map.addLayer({ id: 'gdelt-event-halo', type: 'circle', source: 'gdelt-events', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['get','articles'], 1,8, 10,11, 50,15, 200,20],
         'circle-color': ['match',['get','event_category'],
           'aerial_attack','#FF1744', 'heavy_weapons','#FF6D00', 'bombing','#FF3D3D',
           'armed_clash','#F4511E', 'mass_violence','#C62828', 'assault','#E53935',
           'material_conflict','#FF5252', '#9B978E'],
-        'circle-opacity': 0.10, 'circle-blur': 0.68,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'gdelt-event-icons', type: 'symbol', source: 'gdelt-events', filter:['!',['has','point_count']], layout: {
         'icon-image': ['case',['==',['get','corroboration'],'single-source-report'],
@@ -1037,24 +1074,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       }, paint: { 'text-color': '#EC407A', 'text-halo-color': '#000', 'text-halo-width': 1, 'text-opacity': 0.8 }});
 
       // News clusters count source reports, not independently verified incidents.
-      map.addLayer({ id:'app-news-clusters',type:'circle',source:'app-news',filter:['has','point_count'],paint:{
-        'circle-radius':['step',['get','point_count'],18,10,24,50,30],
-        'circle-color':'#238D89','circle-opacity':0.88,
-        'circle-stroke-width':1.5,'circle-stroke-color':'#A7F6EF',
-      }});
-      map.addLayer({ id:'app-news-cluster-count',type:'symbol',source:'app-news',filter:['has','point_count'],layout:{
-        'text-field':['get','point_count_abbreviated'],'text-font':['Open Sans Bold'],
-        'text-size':12,'text-allow-overlap':true,
-      },paint:{'text-color':'#FFFFFF','text-halo-color':'#08292A','text-halo-width':1.2}});
+      map.addLayer(editorialClusterLayer('app-news-clusters', 'app-news'));
       // Only published M3TM.APP news with source-provided, generalized location.
       map.addLayer({ id: 'app-news-glow', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
         'circle-radius': ['interpolate',['linear'],['zoom'], 1,9, 5,16, 10,22],
-        'circle-color': '#5CD9CE', 'circle-opacity': 0.11, 'circle-blur': 1,
+        'circle-color': '#A5BEC5', 'circle-opacity': 0, 'circle-blur': 0,
       }});
-      map.addLayer({ id: 'app-news-dots', type: 'circle', source: 'app-news', filter:['!',['has','point_count']], paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,4, 5,7, 10,10],
-        'circle-color': '#5CD9CE', 'circle-opacity': 0.86,
-        'circle-stroke-width': 1.3, 'circle-stroke-color': '#FFFFFF', 'circle-stroke-opacity': 0.45,
+      map.addLayer({ id: 'app-news-dots', type: 'symbol', source: 'app-news', filter:['!',['has','point_count']], layout: {
+        'icon-image': 'editorial-report', 'icon-size': ['interpolate',['linear'],['zoom'], 1,.65, 5,.85, 10,1],
+        'icon-allow-overlap': false, 'icon-padding': 3,
       }});
       map.addLayer({ id: 'app-news-label', type: 'symbol', source: 'app-news', filter:['!',['has','point_count']], minzoom: 4, layout: {
         'text-field': ['get', 'source'], 'text-size': 9, 'text-font': ['Open Sans Regular'],
@@ -1069,7 +1097,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           'air_defence','#42A5F5', 'drone','#AB47BC', 'missile','#FF7043',
           'strike','#EF5350', 'ground','#FFA726', 'maritime','#26C6DA',
           'equipment','#FFCA28', '#FF8A65'],
-        'circle-opacity': 0.13, 'circle-blur': 1,
+        'circle-opacity': 0, 'circle-blur': 0,
       }});
       map.addLayer({ id: 'field-alert-icons', type: 'symbol', source: 'field-alerts', layout: {
         'icon-image': ['match',['get','category'],
@@ -1444,9 +1472,9 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             <span style="color:#5C5A54;font-size:9px;letter-spacing:0.1em;">جارٍ تحديد المسار المنشور…</span>
           </div>
           <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
-            <a href="https://www.flightaware.com/live/flight/${encodeURIComponent(cs)}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">FLIGHTAWARE</a>
-            <a href="https://globe.adsbexchange.com/?icao=${encodeURIComponent(p.icao24||'')}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">ADS-B</a>
-            <a href="https://www.radarbox.com/data/flights/${encodeURIComponent(cs)}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">RADARBOX</a>
+            <a href="https://www.flightaware.com/live/flight/${encodeURIComponent(cs)}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">جدول الرحلة</a>
+            <a href="https://globe.adsbexchange.com/?icao=${encodeURIComponent(p.icao24||'')}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">عرض الطائرة</a>
+            <a href="https://www.radarbox.com/data/flights/${encodeURIComponent(cs)}" target="_blank" style="${linkStyle}color:#78909C;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);">سجل الرحلة</a>
           </div>
         </div>`);
 
@@ -1566,15 +1594,15 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div><span style="color:#5C5A54;">العمق</span><br/><span style="color:#E8E6E0;">${p.depth||'—'} كم</span></div>
           <div><span style="color:#5C5A54;">الإحداثيات</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}, ${coords[0].toFixed(3)}</span></div>
         </div>
-        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 ${p.source === 'NIGGG-BAS' ? 'NIGGG-BAS' : 'تفاصيل المصدر'}</a>
+        <a href="${p.source === 'NIGGG-BAS' ? 'https://ndc.niggg.bas.bg/' : `https://earthquake.usgs.gov/earthquakes/eventpage/${encodeURIComponent(p.id||'')}`}" target="_blank" style="${linkStyle}color:#FF9500;border:1px solid rgba(255,149,0,0.4);background:rgba(255,149,0,0.1);">📊 تفاصيل الحدث</a>
       </div>`);
     });
 
     // ── Satellites (SatNOGS powered) ──
     // Layers with their own click handlers. The satellite pick defers to
     // these, and to nothing else — the basemap is not a click target.
-    const CLICKABLE_LAYERS = new Set(['conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
-      'gdelt-event-clusters','civil-unrest-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
+    const CLICKABLE_LAYERS = new Set(['reference-atlas-dots','reference-atlas-clusters','reference-atlas-fill','reference-atlas-outline','conflict-icons','conflict-event-icons','military-activity-dots','naval-activity-dots','civil-unrest-icons','military-satellite-activity-dots','frontlines-fill','frontlines-line','cctv-dots','eq-circles','fires-heat',
+      'gdelt-event-clusters','civil-unrest-clusters','app-news-clusters','cctv-clusters','gdelt-incident-icons','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','app-news-dots','field-alert-icons',
       'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-event-icons',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
@@ -1733,31 +1761,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       const accent = EVENT_COLOR[String(p.event_category)] ?? '#9B978E';
       const src = urlSafe(p.url);
-      const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
-      const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
       <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
-        <div style="padding:7px;margin-bottom:10px;background:rgba(146,174,191,0.12);border:1px solid rgba(146,174,191,0.24);border-radius:5px;color:#E6F0F5;line-height:1.65;font-size:11px;">
-          بلاغ مصنف آليًا، لا يثبت وقوع الحادثة في هذا الموقع.
-          قد يشير اسم المكان إلى ذكر جغرافي في الخبر، لا موقع واقعة مؤكد.
-        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
           <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'حدث نزاع مُبلّغ عنه')}</span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
-          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
-          <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
-          <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
-          <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
-        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
-        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z</div>
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">المصدر</a>` : ''}
       </div>`);
     })
 
@@ -1797,31 +1813,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       const accent = '#FFB300';
       const src = urlSafe(p.url);
-      const tone = Number(p.tone);
-      const coverage = p.corroboration === 'multi-source-report' ? 'تغطية عدة ناشرين؛ ليست تحققًا مستقلاً' : 'ترميز آلي أولي من ناشر واحد';
-      const precision = p.precision === 'generalized-0.25deg' ? 'موقع عام مُعمّم إلى 0.25°' : 'موقع منشور';
       popup(coords, `
       <div class="m3tm-event-card" dir="rtl" style="${pStyle}border:1px solid ${accent}66;min-width:270px;">
-        <div style="padding:7px;margin-bottom:10px;background:rgba(146,174,191,0.12);border:1px solid rgba(146,174,191,0.24);border-radius:5px;color:#E6F0F5;line-height:1.65;font-size:11px;">
-          بلاغ مصنف آليًا، لا يثبت وقوع الحادثة في هذا الموقع.
-          قد يشير اسم المكان إلى ذكر جغرافي في الخبر، لا موقع واقعة مؤكد.
-        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="width:7px;height:7px;border-radius:50%;background:${accent};box-shadow:0 0 8px ${accent};"></span>
           <span style="color:${accent};font-size:10px;font-weight:700;letter-spacing:0.08em;">${htmlEsc(p.event_label_ar || 'احتجاج أو اضطراب مدني مُبلّغ عنه')}</span>
         </div>
         <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.name || 'موقع منشور')}</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-          <span style="opacity:0.6;">CAMEO</span><span style="color:#E8E6E0;">${htmlEsc(p.event_code || p.root_code || '—')}</span>
           ${p.reported_actor1 ? `<span style="opacity:0.6;">الطرف المذكور ١</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor1)}</span>` : ''}
           ${p.reported_actor2 ? `<span style="opacity:0.6;">الطرف المذكور ٢</span><span style="color:#E8E6E0;">${htmlEsc(p.reported_actor2)}</span>` : ''}
-          <span style="opacity:0.6;">التغطية</span><span style="color:#E8E6E0;">${coverage} · ${htmlEsc(p.sources || 0)} مصادر / ${htmlEsc(p.articles || 0)} مقالات</span>
-          <span style="opacity:0.6;">Goldstein (شدة الترميز لا احتمال الوقوع)</span><span style="color:${Number(p.goldstein) < 0 ? '#FF3D3D' : '#00E676'};">${htmlEsc(p.goldstein)}</span>
-          <span style="opacity:0.6;">نبرة تغطية الخبر</span><span style="color:${tone < 0 ? '#FF9500' : '#00E676'};">${htmlEsc(p.tone)}</span>
-          <span style="opacity:0.6;">الدقة العامة</span><span style="color:#E8E6E0;">${precision}</span>
         </div>
-        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">GDELT 2.0 · ${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z<br/>التصنيف يصف ما ورد في السجل المنشور ولا يعني تحققًا مستقلاً من M3TM.WORLD أو تحديد نقطة هدف دقيقة.</div>
-        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
+        <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#7E817C;">${htmlEsc(String(p.date).slice(0, 16).replace('T', ' '))}Z</div>
+        ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">المصدر</a>` : ''}
       </div>`);
     });
 
@@ -1836,9 +1840,6 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
       if (isReportedCyber) {
         const accent = '#00D7E8';
-        const precision = p.precision === 'generalized-0.25deg'
-          ? 'موقع عام مُعمّم إلى 0.25°'
-          : 'موقع منشور';
         popup(coords, `
         <div style="${pStyle}border:1px solid ${accent}66;min-width:255px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -1848,14 +1849,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <div style="color:#E8E6E0;font-size:12px;font-weight:700;margin-bottom:8px;">${htmlEsc(p.country_name || 'موقع منشور')}</div>
           ${p.description ? `<div style="color:#9B978E;font-size:10px;line-height:1.6;margin-bottom:8px;">${htmlEsc(p.description)}</div>` : ''}
           <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;color:#9B978E;">
-            <span style="opacity:0.6;">التصنيف</span><span style="color:#E8E6E0;">${htmlEsc(p.cause || 'CAMEO 176')}</span>
-            <span style="opacity:0.6;">الدقة</span><span style="color:#E8E6E0;">${precision}</span>
+            <span style="opacity:0.6;">التصنيف</span><span style="color:#E8E6E0;">${htmlEsc(p.cause || 'حدث شبكي')}</span>
             <span style="opacity:0.6;">التاريخ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start || '').slice(0, 16).replace('T', ' '))}</span>
           </div>
-          <div style="margin-top:8px;font-size:9px;line-height:1.5;color:#6E7777;">
-            ${htmlEsc(source)} · بلاغ منشور لا يعني تحققًا مستقلاً من M3TM.WORLD ولا يثبت انقطاعًا شاملاً للشبكة.
-          </div>
-          ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">فتح المصدر المنشور</a>` : ''}
+          ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">المصدر</a>` : ''}
         </div>`);
         return;
       }
@@ -1879,7 +1876,6 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <span style="opacity:0.6;">بدأ</span><span style="color:#E8E6E0;">${htmlEsc(String(p.start).slice(0, 16).replace('T', ' '))}</span>
           ${p.end ? `<span style="opacity:0.6;">انتهى</span><span style="color:#E8E6E0;">${htmlEsc(String(p.end).slice(0, 16).replace('T', ' '))}</span>` : ''}
         </div>
-        <div style="margin-top:8px;font-size:9px;color:#5C5A54;">${htmlEsc(source)}</div>
         ${src !== '#' ? `<a href="${src}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:${accent};border:1px solid ${accent}66;background:${accent}1a;">تفاصيل الرصد</a>` : ''}
       </div>`);
     });
@@ -1905,9 +1901,6 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             <span style="opacity:0.6;">الحصة</span><span style="color:#7BE7EF;font-weight:700;">${htmlEsc(p.share)}%</span>
             <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
           </div>
-          <div style="margin-top:8px;font-size:9px;color:#6E7777;line-height:1.5;">
-            ${htmlEsc(source)} · الحصة من بنية C2 المرصودة في العينة العامة. البلد يصف موقع البنية المرصودة ولا يمثل إسنادًا لهوية أو بلد المهاجم.
-          </div>
         </div>`);
         return;
       }
@@ -1924,7 +1917,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <span style="opacity:0.6;">الرمز</span><span style="color:#E8E6E0;">${htmlEsc(p.country)}</span>
         </div>
         <div style="margin-top:8px;font-size:9px;color:#5C5A54;line-height:1.5;">
-          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر · ${htmlEsc(source)}
+          حصة حركة هجمات طبقة 3 المرصودة بحسب بلد المصدر
         </div>
       </div>`);
     });
@@ -1967,27 +1960,22 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const coords = (e.features[0].geometry as any).coordinates;
       const color = p.severity === 'war' ? '#FF1744' : p.severity === 'high' ? '#FF9500' : '#FFD500';
       const isEvent = p.kind === 'event';
-      const sourceLine = isEvent
-        ? `${htmlEsc(p.sourceLabel || p.provider || 'GDELT')}${Number(p.providerCount || 1) > 1 ? ' · دمج متعدد المصادر' : ''}`
-        : 'منطقة سياقية';
       const strength = Math.max(0, Math.min(100, Number(p.reportingStrength) || 0));
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">⚠️ ${htmlEsc(p.label || 'حدث مرصود')}</div>
         <div style="font-size:10px;color:#E8E6E0;margin-bottom:8px;line-height:1.4;">${htmlEsc(p.description || 'بلاغ عام مرتبط بهذا الموقع.')}</div>
-        ${isEvent && p.reportedActors ? `<div style="font-size:10px;color:#D5DCE0;margin-bottom:7px;">جهات وردت في ترميز الخبر (دون إثبات المسؤولية): ${htmlEsc(p.reportedActors)}</div>` : ''}
+        ${isEvent && p.reportedActors ? `<div style="font-size:10px;color:#D5DCE0;margin-bottom:7px;">الأطراف المذكورة: ${htmlEsc(p.reportedActors)}</div>` : ''}
         ${!isEvent && Number(p.acledPublishedUpdates10d)>0
-            ? `<div style="font-size:10px;color:#B8CFE0;margin-bottom:7px;">ACLED: ${htmlEsc(String(p.acledPublishedUpdates10d))} سجلًا منشورًا أو مُحدّثًا في آخر ١٠ أيام (وقائع آخر ٣٥ يومًا)، منها ${htmlEsc(String(p.acledReports7d||0))} وقائع في آخر ٧ أيام. مؤشرات إقليمية مجمّعة · acleddata.com</div>`
+            ? `<div style="font-size:10px;color:#B8CFE0;margin-bottom:7px;">${htmlEsc(String(p.acledPublishedUpdates10d))} تقارير خلال ١٠ أيام · ${htmlEsc(String(p.acledReports7d||0))} خلال ٧ أيام</div>`
             : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;margin-bottom:8px;">
           <div><span style="color:#5C5A54;">النوع</span><br/><span style="color:${color};">${isEvent ? htmlEsc(p.eventCategory || 'material_conflict') : arEnum(p.severity)}</span></div>
-          <div><span style="color:#5C5A54;">المصدر</span><br/><span style="color:#E8E6E0;">${sourceLine}</span></div>
           ${isEvent ? `<div><span style="color:#5C5A54;">قوة التغطية</span><br/><span style="color:#E8E6E0;">${strength}/100</span></div>` : ''}
           ${isEvent && p.ageHours !== null && p.ageHours !== undefined ? `<div><span style="color:#5C5A54;">عمر البلاغ</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageHours))} ساعة</span></div>` : ''}
-          ${isEvent && (p.ageHours === null || p.ageHours === undefined) && p.ageDays !== null && p.ageDays !== undefined ? `<div><span style="color:#5C5A54;">عمر الحدث</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageDays))} يوم · دقة زمنية ${htmlEsc(String(p.timePrecision || '—'))}</span></div>` : ''}
+          ${isEvent && (p.ageHours === null || p.ageHours === undefined) && p.ageDays !== null && p.ageDays !== undefined ? `<div><span style="color:#5C5A54;">عمر الحدث</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.ageDays))} يوم</span></div>` : ''}
           ${isEvent && Number(p.fatalities || 0) > 0 ? `<div><span style="color:#5C5A54;">وفيات مبلّغ عنها</span><br/><span style="color:#E8E6E0;">${htmlEsc(String(p.fatalities))}</span></div>` : ''}
           <div><span style="color:#5C5A54;">الموقع العام</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(2)}°, ${coords[0].toFixed(2)}°</span></div>
         </div>
-        ${isEvent ? '<div style="font-size:8px;color:#7E817C;margin-bottom:6px;">قوة التغطية مقياس لكثرة/تنوع التقارير وليست احتمالًا للحقيقة. الإحداثيات العامة معمّمة إلى 0.25°.</div>' : ''}
         ${p.sourceUrl ? `<a href="${urlSafe(p.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}flex:1;text-align:center;color:${color};border:1px solid ${color}40;background:${color}15;display:inline-block;width:100%;box-sizing:border-box;margin-top:4px;">[ فتح المصدر ↗ ]</a>` : ''}
       </div>`);
     };
@@ -2002,13 +1990,12 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const color = level >= 3 ? '#EF5350' : level >= 2 ? '#FF7043' : '#FFB74D';
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط جوي عسكري عام</div>
-        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي واسع من بيانات عامة. لا تُعرض هوية الطائرات أو إحداثياتها الدقيقة أو مساراتها التشغيلية.</div>
-        ${p.data_state === 'cached-stale' ? '<div style="font-size:10px;color:#FFCC80;margin-bottom:7px;font-weight:700;">مشاهدة محفوظة — تعذر تحديث المصدر؛ لا تعني نشاطًا جارياً.</div>' : ''}
+        ${p.data_state === 'cached-stale' ? '<div style="font-size:10px;color:#FFCC80;margin-bottom:7px;font-weight:700;">آخر مشاهدة محفوظة</div>' : ''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
           <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
-        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · الزمن: نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
+        ${p.observed_at_bucket ? `<time style="font-size:9px;color:#AAB6BF;">${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))} UTC</time>` : ''}
       </div>`);
     });
 
@@ -2020,12 +2007,11 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const color = level >= 3 ? '#00ACC1' : level >= 2 ? '#26C6DA' : '#80DEEA';
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط بحري عسكري عام</div>
-        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">تجميع إقليمي من ملاحظات AIS عامة مصنفة عسكريًا. لا تُعرض أسماء السفن أو MMSI أو السرعة أو الاتجاه أو أي مسار فردي.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
           <div><span style="color:#5C5A54;">مستوى النشاط</span><br/><span style="color:${color};">${htmlEsc(p.activity || 'محدود')}</span></div>
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '2-4')}</span></div>
         </div>
-        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية إقليمية تقريبية ${htmlEsc(String(p.cell_degrees || 6))}° · نافذة 30 دقيقة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''}</div>
+        ${p.observed_at_bucket ? `<time style="font-size:9px;color:#AAB6BF;">${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))} UTC</time>` : ''}
       </div>`);
     });
 
@@ -2037,24 +2023,51 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       const color = level >= 3 ? '#AB47BC' : level >= 2 ? '#BA68C8' : '#CE93D8';
       popup(coords, `<div style="${pStyle}border:1px solid ${color}40;">
         <div style="color:${color};font-size:12px;font-weight:700;margin-bottom:6px;">نشاط أقمار عسكرية/حكومية عام</div>
-        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;margin-bottom:8px;">موضع إقليمي مجمّع من TLE عامة بعد انتشار SGP4. ليس قياسًا مباشرًا ولا مسارًا مداريًا فرديًا.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
           <div><span style="color:#5C5A54;">الحجم التقريبي</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.approximate_count || '3-5')}</span></div>
           <div><span style="color:#5C5A54;">نطاق الارتفاع</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.average_altitude_band || 'غير محدد')}</span></div>
         </div>
-        <div style="font-size:8px;color:#7E817C;margin-top:8px;">الدقة: خلية ${htmlEsc(String(p.cell_degrees || 20))}° · نافذة زمنية ساعة${p.observed_at_bucket ? ` · ${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))}Z` : ''} · لا أسماء/معرفات/مسارات فردية.</div>
+        ${p.observed_at_bucket ? `<time style="font-size:9px;color:#AAB6BF;">${htmlEsc(String(p.observed_at_bucket).slice(0,16).replace('T',' '))} UTC</time>` : ''}
       </div>`);
     });
 
+    map.on('click', 'reference-atlas-clusters', e => {
+      const feature = e.features?.[0];
+      const clusterId = Number(feature?.properties?.cluster_id);
+      if (!feature || !Number.isFinite(clusterId) || feature.geometry.type !== 'Point') return;
+      const source = map.getSource('reference-atlas-points') as maplibregl.GeoJSONSource | undefined;
+      const coordinates = feature.geometry.coordinates.slice(0, 2) as [number, number];
+      // Keep expansion on the world copy that was actually clicked.
+      while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+      void source?.getClusterExpansionZoom(clusterId).then(zoom => {
+        map.easeTo({ center: coordinates, zoom: Math.min(zoom, 10), duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400 });
+      }).catch(() => {});
+    });
+    const onReferenceAtlasClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature?.properties) return;
+      const p = feature.properties;
+      const side = p.affiliation === 'houthi' ? 'منطقة الحوثيين' : p.affiliation === 'government' ? 'منطقة الحكومة' : '';
+      const kinds: Record<string, string> = { tank: 'دبابة', artillery: 'مدفعية', radar: 'رادار', missile: 'منشأة صواريخ', airfield: 'مطار / قاعدة جوية', port: 'ميناء / منشأة بحرية', base: 'منشأة عسكرية' };
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(`<div dir="rtl" style="padding:10px;color:#DEE7EB;background:#0C1922;font-size:12px;line-height:1.8;border-radius:12px;">
+        <strong>${htmlEsc(p.name || 'معلم')}</strong><div>${htmlEsc(side || kinds[p.symbol] || (p.kind === 'reference_line' ? 'خط ميداني' : 'منطقة'))}</div>
+      </div>`).addTo(map);
+    };
+    map.on('click', 'reference-atlas-dots', onReferenceAtlasClick);
+    map.on('click', 'reference-atlas-fill', onReferenceAtlasClick);
+    map.on('click', 'reference-atlas-outline', onReferenceAtlasClick);
+
+    for (const layer of ['reference-atlas-dots', 'reference-atlas-clusters', 'reference-atlas-fill', 'reference-atlas-outline']) {
+      map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+    }
+
     const onFrontlineClick = (e: any) => {
       if (!e.features?.length) return;
-      const p = e.features[0].properties as any;
       const coords = e.lngLat;
       popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid rgba(255,209,102,.28);">
-        <div style="color:#FFD166;font-size:12px;font-weight:700;margin-bottom:6px;">خط/منطقة جبهة منشورة</div>
-        <div style="font-size:10px;color:#E8E6E0;line-height:1.5;">هندسة سياقية من لقطة منشورة للعامة، وليست موضعًا تكتيكيًا لحظيًا.</div>
-        <div style="font-size:9px;color:#A8AAA5;margin-top:7px;">المصدر: ${htmlEsc(p.source || 'DeepStateMap.Live')}</div>
-        ${p.source_label ? `<div style="font-size:8px;color:#7E817C;margin-top:3px;">وصف المصدر: ${htmlEsc(p.source_label)}</div>` : ''}
+        <div style="color:#FFD166;font-size:12px;font-weight:700;margin-bottom:6px;">خطوط الجبهة</div>
       </div>`);
     };
     map.on('click', 'frontlines-fill', onFrontlineClick);
@@ -2062,23 +2075,13 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
 
 
     // ── M3TM.WORLD SDK link click ──
-    const SDK_SOURCE_URLS: Record<string, string> = {
-      'AIS Maritime': 'https://www.marinetraffic.com',
-      'AIS Stream': 'https://aisstream.io',
-      'AIS → Lattice': 'https://aisstream.io',
-      'ADS-B / OpenSky': 'https://opensky-network.org',
-      'ADS-B → Lattice': 'https://opensky-network.org',
-      'Naval Public Data': 'https://www.odni.gov',
-    };
     ['sdk-sea','sdk-sea-glow','sdk-air','sdk-air-glow','sdk-intel','sdk-intel-glow'].forEach(layer => {
       map.on('click', layer, e => {
         if (!e.features?.length) return;
         const p = e.features[0].properties as any;
         const coords = e.lngLat;
-        const srcUrl = p.url || SDK_SOURCE_URLS[p.source] || 'https://m3tm.world';
         const domainLabel = p.domain === 'SEA' ? '⚓ مسار بحري' : p.domain === 'AIR' ? '✈ ممر جوي' : '🛡 بيانات عامة';
         const domainColor = p.domain === 'SEA' ? '#4FC3F7' : p.domain === 'AIR' ? '#B3E5FC' : '#81D4FA';
-        const linkStyle = 'text-decoration:none;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.05em;';
         popup([coords.lng, coords.lat], `<div style="${pStyle}border:1px solid ${domainColor}40;">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
             <div style="width:8px;height:8px;border-radius:50%;background:${domainColor};box-shadow:0 0 8px ${domainColor};"></div>
@@ -2088,9 +2091,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
             <div><span style="color:#5C5A54;">من</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.fromName || 'نقطة البداية')}</span></div>
             <div><span style="color:#5C5A54;">إلى</span><br/><span style="color:#E8E6E0;">${htmlEsc(p.toName || 'الوجهة')}</span></div>
             <div><span style="color:#5C5A54;">المجال</span><br/><span style="color:${domainColor};">${p.domain === 'SEA' ? 'بحري' : p.domain === 'AIR' ? 'جوي' : 'عام'}</span></div>
-            <div><span style="color:#5C5A54;">المصدر</span><br/><a href="${urlSafe(srcUrl)}" target="_blank" style="color:${domainColor};text-decoration:underline;cursor:pointer;">${htmlEsc(p.source === 'Naval Public Data' ? 'مصدر بحري' : (p.source || 'M3TM.WORLD'))}</a></div>
           </div>
-          <a href="${urlSafe(srcUrl)}" target="_blank" style="${linkStyle}color:${domainColor};border:1px solid ${domainColor}40;background:${domainColor}18;display:inline-block;margin-top:4px;">فتح المصدر ↗</a>
         </div>`);
       });
     });
@@ -2119,7 +2120,6 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
           <span style="font-size:7px;color:#5C5A54;letter-spacing:0.15em;">الشدة ${p.severity || '?'}/10</span>
           <div style="flex:1;height:3px;border-radius:2px;background:linear-gradient(90deg, ${sevColor}, ${sevColor}00);opacity:0.5;"></div>
         </div>
-        <div style="margin-top:8px;font-size:7px;color:#5C5A54;text-align:center;letter-spacing:0.1em;">المصدر: ABUSE.CH FEODO TRACKER</div>
       </div>`);
     });
 
@@ -2376,11 +2376,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       if (!p) return;
       const coords = (e.features![0].geometry as any).coordinates;
       popup(coords, `<div style="${pStyle}border:1px solid rgba(92,217,206,0.4);">
-        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر منشور من M3TM.APP</div>
+        <div style="color:#5CD9CE;font-size:11px;font-weight:700;margin-bottom:5px;">خبر</div>
         <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'خبر')}</div>
         <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
-        <p style="font-size:8px;color:#A0A0A0;">موقع إقليمي معمّم 0.5°، وليس تحديدًا دقيقًا لمكان الواقعة. المحتوى منسوب لناشره.</p>
-        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">فتح الخبر المنشور ↗</a>` : ''}
+        ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#5CD9CE;">المصدر ↗</a>` : ''}
       </div>`);
     });
 
@@ -2392,7 +2391,6 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
         <div style="color:#FFB199;font-size:11px;font-weight:700;margin-bottom:5px;">${htmlEsc(p.label_ar || 'تنبيه ميداني منشور')}</div>
         <div style="font-size:11px;color:#F3F3F3;margin-bottom:8px;">${htmlEsc(p.title || 'بلاغ منشور')}</div>
         <div style="font-size:9px;color:#C5C5C5;">${htmlEsc(p.source || 'M3TM.APP')} · ${htmlEsc(p.published || 'وقت النشر غير متاح')}</div>
-        <p style="font-size:8px;color:#A0A0A0;">تصنيف نصي لخبر منشور؛ الإحداثيات من الناشر ومُعمّمة 0.5°. لا يمثل تتبعًا لوحدة أو سلاح بعينه.</p>
         ${p.url ? `<a href="${urlSafe(p.url)}" target="_blank" rel="noopener noreferrer" style="${linkStyle}color:#FFB199;">فتح المصدر ↗</a>` : ''}
       </div>`);
     });
@@ -2449,13 +2447,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // The API currently carries only thousands of public civilian points, well
     // within a single MapLibre symbol layer. Fixed index sampling erased sparse
     // regions even when valid aircraft were present, so retain every valid row.
-    setGeo('flights', activeLayers.flights ? toFeatures(data.commercial_flights) : []);
+    const commercialFlightLayer = activeLayers.flights || activeLayers.sdk_air;
+    setGeo('flights', commercialFlightLayer ? toFeatures(data.commercial_flights) : []);
     setGeo('private-fl', activeLayers.private ? toFeatures(data.private_flights) : []);
     setGeo('jets', activeLayers.jets ? toFeatures(data.private_jets) : []);
-    const anyCivilianFlightLayer = activeLayers.flights || activeLayers.private || activeLayers.jets;
+    const anyCivilianFlightLayer = commercialFlightLayer || activeLayers.private || activeLayers.jets;
     setGeo('civilian-flight-activity',
       anyCivilianFlightLayer ? civilianFlightMapFeatures(data.civilian_flight_activity ?? [], {
-        commercial: activeLayers.flights,
+        commercial: commercialFlightLayer,
         private: activeLayers.private,
         jets: activeLayers.jets,
       }) : []);
@@ -3094,6 +3093,33 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
   }, [mapReady, data.frontlines, (activeLayers as any).frontlines, setGeo]);
 
 
+  useEffect(() => {
+    if (!mapReady) return;
+    const snapshot = data.reference_atlas as AtlasSnapshot | undefined;
+    const features = activeLayers.reference_atlas
+      ? referenceAtlasFeatures(snapshot, referenceAtlasLayerId, referenceAtlasKind).map(feature => ({
+          ...feature,
+          properties: { ...feature.properties, affiliation: publishedAreaAffiliation(feature.properties.name),
+            symbol: publishedEquipmentSymbol(feature.properties.name), atlasStatus: snapshot?.status, atlasFetchedAt: snapshot?.fetchedAt },
+        })) : [];
+    setGeo('reference-atlas-points', activeLayers.reference_atlas_points !== false ? features.filter(feature => feature.geometry.type === 'Point' && feature.properties.symbol) : []);
+    setGeo('reference-atlas-areas', features.filter(feature => feature.geometry.type !== 'Point'));
+  }, [mapReady, data.reference_atlas, activeLayers.reference_atlas, activeLayers.reference_atlas_points, referenceAtlasLayerId, referenceAtlasKind, setGeo]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !activeLayers.reference_atlas || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let phase = 0;
+    const timer = window.setInterval(() => {
+      if (document.hidden || !map.hasImage('territory-wave-red')) return;
+      phase += .13;
+      map.updateImage('territory-wave-red', territoryWave('#CB6E71', phase));
+      map.updateImage('territory-wave-green', territoryWave('#63AA91', phase));
+      map.triggerRepaint();
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [mapReady, activeLayers.reference_atlas]);
+
   // The page's /api/conflicts loader is the single authority. Do not issue
   // a parallel fetch here or invent event markers during source outages.
 
@@ -3171,8 +3197,8 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     // Clearing the 3D layer is what actually turns satellites off.
     if (!anySat) { satRowsRef.current = []; satLayerRef.current?.setPoints([]); }
     setVis(['gdelt-incident-halo','gdelt-incident-icons'], activeLayers.global_incidents);
-    setVis(['gdelt-event-halo','gdelt-event-icons','gdelt-event-clusters','gdelt-event-cluster-count'], (activeLayers as any).gdelt_events);
-    setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters','civil-unrest-cluster-count'], (activeLayers as any).civil_unrest);
+    setVis(['gdelt-event-halo','gdelt-event-icons','gdelt-event-clusters'], (activeLayers as any).gdelt_events);
+    setVis(['civil-unrest-halo','civil-unrest-icons','civil-unrest-clusters'], (activeLayers as any).civil_unrest);
     setVis(['cf-outage-halo','cf-outage-dots','cf-outage-label'], (activeLayers as any).cf_outages);
     setVis(['cf-attack-dots','cf-attack-label'], (activeLayers as any).cf_attacks);
 
@@ -3180,7 +3206,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['network-mesh-atmo', 'network-mesh-glow', 'network-mesh-core'], activeLayers.internet_outages || activeLayers.malware);
     setVis(['cyber-arcs-atmo','cyber-arcs-glow','cyber-arcs-core','cyber-arcs-flow','cyber-heads','cyber-impacts','cyber-labels'], (activeLayers as any).cyber_attacks);
     setVis(['day-night-fill'], activeLayers.day_night);
-    setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights);
+    setVis(['fl-commercial-halo','fl-commercial'], activeLayers.flights || activeLayers.sdk_air);
     setVis(['fl-private-halo','fl-private'], activeLayers.private);
     setVis(['fl-jets-halo','fl-jets'], activeLayers.jets);
     setVis(
@@ -3199,12 +3225,14 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     setVis(['choke-glow','choke-dots','choke-label'], activeLayers.maritime);
     setVis(['ship-dots','ship-label'], activeLayers.maritime);
     setVis(['news-glow','news-dots','news-label'], activeLayers.live_news);
-    setVis(['app-news-glow','app-news-dots','app-news-label','app-news-clusters','app-news-cluster-count'], (activeLayers as any).app_news);
+    setVis(['app-news-glow','app-news-dots','app-news-label','app-news-clusters'], (activeLayers as any).app_news);
     setVis(['country-boundary-reference','country-boundary-contested'], (activeLayers as any).country_borders);
     setVis(['conflict-density-heat'], (activeLayers as any).conflict_density !== false);
     setVis(['conflict-zone-halo','conflict-event-halo','conflict-event-icons','conflict-icons'], activeLayers.conflict_zones !== false);
     setVis(['reported-routes-halo','reported-routes-core'], (activeLayers as any).reported_routes);
     setVis(['frontlines-fill','frontlines-line'], (activeLayers as any).frontlines);
+    setVis(['reference-atlas-fill','reference-atlas-wave','reference-atlas-outline'], activeLayers.reference_atlas);
+    setVis(['reference-atlas-clusters','reference-atlas-dots'], activeLayers.reference_atlas && activeLayers.reference_atlas_points !== false);
 
     setVis(['balloon-dots','balloon-label'], activeLayers.balloons);
     setVis(['rad-glow','rad-dots','rad-label'], activeLayers.radiation);
@@ -4115,6 +4143,19 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedSat, clearSat]);
 
+  // Wind credit is active only while the overlay is enabled.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    if (!activeLayers.wind) {
+      if (map.getLayer('wind-credit')) map.removeLayer('wind-credit');
+      if (map.getSource('wind-credit')) map.removeSource('wind-credit');
+      return;
+    }
+    if (!map.getSource('wind-credit')) map.addSource('wind-credit', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, attribution: WIND_ATTRIBUTION });
+    if (!map.getLayer('wind-credit')) map.addLayer({ id: 'wind-credit', type: 'circle', source: 'wind-credit' });
+  }, [mapReady, activeLayers.wind, mapStyle]);
+
   return (
     <>
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
@@ -4131,7 +4172,7 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       )}
       {mapReady && mapLoadState === 'recovery' && (
         <div role="status" className="pointer-events-none absolute bottom-28 left-3 z-10 rounded-lg border border-white/15 bg-[#081322]/60 px-2 py-1 text-[10px] text-white/85">
-          خريطة بديلة · بيانات الخلفية من Esri
+          خريطة بديلة
         </div>
       )}
       {mapReady && mapRef.current && (
@@ -4159,6 +4200,10 @@ function WorldMap({ data, activeLayers, onEntityClick, onReady, onMouseCoords, o
       )}
       {selectedSat && <SatelliteCard sat={selectedSat} onClose={clearSat} />}
       {mapReady && <MapControls mapRef={mapRef} onInteract={onFollowInterrupt} />}
+      {mapReady && (activeLayers.wind || activeLayers.rain) && <div className={DOCK}>
+        {activeLayers.wind && <WindBar mapRef={mapRef} controls={!!activeLayers.wind_controls} onOff={() => onLayerOff?.('wind')} />}
+        {activeLayers.rain && <RainBar mapRef={mapRef} mapStyle={mapStyle} controls={!!activeLayers.rain_controls} onOff={() => onLayerOff?.('rain')} />}
+      </div>}
     </>
   );
 }

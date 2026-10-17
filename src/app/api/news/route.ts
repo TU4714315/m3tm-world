@@ -1,3 +1,4 @@
+import { withMixedMapPolicy } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicNewsLocation } from '@/lib/publicCountryVisibility';
 import crypto from 'crypto';
@@ -127,7 +128,7 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
   return items;
 }
 
-export async function GET() {
+async function providerGET() {
   try {
     // Start independent RSS concurrently with APP. Neither stream waits for
     // the other's 15-minute publisher cadence. No inferred map locations.
@@ -171,6 +172,9 @@ export async function GET() {
             link: String(item.sourceUrl || ''),
             published: String(item.publishedAt || ''),
             source: String(item.source || 'M3TM.APP'),
+            isBreaking: item.isBreaking === true,
+            breaking: item.breaking === true,
+            ...(item.urgency === 'breaking' ? { urgency: 'breaking' as const } : {}),
             risk_score: severityScore[String(item.severity || '').toLowerCase()] ?? 1,
             coords: hasCoords ? [lat as number, lng as number] as [number,number] : null,
             coords_default: !hasCoords,
@@ -271,3 +275,5 @@ export async function GET() {
     return NextResponse.json({ news: [], error: 'Failed to fetch data' }, { status: 500 });
   }
 }
+
+export const GET = withMixedMapPolicy('news', providerGET);

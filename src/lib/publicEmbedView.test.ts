@@ -58,4 +58,14 @@ describe('public embed source-preserving display presets', () => {
     expect(visible.alert_pins).toBe(true);
   });
 
+  it('hides atlas point annotations while preserving its contextual areas and active choice', () => {
+    const selected = { ...layers, reference_atlas: true };
+    const hidden = hidePublicMapMarkers(selected, false) as Record<string, boolean>;
+    expect(hidden.reference_atlas).toBe(true);
+    expect(hidden.reference_atlas_points).toBe(false);
+    expect('reference_atlas_points' in selected).toBe(false);
+    expect(hidePublicMapMarkers(selected, true)).toBe(selected);
+    expect(reducePublicEventClutter(selected).reference_atlas).toBe(true);
+  });
+
 });

@@ -25,6 +25,9 @@ export type RoutedNews = {
   coords: [number, number] | null; coords_default: boolean;
   language: string; feed_origin: string; location_basis: string;
   verification_status: 'source-reported'; machine_assessment: null;
+  isBreaking?: boolean;
+  breaking?: boolean;
+  urgency?: 'breaking';
   publication_count?: number;
   evidence_links?: Array<{ publisher: string; url: string }>;
   evidence_label?: string;

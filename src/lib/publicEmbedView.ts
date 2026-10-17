@@ -31,11 +31,15 @@ export const PUBLIC_MAP_MARKER_LAYERS = [
   'sat_navigation', 'sat_earth', 'sat_science', 'cctv', 'cctv_previews',
   'sdk_air', 'sdk_sea', 'sdk_naval', 'infrastructure', 'malware',
   'cf_outages', 'cf_attacks',
+  'reference_atlas_points',
 ] as const;
 
 export function hidePublicMapMarkers<T extends Record<string, boolean>>(layers: T, visible: boolean): T {
   if (visible) return layers;
   const next: Record<string, boolean> = { ...layers };
+  // The atlas combines point annotations with polygon context. This derived
+  // renderer flag hides only its markers while retaining the selected atlas.
+  if ('reference_atlas' in next) next.reference_atlas_points = false;
   for (const key of PUBLIC_MAP_MARKER_LAYERS) {
     if (key in next) next[key] = false;
   }

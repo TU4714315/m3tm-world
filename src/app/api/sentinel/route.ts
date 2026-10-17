@@ -1,7 +1,8 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 
 // Sentinel-1 SAR Satellite — STAC Catalog via Element84 Earth Search + Copernicus fallback
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const { searchParams } = new URL(req.url);
   const lat = parseFloat(searchParams.get('lat') || '0');
   const lng = parseFloat(searchParams.get('lng') || '0');
@@ -99,7 +100,7 @@ export async function GET(req: Request) {
       datetime,
       timestamp: new Date().toISOString(),
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   } catch (e) {
     return NextResponse.json({ error: 'Sentinel lookup failed', scenes: [] }, { status: 500 });
@@ -133,3 +134,5 @@ function estimateArea(bbox: number[]): number {
   const lngDiff = Math.abs(maxLng - minLng) * 111 * Math.cos((minLat + maxLat) / 2 * Math.PI / 180);
   return Math.round(latDiff * lngDiff);
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -86,7 +87,7 @@ function anchorTime(raw: string | null): Date {
   return drift > 7 * 24 * 3600_000 ? new Date() : new Date(ms);
 }
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const params = new URL(req.url).searchParams;
   const id = params.get('id')?.trim();
   if (!id || !/^\d{1,6}$/.test(id)) {
@@ -150,6 +151,8 @@ export async function GET(req: Request) {
   }, {
     // An orbit is stable for far longer than a position: the shape only
     // changes when a fresh TLE lands.
-    headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' },
+    headers: { 'Cache-Control': 'private, no-store, max-age=0' },
   });
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

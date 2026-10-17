@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 
@@ -25,7 +26,7 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   VE:[-66,8],VN:[106,16],YE:[48,15.5],ZM:[28,-14],ZW:[30,-20],
 };
 
-export async function GET() {
+async function providerGET() {
   try {
     const now = Math.floor(Date.now() / 1000);
     const from = now - 86400; // Last 24 hours
@@ -78,10 +79,12 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       source: 'IODA — Georgia Tech Internet Outage Detection',
     }), {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   } catch (error) {
     console.error('[OSIRIS] IODA fetch error:', error);
     return NextResponse.json({ outages: [], total: 0, error: 'IODA unavailable' }, { status: 500 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

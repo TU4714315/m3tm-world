@@ -1,6 +1,6 @@
 // Isolated production-browser smoke test. No runtime dependency or user profile.
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,8 +9,11 @@ if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname)) {
   throw new Error('This smoke test only accepts localhost previews.');
 }
 const profile = await mkdtemp(join(tmpdir(), 'osiris-smoke-'));
+const output = process.env.SMOKE_OUTPUT_DIR || profile;
+await mkdir(output, { recursive: true });
 const chrome = spawn(process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', '--no-first-run', '--no-default-browser-check',
+  ...(process.env.CI === 'true' ? ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []),
   '--remote-debugging-pipe', `--user-data-dir=${profile}`, '--window-size=1440,1000', 'about:blank',
 ], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
 const pending = new Map();
@@ -139,9 +142,52 @@ try {
     measurements.recoveryMs = Date.now() - retryStarted;
     await check('Retry restores one working map', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready' && document.querySelectorAll('.maplibregl-canvas').length === 1`);
   } else {
-    await check('Fresh map finishes loading', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready'`);
-    await check('Globe projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'globe'`);
+    if (scenario === 'yemen') {
+      await check('Fresh map finishes loading', `(() => {
+        const root=document.querySelector('[data-map-projection][data-map-camera]');
+        const camera=JSON.parse(root?.dataset.mapCamera || '{}');
+        const canvas=root?.querySelector('.maplibregl-canvas');
+        return Number.isFinite(camera.lat) && Number.isFinite(camera.lng) && canvas?.width>0 && canvas?.height>0;
+      })()`);
+      await check('Globe projection is actually initialized', `document.querySelector('[data-map-projection]')?.dataset.mapProjection === 'globe'`);
+    } else {
+      await check('Fresh map finishes loading', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready'`);
+      await check('Globe projection is actually initialized', `document.querySelector('[data-map-status]')?.dataset.mapProjection === 'globe'`);
+    }
     await check('Terrain is not fetched during startup', `!performance.getEntriesByType('resource').some(r => r.name.includes('elevation-tiles-prod'))`);
+    if (scenario === 'yemen') {
+      const response = await fetch(new URL('/api/reference-atlas', url), { signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error(`Published areas HTTP${response.status}`);
+      const snapshot = await response.json();
+      const areas = snapshot.features?.features?.filter(f => ['Polygon','MultiPolygon'].includes(f.geometry?.type)) || [];
+      measurements.yemenAreas = {
+        houthi: areas.filter(f => /ansar\s*allah|houthi/i.test(f.properties?.name)).length,
+        government: areas.filter(f => /\bhadi\b|yemeni? government/i.test(f.properties?.name)).length,
+        sourcePublishedAt: snapshot.sourcePublishedAt,
+        fetchedAt: snapshot.fetchedAt,
+      };
+      checks.push({ name: 'Published Yemen regions available across publisher folders', passed: measurements.yemenAreas.houthi > 0 && measurements.yemenAreas.government > 0 });
+      await click('رصد اليمن');
+      await pause(10000);
+      await check('Yemen focus reaches the intended camera on a working flat map', `(() => {
+        const element=document.querySelector('[data-map-projection][data-map-camera]');
+        const camera=JSON.parse(element?.dataset.mapCamera || '{}');
+        return element?.dataset.mapProjection === 'mercator' && element.querySelector('.maplibregl-canvas')?.width>0
+          && Math.abs(camera.lat-15.6)<0.2 && Math.abs(camera.lng-47.5)<0.2 && camera.zoom>=5.4;
+      })()`);
+      await check('Yemen view retains news and no invitation prompt', `!document.body.innerText.includes('كود الدعوة') && document.querySelectorAll('.maplibregl-canvas').length===1`);
+      await evaluate(`(() => {
+        const summary=[...document.querySelectorAll('summary')].find(node=>node.textContent.includes('دليل الرموز'));
+        if (!summary) throw new Error('Missing symbol legend');
+        if (!summary.parentElement.open) summary.click();
+      })()`);
+      await check('Public legend retains both affiliations without folder dates or system explanations', `(() => {
+        const legend=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary')?.textContent.includes('دليل الرموز'));
+        return legend?.open && legend.innerText.includes('مناطق الحوثيين') && legend.innerText.includes('مناطق الحكومة')
+          && !/نفوذ منشور بتاريخ|2024-06-02|ليست حصرًا|أطلس المصدر/.test(legend.innerText);
+      })()`);
+
+    }
     if (scenario === 'zoom') {
       await openDisplay();
       const zoom = () => evaluate(`Number(document.body.innerText.match(/ZOOM\\s+([\\d.]+)/)?.[1])`);
@@ -203,7 +249,7 @@ try {
       await pause(8_000);
       await check('Zoomed terrain finishes loading', `document.body.innerText.includes('Terrain on')`);
       const terrainScreenshot = await command('Page.captureScreenshot', { format: 'png' });
-      await writeFile(join(profile, 'terrain.png'), Buffer.from(terrainScreenshot.data, 'base64'));
+      await writeFile(join(output, 'terrain.png'), Buffer.from(terrainScreenshot.data, 'base64'));
       await click('3D Terrain');
       await pause(1_500);
       await check('Terrain toggles off without replacing the canvas', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'ready' && document.querySelectorAll('.maplibregl-canvas').length === 1 && !document.body.innerText.includes('Terrain on')`);
@@ -259,21 +305,21 @@ try {
   });
   if (process.env.PROFILE_TERRAIN) {
     const { profile: cpu } = await command('Profiler.stop');
-    await writeFile(join(profile, 'terrain.cpuprofile'), JSON.stringify(cpu));
+    await writeFile(join(output, 'terrain.cpuprofile'), JSON.stringify(cpu));
     const totals = new Map();
     cpu.samples?.forEach((id, i) => totals.set(id, (totals.get(id) ?? 0) + cpu.timeDeltas[i]));
     measurements.cpuTop = [...totals].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([id, us]) => ({ ms: Math.round(us / 1000), frame: cpu.nodes.find(n => n.id === id)?.callFrame }));
   }
   const visual = await command('Page.captureScreenshot', { format: 'jpeg', quality: 75 });
-  await writeFile(join(profile, 'visual.jpg'), Buffer.from(visual.data, 'base64'));
+  await writeFile(join(output, 'visual.jpg'), Buffer.from(visual.data, 'base64'));
   const screenshot = await command('Page.captureScreenshot', { format: 'png' });
-  await writeFile(join(profile, 'preview.png'), Buffer.from(screenshot.data, 'base64'));
+  await writeFile(join(output, 'preview.png'), Buffer.from(screenshot.data, 'base64'));
   checks.push({ name: 'No camera or renderer failures', passed: !warnings.some(w => /Projection switch failed|TypeError|Satellite picking unavailable|Map initialization failed/.test(JSON.stringify(w))) });
   measurements.mapNetwork = [...network.values()].filter(r => /cartocdn|maplibre|dark-matter-style/.test(r.url));
   measurements.visibility = await evaluate(`({hidden: document.hidden, state: document.visibilityState})`);
-  const report = { scenario, checks, measurements, page: JSON.parse(result.result.value), errors, warnings, failedRequests: requests, screenshot: join(profile, 'preview.png') };
-  await writeFile(join(profile, 'report.json'), JSON.stringify(report, null, 2));
-  console.log(JSON.stringify({ scenario, checks, measurements, errors, warnings, failedRequests: requests, report: join(profile, 'report.json'), screenshot: report.screenshot }, null, 2));
+  const report = { scenario, checks, measurements, page: JSON.parse(result.result.value), errors, warnings, failedRequests: requests, screenshot: join(output, 'preview.png') };
+  await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify({ scenario, checks, measurements, errors, warnings, failedRequests: requests, report: join(output, 'report.json'), screenshot: report.screenshot }, null, 2));
   process.exitCode = errors.length || checks.some(c => !c.passed) ? 1 : 0;
 } finally {
   clearTimeout(deadline);

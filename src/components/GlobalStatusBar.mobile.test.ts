@@ -17,7 +17,7 @@ describe('WORLD mobile ticker and uncluttered glass controls', () => {
     expect(page).toContain('<GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />');
     expect(page).not.toContain("(!embedMode || embedSurface === 'public') && <GlobalStatusBar");
     expect(ticker).toContain('delay: embed ? 0 : 0.2');
-    expect(ticker).toContain('{!embed && (');
+    expect(ticker).not.toContain('href="/docs"');
     expect(css).toContain(".world-news-ticker[data-embed='true']");
     expect(css).toContain('bottom: env(safe-area-inset-bottom, 0px) !important;');
   });

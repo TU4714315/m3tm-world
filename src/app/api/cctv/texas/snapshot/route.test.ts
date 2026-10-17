@@ -33,5 +33,5 @@ it('does not serve unavailable or non-JPEG payloads as images', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')));
   const response = await GET(request());
   expect(response.status).toBe(502);
-  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(response.headers.get('cache-control')).toContain('no-store');
 });

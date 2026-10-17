@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+async function providerGET() {
   return NextResponse.json({
     sdk: 'polybolos',
     version: '1.0.0',
@@ -151,3 +152,5 @@ export async function GET() {
     timestamp: new Date().toISOString(),
   });
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

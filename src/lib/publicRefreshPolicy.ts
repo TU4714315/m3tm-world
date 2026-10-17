@@ -6,6 +6,7 @@ export const PUBLIC_REFRESH_MS = {
   militaryRegionalFlightAggregate: 5 * 60_000,
   civilianFlightsOnDemand: 24 * 60 * 60_000,
   worldwidePublishedFrontlines: 24 * 60 * 60_000,
+  referenceAtlasCheck: 60_000,
   africanNeighboringConflictArchive: 12 * 60 * 60_000,
   ukraineConflictArchive: 24 * 60 * 60_000,
   commercialMaritime: 24 * 60 * 60_000,

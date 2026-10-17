@@ -1,4 +1,5 @@
 import saudiAdmin0 from './saudiAdmin0.json';
+import { geometryIntersectsSaudi } from './publicGeometryBoundary';
 
 /**
  * Public presentation contract. Saudi-specific observation markers are omitted
@@ -90,7 +91,7 @@ export function isSaudiPublicIndicator(value: unknown): boolean {
     if (isSaudiPointBetween(obj.origin_lat, obj.origin_lng, obj.target_lat, obj.target_lng)) return true;
     // APP geo-tagged feed uses [lat, lng], not GeoJSON [lng, lat].
     if (Array.isArray(obj.coords) && inSaudiPublicBoundary(obj.coords[0], obj.coords[1])) return true;
-    if (isSaudiCoordinates(record(obj.geometry)?.coordinates)) return true;
+    if (isSaudiCoordinates(record(obj.geometry)?.coordinates) || geometryIntersectsSaudi(obj.geometry)) return true;
   }
   return false;
 }
@@ -134,6 +135,23 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
   if (fronts?.type === 'FeatureCollection' && Array.isArray(fronts.features)) {
     result.frontlines = { ...fronts, features: fronts.features.filter((f: unknown) => !isSaudiPublicIndicator(f)) };
   }
+  const atlas = record(result.reference_atlas);
+  const collection = record(atlas?.features);
+  if (atlas && collection?.type === 'FeatureCollection' && Array.isArray(collection.features)) {
+    const features = collection.features.filter((feature: unknown) => {
+      const props = record(record(feature)?.properties);
+      return !/saudi|السعودية/i.test(String(props?.layerName || '')) && !isSaudiPublicIndicator(feature);
+    });
+    const layers = Array.isArray(atlas.layers) ? atlas.layers.flatMap((raw: unknown) => {
+      const layer = record(raw);
+      if (!layer) return [];
+      const count = features.filter((feature: unknown) => record(record(feature)?.properties)?.layerId === layer.id).length;
+      return count ? [{ ...layer, count }] : [];
+    }) : [];
+    result.reference_atlas = { ...atlas, features: { type: 'FeatureCollection', features },
+      featureCount: features.length, layers,
+      changes: features.length === collection.features.length ? atlas.changes ?? null : null };
+  }
   // Recompute count fields that belong to these lists; never show a raw
   // Saudi-inclusive count alongside a masked list.
   for (const [items, total] of [
@@ -150,6 +168,19 @@ export function maskSaudiPublicIndicators<T extends Row>(projection: T): T {
     }
   }
   const rows = result.liveEvents;
+  if (Array.isArray(result.commercial_flights) && Array.isArray(result.private_flights) && Array.isArray(result.private_jets)) {
+    const publicTotal = result.commercial_flights.length + result.private_flights.length + result.private_jets.length;
+    if (typeof result.total === 'number') result.total = publicTotal;
+    const civilianMeta = record(result.civilian_flight_activity_meta);
+    if (civilianMeta) {
+      result.civilian_flight_activity_meta = { ...civilianMeta, public_total: publicTotal,
+        fallback_cells: Array.isArray(result.civilian_flight_activity) ? result.civilian_flight_activity.length : 0 };
+    }
+    const flightStatus = record(result.flight_source_status);
+    if (flightStatus) result.flight_source_status = { ...flightStatus, public_total: publicTotal,
+      civilian_fallback_cells: Array.isArray(result.civilian_flight_activity) ? result.civilian_flight_activity.length : 0,
+      military_public_cells: Array.isArray(result.military_activity) ? result.military_activity.length : 0 };
+  }
   if (Array.isArray(rows) && 'categoryCounts' in result) {
     const categories: Record<string, number> = {};
     for (const row of rows) {

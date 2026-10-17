@@ -7,7 +7,7 @@
 export const SATELLITE_VISUAL_PRESETS = {
   original: {
     labelAr: 'أصلي',
-    descriptionAr: 'صورة Esri الأصلية بتعديلات خفيفة',
+    descriptionAr: 'الصورة الأصلية بتعديلات خفيفة',
     opacity: 0.96,
     contrast: 0.08,
     saturation: 0.04,

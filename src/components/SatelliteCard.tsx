@@ -142,7 +142,7 @@ export default function SatelliteCard({ sat, onClose }: { sat: SatelliteDetail; 
         />
         <Field label="خط العرض" value={`${sat.lat.toFixed(3)}°`} />
         <Field label="خط الطول" value={`${sat.lng.toFixed(3)}°`} />
-        <Field label="معرّف NORAD" value={sat.noradId || '—'} />
+        <Field label="المعرّف" value={sat.noradId || '—'} />
         <Field label="الفئة" value={shell.note} />
       </div>
 
@@ -152,7 +152,7 @@ export default function SatelliteCard({ sat, onClose }: { sat: SatelliteDetail; 
         <Orbit className="h-2.5 w-2.5" />
         {sat.track === 'loading' && <span>جارٍ رسم المدار…</span>}
         {sat.track === 'ready' && <span style={{ color: accent }}>المسار المداري ظاهر على الكرة</span>}
-        {sat.track === 'unavailable' && <span>المسار غير متاح — بيانات TLE غير متوفرة</span>}
+        {sat.track === 'unavailable' && <span>المسار غير متاح حاليًا</span>}
       </div>
 
       {sat.noradId && (

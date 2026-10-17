@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ function sourceState(result: SettledResponse, parsed: any | null) {
  * endpoint fail. Counts are best-effort and the response explicitly reports
  * degraded state when one or more source APIs could not be read.
  */
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const emptyStats = {
     flights: 0,
     sats: 0,
@@ -92,7 +93,7 @@ export async function GET(req: Request) {
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+          'Cache-Control': 'private, no-store, max-age=0',
         },
       },
     );
@@ -108,9 +109,11 @@ export async function GET(req: Request) {
       },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+          'Cache-Control': 'private, no-store, max-age=0',
         },
       },
     );
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

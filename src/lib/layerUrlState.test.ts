@@ -12,6 +12,12 @@ const defaults = {
 };
 
 describe('versioned WORLD layer bookmarks', () => {
+  it('keeps weather controls available in older bookmarks without starting weather layers', () => {
+    const layers = { wind: false, rain: false, wind_controls: true, rain_controls: true };
+    expect(restoreLayerState(layers, new URLSearchParams('layers_v=5&layers='))).toEqual(layers);
+    const chosen = { ...layers, wind: true, wind_controls: false };
+    expect(restoreLayerState(layers, serializeLayerState(chosen, new URLSearchParams()))).toEqual(chosen);
+  });
   it('migrates a v3 bookmark only to the newly promoted v4 defaults', () => {
     const restored = restoreLayerState(defaults, new URLSearchParams('layers_v=3&layers=flights'));
     expect(restored.flights).toBe(true);
@@ -65,7 +71,7 @@ describe('versioned WORLD layer bookmarks', () => {
       cctv: false,
     };
     const params = serializeLayerState(selected, new URLSearchParams('surface=public&foo=bar'));
-    expect(params.get('layers_v')).toBe('4');
+    expect(params.get('layers_v')).toBe('6');
     expect(params.get('surface')).toBe('public');
     expect(params.get('foo')).toBe('bar');
     expect(restoreLayerState(defaults, params)).toEqual(selected);
@@ -73,5 +79,11 @@ describe('versioned WORLD layer bookmarks', () => {
 
   it('does not modify defaults when the URL has no layer preference', () => {
     expect(restoreLayerState(defaults, new URLSearchParams('surface=public'))).toBe(defaults);
+  });
+  it('introduces published areas into older views but preserves a new explicit off choice', () => {
+    const state = { ...defaults, reference_atlas: true };
+    expect(restoreLayerState(state, new URLSearchParams('layers_v=4&layers=flights')).reference_atlas).toBe(true);
+    const off = serializeLayerState({ ...state, reference_atlas: false }, new URLSearchParams());
+    expect(restoreLayerState(state, off).reference_atlas).toBe(false);
   });
 });

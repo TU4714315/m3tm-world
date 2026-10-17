@@ -1,3 +1,4 @@
+import { withMixedMapPolicy } from '@/lib/mapAccessServer';
 
 import { NextResponse } from 'next/server';
 import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
@@ -235,7 +236,7 @@ const PUBLIC_MILITARY_MIN_GROUP = 2;
 const PUBLIC_MILITARY_TIME_BUCKET_MS = 30 * 60 * 1000;
 const PUBLIC_MILITARY_CACHE_KEY = 'm3tm:public:military-activity:v2';
 const PUBLIC_MILITARY_CACHE_TTL_SECONDS = 60 * 60;
-const PUBLIC_CIVILIAN_CACHE_KEY = 'm3tm:public:civilian-flight-aggregate:v1';
+const PUBLIC_CIVILIAN_CACHE_KEY = 'm3tm:public:civilian-flight-aggregate:v2';
 const PUBLIC_CIVILIAN_CACHE_TTL_SECONDS = 45 * 60;
 
 interface PublicMilitaryActivityCell {
@@ -416,7 +417,7 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
   }
 }
 
-export async function GET(req: Request) {
+async function providerGET(req: Request) {
   const now = Date.now();
 
   const cachedSummary = cachedData ? buildFlightSummary(cachedData) : null;
@@ -793,3 +794,5 @@ function aggregateJamming(points: any[], threshold: number) {
       count: z.count,
     }));
 }
+
+export const GET = withMixedMapPolicy('flights', providerGET);

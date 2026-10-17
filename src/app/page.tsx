@@ -1,9 +1,14 @@
 'use client';
+import MapAccessGate from '@/components/MapAccessGate';
+import { createMapMemberExchange } from '@/lib/mapMemberExchange';
+import { useMapAccess } from '@/lib/useMapAccess';
+import { canViewPublishedMap, temporaryPublicMapEndpoint, publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
+
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, Eye, EyeOff, SlidersHorizontal, ChevronDown, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Pentagon, Radio, PenLine, Save } from 'lucide-react';
+import { Layers, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, Eye, EyeOff, SlidersHorizontal, ChevronDown, ExternalLink, AlertTriangle, Activity, Wifi, Play, Network, Crosshair, Pentagon, Radio, PenLine, Save } from 'lucide-react';
 import { type TerrainStatus } from '@/lib/map-terrain';
 import { loadCameraCatalog, mergeCameraCatalog } from '@/lib/camera-catalog';
 import { buildPublicLayerData } from '@/lib/publicLayerData';
@@ -27,9 +32,9 @@ import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import { hidePublicMapMarkers, reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
+import { restoreYemenMapLayers, YEMEN_MAP_FOCUS } from '@/lib/yemenMapView';
 import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
-import ArcGISPanel from '@/components/ArcGISPanel';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
@@ -88,11 +93,11 @@ function toEmbeddedCoordinate(value: unknown, min: number, max: number): number 
 }
 
 const DEFAULT_ACTIVE_LAYERS = {
-  flights: false, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
+  flights: true, private: false, jets: false, military: false, military_activity: true, maritime: true, naval_activity: true,
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
   sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
-  live_news: true, earthquakes: false, fires: true, weather: false, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reported_routes: true, day_night: true,
+  live_news: true, earthquakes: false, fires: true, weather: false, wind: false, rain: false, wind_controls: true, rain_controls: true, radiation: false,
+  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reference_atlas: true, reported_routes: true, day_night: false,
   cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
@@ -102,11 +107,11 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
   Object.keys(DEFAULT_ACTIVE_LAYERS).map((key) => [
     key,
     [
-      'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'gdelt_events',
+      'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas', 'gdelt_events',
       'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
-      'country_borders',
+      'country_borders', 'flights', 'wind_controls', 'rain_controls',
     ].includes(key) && ![
       // Defer expensive catalogs, raster overlays and slower optional sources
       // until the operator explicitly enables them. Keep MENA events, alerts,
@@ -122,8 +127,8 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
 const PUBLIC_EMBED_LAYER_KEYS = [
   'flights', 'military_activity', 'private', 'jets', 'maritime', 'naval_activity',
   'satellites', 'sat_comms', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
-  'cctv', 'cctv_previews', 'live_news', 'fires', 'weather',
-  'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines',
+  'cctv', 'cctv_previews', 'live_news', 'fires', 'weather', 'wind', 'rain', 'wind_controls', 'rain_controls',
+  'infrastructure', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas',
   'reported_routes', 'global_incidents', 'gdelt_events', 'civil_unrest', 'cables',
   'sdk_sea', 'sdk_air', 'sdk_naval',
   'malware', 'cf_outages', 'cf_attacks', 'app_news', 'alert_pins', 'country_borders', 'day_night', 'terrain_3d',
@@ -189,9 +194,17 @@ function ViewSegment({ active, onClick, title, icon: Icon, label, layoutId }: {
 }
 
 export default function Dashboard() {
+  const { hasMapAccess, accessModeRef, blockMemberResume, acceptMapAccess, clearMapAccess, mapAccessHeaders } = useMapAccess();
+  const hasPublishedMapAccess = canViewPublishedMap(hasMapAccess);
+  const [showMapAccess, setShowMapAccess] = useState(false);
+  const accessGeneration = useRef(0);
+  const allowedRef = useRef(hasMapAccess);
+  allowedRef.current = hasMapAccess;
+  const publishedRef = useRef(hasPublishedMapAccess);
+  publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
   const [dataVersion, setDataVersion] = useState(0);
-  const data = dataRef.current;
+  const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
 
   useEffect(() => {
     void recordWorldVisitOnce();
@@ -239,7 +252,7 @@ export default function Dashboard() {
       }
       if (message.type !== 'm3tm:sync') return;
 
-      const items: EmbeddedNewsItem[] = Array.isArray(message.newsItems)
+      const items: EmbeddedNewsItem[] = publishedRef.current && Array.isArray(message.newsItems)
         ? message.newsItems.flatMap((item: EmbeddedNewsPayload) => {
             const latitude = toEmbeddedCoordinate(item?.latitude, -90, 90);
             const longitude = toEmbeddedCoordinate(item?.longitude, -180, 180);
@@ -419,9 +432,9 @@ export default function Dashboard() {
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
   const [showMobileHudDetails, setShowMobileHudDetails] = useState(false);
-  const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('clarity');
+  const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('bright');
   const [sweepData, setSweepData] = useState<any>(null);
   const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
@@ -452,6 +465,16 @@ export default function Dashboard() {
   const [showPublicMapMarkers, setShowPublicMapMarkers] = useState(true);
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
+  const focusYemenMonitoring = (event: React.MouseEvent<HTMLButtonElement>) => {
+    selectFlatMap();
+    setShowMenaPulse(false);
+    setMobilePanel(null);
+    setShowPublicMapMarkers(true);
+    setPublicEmbedQuiet(false);
+    quietPublicLayersBeforeRef.current = null;
+    setActiveLayers(previous => restoreYemenMapLayers(previous));
+    setFlyToLocation({ ...YEMEN_MAP_FOCUS, ts: event.timeStamp });
+  };
   // This affects map rendering only, not source ingestion or the user's saved layer preferences.
   const displayedMapLayers = useMemo(() => {
     const visible = embedMode && embedSurface === 'public'
@@ -486,9 +509,9 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
-      // Embedded visitors should not pay for the satellite raster and globe
-      // projection before the simpler, source-backed map can first paint.
-      setMapStyle('dark');
+      // Start embedded visitors on the same clear imagery as the public map.
+
+      setMapStyle('satellite');
       setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
@@ -515,6 +538,30 @@ export default function Dashboard() {
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
   const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
+
+  useEffect(() => {
+    accessGeneration.current++;
+    dataRef.current = {};
+    setDataVersion(value => value + 1);
+    setEmbeddedNewsItems([]); setEmbeddedRoute(null);
+    setActiveCamera(null); setLiveFeedUrl('');
+    setRegionDossier(null); setDossierLoading(false);
+    if (!hasMapAccess) setShowMenaPulse(false);
+    if (!hasPublishedMapAccess) setShowSpaceCam(false);
+  }, [hasMapAccess, hasPublishedMapAccess]);
+
+  useEffect(() => {
+    const exchange = createMapMemberExchange({ mode: () => accessModeRef.current,
+      blockResume: blockMemberResume, accept: acceptMapAccess, deny: clearMapAccess });
+    const onSession = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== M3TM_APP_ORIGIN
+        || event.data?.source !== 'm3tm-app' || event.data.version !== 1
+        || event.data.type !== 'm3tm:map-session') return;
+      void exchange.receive(event.data.accessToken);
+    };
+    window.addEventListener('message', onSession);
+    return () => { exchange.dispose(); window.removeEventListener('message', onSession); };
+  }, [acceptMapAccess, clearMapAccess, accessModeRef, blockMemberResume]);
 
   // Splash screen
   useEffect(() => {
@@ -694,12 +741,18 @@ export default function Dashboard() {
 
   // Region dossier (right-click)
   const handleRightClick = useCallback(async (coords: { lat: number; lng: number }) => {
+    if (!allowedRef.current) { setShowMapAccess(true); return; }
+    const generation = accessGeneration.current;
     setDossierLoading(true); setRegionDossier(null);
     try {
-      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
-      if (res.ok) setRegionDossier(await res.json());
-    } catch (e) { console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
-  }, []);
+      const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`, { headers: mapAccessHeaders(), cache: 'no-store' });
+      if (res.ok) {
+        const dossier = await res.json();
+        if (generation === accessGeneration.current && allowedRef.current) setRegionDossier(dossier);
+      }
+    } catch { /* Keep the current map usable when the dossier is unavailable. */ }
+    finally { if (generation === accessGeneration.current) setDossierLoading(false); }
+  }, [mapAccessHeaders]);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
     if (entity?.type === 'cctv') setActiveCamera(entity);
@@ -809,11 +862,16 @@ export default function Dashboard() {
     { skipWhenHidden = false }: { skipWhenHidden?: boolean } = {},
   ): Promise<boolean> => {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
+    if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
+      && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
     try {
       // Force the browser to bypass its local disk cache for real-time data
-      const res = await fetch(url, { ...options, cache: 'no-store' });
+      const generation = accessGeneration.current;
+      const res = await fetch(url, { ...options, cache: 'no-store', headers: { ...options?.headers, ...mapAccessHeaders() } });
+      if (generation !== accessGeneration.current) return false;
       if (res.ok) {
         const json = await res.json();
+        if (generation !== accessGeneration.current) return false;
         const d = transform ? transform(json) : json;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
@@ -826,7 +884,21 @@ export default function Dashboard() {
       setBackendStatus('error');
       return false;
     }
-  }, []);
+  }, [mapAccessHeaders]);
+
+  // Browser checks do not imply that the publisher has changed the reference map.
+  useEffect(() => {
+    if (!activeLayers.reference_atlas) return;
+    const check = async (skipWhenHidden = false) => {
+      if (skipWhenHidden && document.hidden) return;
+      await fetchEndpoint('/api/reference-atlas', snapshot => ({ reference_atlas: snapshot }));
+    };
+    void check();
+    const timer = window.setInterval(() => {
+      void check(true);
+    }, PUBLIC_REFRESH_MS.referenceAtlasCheck);
+    return () => { window.clearInterval(timer); };
+  }, [activeLayers.reference_atlas, fetchEndpoint, hasMapAccess]);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
   useEffect(() => {
@@ -864,7 +936,7 @@ export default function Dashboard() {
       clearTimeout(spaceTimer);
       intervals.forEach(clearInterval);
     };
-  }, [fetchEndpoint]);
+  }, [fetchEndpoint, hasMapAccess]);
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
@@ -916,7 +988,7 @@ export default function Dashboard() {
         () => {
           const sourceStatus = dataRef.current.flight_source_status;
           return hasUsableCivilianFlightData({
-            publicTotal: Number(sourceStatus?.public_total ?? 0),
+            publicTotal: Number(sourceStatus?.public_total ?? ((dataRef.current.commercial_flights?.length ?? 0) + (dataRef.current.private_flights?.length ?? 0) + (dataRef.current.private_jets?.length ?? 0))),
             fallbackActive: sourceStatus?.civilian_fallback_active === true,
           });
         },
@@ -1096,7 +1168,7 @@ export default function Dashboard() {
     }
 
 
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, hasMapAccess]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
@@ -1203,7 +1275,7 @@ export default function Dashboard() {
       }), undefined, { skipWhenHidden: true });
     }, 5 * 60_000);
     return () => window.clearInterval(retry);
-  }, [activeLayers.frontlines, fetchEndpoint]);
+  }, [activeLayers.frontlines, fetchEndpoint, hasMapAccess]);
 
     // Refresh time-sensitive, published MENA activity once when returning from a
   // meaningful hidden period. Do not revive daily reference layers or duplicate
@@ -1255,7 +1327,7 @@ export default function Dashboard() {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [activeLayers, fetchEndpoint]);
+  }, [activeLayers, fetchEndpoint, hasMapAccess]);
 
 
   // Rolling 24-hour regional fire observations; no fetch on layer toggling.
@@ -1275,7 +1347,7 @@ export default function Dashboard() {
       });
     }, 60_000);
     return () => clearInterval(timer);
-  }, [activeLayers.fires, fetchEndpoint]);
+  }, [activeLayers.fires, fetchEndpoint, hasMapAccess]);
 
   // Public maritime reference is updated daily instead of repeated vessel polling.
   // Layer toggling retains an initial on-demand load; no public exact naval tracks.
@@ -1308,7 +1380,7 @@ export default function Dashboard() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [activeLayers.maritime, activeLayers.naval_activity, activeLayers.sdk_sea, fetchEndpoint]);
+  }, [activeLayers.maritime, activeLayers.naval_activity, activeLayers.sdk_sea, fetchEndpoint, hasMapAccess]);
   /* ── LIVE MALWARE — pushed over SSE while the layer is on ──
      Detections arrive when URLhaus reports them rather than on a timer, so
      there is no poll interval to tune and no request that re-downloads the
@@ -1428,7 +1500,7 @@ export default function Dashboard() {
     return entities;
   }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
 
-  const embeddedLiveFeeds = useMemo(() => embeddedNewsItems.map(item => ({
+  const embeddedLiveFeeds = useMemo(() => (hasPublishedMapAccess ? embeddedNewsItems : []).map(item => ({
     bridge_id: item.id,
     name: item.title,
     city: '',
@@ -1447,7 +1519,7 @@ export default function Dashboard() {
           origin_lng: item.originLongitude,
         }
       : {}),
-  })), [embeddedNewsItems]);
+  })), [embeddedNewsItems, hasPublishedMapAccess]);
 
   // WORLD has no authenticated subscriber session. A query string such as
   // ?embed=1 (or surface=internal) MUST NOT switch it to raw/internal data.
@@ -1594,10 +1666,7 @@ export default function Dashboard() {
               {/* Status messages — cycling */}
               <div className="mt-3 h-4 flex items-center justify-center">
                 {[
-                  { text: 'جارٍ تأمين الاتصال الآمن...', delay: 0.5 },
-                  { text: 'تهيئة مصادر البيانات...', delay: 1.1 },
-                  { text: 'معايرة الحساسات...', delay: 1.7 },
-                  { text: 'النظام جاهز', delay: 2.2 },
+                  { text: 'جارٍ التحميل…', delay: 0.5 },
                 ].map((stage, i) => (
                   <motion.span
                     key={i}
@@ -1654,13 +1723,14 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={displayedMapLayers}
+          activeLayers={visibleMapLayers(displayedMapLayers, hasMapAccess)}
           onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
           terrainFocus={terrainFocus}
           terrainRetry={terrainRetry}
           onTerrainStatusChange={setTerrainStatus}
+          onLayerOff={key => setActiveLayers(prev => ({ ...prev, [key]: false }))}
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'}
           satelliteVisual={satelliteVisual} 
           onEntityClick={handleEntityClick} 
@@ -1812,22 +1882,18 @@ export default function Dashboard() {
         {(!isMobile || showMobileHudDetails) && <>
         {/* One-touch regional operations layout, independent of source layers. */}
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
-          <button type="button" onClick={() => {
-              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
-              if (isMobile) setMobilePanel('intel');
-              setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
-            }}
+          <button type="button" onClick={focusYemenMonitoring}
             className="rounded-md border border-amber-300/50 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-amber-100 hover:border-amber-200/70 focus-visible:ring-2 focus-visible:ring-amber-300"
-            title="الانتقال إلى اليمن: بلاغات عامة منشورة ومجمعة، دون تتبع مواقع أو تحركات عملياتية دقيقة">
+            title="رصد اليمن">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> رصد اليمن
           </button>
           <button type="button" onClick={() => {
-              selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
+              selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
               if (isMobile) setMobilePanel('intel');
               setFlyToLocation({ lat: 25, lng: 42.5, zoom: 4.2, ts: Date.now() });
             }}
             className="rounded-md border border-cyan-300/45 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-cyan-100 hover:border-cyan-200/70 focus-visible:ring-2 focus-visible:ring-cyan-300"
-            title="خريطة داكنة مسطّحة، تركيز الشرق الأوسط، موجز الأدلة المنشورة — لا يغيّر المصادر">
+            title="الانتقال إلى الشرق الأوسط">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> مرصد الشرق الأوسط
           </button>
           {mapStyle === 'satellite' && <>
@@ -1846,12 +1912,11 @@ export default function Dashboard() {
           className="pointer-events-auto max-w-[min(92vw,460px)] rounded-xl border border-white/15 bg-[#05080d]/15 px-2.5 py-1.5 text-[11px] leading-5 text-white/90 shadow-sm backdrop-blur-sm" aria-label="دليل رموز الأحداث">
           <summary className="cursor-pointer list-none py-1 font-semibold text-amber-100">دليل الرموز ▾</summary>
           <div className="pt-1">
-            <span className="text-slate-300 font-semibold">⬡ ناشر واحد / أولي</span>
+            <span className="text-red-300">〰 مناطق الحوثيين</span>
             <span className="mx-2 text-white/30">|</span>
-            <span className="text-orange-300 font-semibold">⬡ عدة ناشرين</span>
+            <span className="text-emerald-300">〰 مناطق الحكومة</span>
             <span className="mx-2 text-white/30">|</span>
-            <span className="text-amber-200">● رقم = مجموعة تقارير</span>
-            <span className="block text-[10px] text-white/60">الرموز تلخص بلاغات منشورة ولا تعني تأكيد الواقعة.</span>
+            <span className="text-slate-200">✈ مطار · ⚓ ميناء · ⛨ منشأة · ▱ مدرعات · ⌁ رادار</span>
           </div>
         </details>}
         </>}
@@ -1910,14 +1975,14 @@ export default function Dashboard() {
               className="pointer-events-auto mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-cyan-300/30 bg-[#060c16]/85 p-2 text-xs text-white shadow-xl backdrop-blur-md"
               onKeyDown={event => { if (event.key === 'Escape') setShowPublicDisplayControls(false); }}>
               <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
-                title="إظهار أو إخفاء خطوط الحدود المرجعية دون تعديل بيانات الخريطة"
+                title="إظهار الحدود أو إخفاؤها"
                 onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
                 className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-amber-300 ${activeLayers.country_borders ? 'border-amber-300/55 text-amber-100' : 'border-white/25 text-white/75'}`}>
                 {activeLayers.country_borders ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 الحدود: {activeLayers.country_borders ? 'ظاهرة' : 'مخفية'}
               </button>
               <button type="button" aria-pressed={showPublicMapMarkers}
-                title="إظهار أو إخفاء رموز ومؤشرات الخريطة دون حذف الأخبار أو الأحداث"
+                title="إظهار الرموز أو إخفاؤها"
                 onClick={() => setShowPublicMapMarkers(show => !show)}
                 className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-cyan-300 ${showPublicMapMarkers ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/75'}`}>
                 {showPublicMapMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -1925,7 +1990,7 @@ export default function Dashboard() {
               </button>
               <button type="button" aria-expanded={showMenaPulse}
                 onClick={() => {
-                  selectFlatMap(); setMapStyle('dark');
+                  selectFlatMap();
                   setShowMenaPulse(open => !open);
                   setShowPublicDisplayControls(false);
                   setFlyToLocation({ lat: 27, lng: 43, zoom: 4.5, ts: Date.now() });
@@ -1933,12 +1998,9 @@ export default function Dashboard() {
                 className="min-h-10 rounded-xl border border-cyan-300/30 bg-transparent px-2 text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 مرصد الشرق الأوسط
               </button>
-              <button type="button" onClick={() => {
-                  selectFlatMap(); setMapStyle('dark'); setShowMenaPulse(true);
-                  setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
-                }}
+              <button type="button" onClick={focusYemenMonitoring}
                 className="min-h-10 rounded-xl border border-amber-300/40 bg-transparent px-2 text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300"
-                title="التركيز على اليمن وبلاغاتها العامة المنشورة دون تموضع عسكري دقيق">
+                title="رصد اليمن">
                 رصد اليمن
               </button>
               <button type="button" aria-pressed={mapStyle === 'satellite'}
@@ -1947,7 +2009,7 @@ export default function Dashboard() {
                 {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
               </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
-                title="تقليل كثافة طبقات البلاغات دون مسح بياناتها"
+                title="تقليل الازدحام"
                 onClick={() => {
                   if (!publicEmbedQuiet) {
                     quietPublicLayersBeforeRef.current = { ...activeLayers };
@@ -1973,15 +2035,12 @@ export default function Dashboard() {
                 className="col-span-2 flex min-h-9 items-center justify-center rounded-xl border border-white/15 bg-transparent text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 الأخبار المنشورة
               </a>
-              <p className="col-span-2 px-1 text-center text-[10px] leading-4 text-slate-300">
-                مفاتيح العرض لا تحذف بيانات الأخبار أو الأحداث، وتبقى حدود الدول مرجعية غير سيادية.
-              </p>
             </nav>
           )}
           {showMenaPulse && (
             <section aria-label="ملخص مرصد الشرق الأوسط" className="pointer-events-auto mt-2 max-h-[min(53dvh,360px)] overflow-y-auto rounded-xl border border-cyan-300/25 bg-[#060c16]/80 p-2 shadow-lg backdrop-blur-md">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-slate-200">تقارير منشورة ومحايدة؛ المواقع مرجعية أو معممة.</span>
+                <span className="text-[10px] text-slate-200">مرصد الشرق الأوسط</span>
                 <button type="button" aria-label="إخفاء مرصد الشرق الأوسط"
                   onClick={() => setShowMenaPulse(false)}
                   className="shrink-0 rounded-lg border border-white/20 bg-transparent p-2 text-white/80 focus-visible:ring-2 focus-visible:ring-cyan-300">
@@ -2018,8 +2077,7 @@ export default function Dashboard() {
                 <button type="button" aria-label="إغلاق الطبقات" className="p-1 text-white/70"
                   onClick={() => setShowPublicEmbedLayers(false)}><X className="w-4 h-4" /></button>
               </div>
-              <p className="mb-2 text-[10px] text-white/50">إتاحة الطبقة لا تعني توفر بيانات مصدرها الآن؛ تظهر أعداد العناصر بعد وصول البيانات.</p>
-              <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers}
+              <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)}
                 setActiveLayers={setActiveLayers} isMobile={true}
                 allowedLayerKeys={PUBLIC_EMBED_LAYER_KEYS}
                 />
@@ -2029,16 +2087,16 @@ export default function Dashboard() {
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {!embedMode && showLayers && !isMobile && <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
+      {!embedMode && showLayers && !isMobile && <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} theme={worldTheme} setTheme={setWorldTheme} />}
 
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!embedMode && !isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto rounded-full border border-white/10 bg-[#05080d]/20 p-1 shadow-[0_14px_50px_rgba(0,0,0,0.25)] backdrop-blur-2xl">
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(false); setShowSpaceCam(v => !v); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
+          <button onClick={() => { setShowAlerts(false); if (hasPublishedMapAccess) setShowSpaceCam(v => !v); else setShowMapAccess(true); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="بث مباشر من الفضاء — قناة فيديو من محطة الفضاء الدولية" aria-label="الفضاء" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
-            {showSpaceCam && (
+            {hasPublishedMapAccess && showSpaceCam && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[#00E5FF]"
@@ -2047,7 +2105,7 @@ export default function Dashboard() {
           </button>
           <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">الفضاء</span>
           <AnimatePresence>
-            {showSpaceCam && (
+            {hasPublishedMapAccess && showSpaceCam && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
                 <SpaceCam />
               </motion.div>
@@ -2076,7 +2134,7 @@ export default function Dashboard() {
           </div>}
         </div>
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(!showAlerts); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="تنبيهات حية — زلازل ونزاعات وأخبار عاجلة" aria-label="التنبيهات" aria-expanded={showAlerts}>
+          <button onClick={() => { setShowAlerts(!showAlerts); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="أخبار وتنبيهات منفصلة" aria-label="التنبيهات" aria-expanded={showAlerts}>
             <AlertTriangle className={`w-4 h-4 ${showAlerts ? 'text-[#FF3D3D]' : 'text-white/60'}`} />
             {showAlerts && (
               <span
@@ -2089,7 +2147,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showAlerts && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <LiveAlerts data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                <LiveAlerts hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -2144,42 +2202,22 @@ export default function Dashboard() {
         {/* Separator */}
         <div className="w-4 h-px bg-white/10 mx-auto" />
 
-        {/* ── ARCGIS INTEL ── */}
+        {/* Map presentation controls */}
         <div className="relative group">
-          <button onClick={() => {
-            setShowArcGIS(v => !v);
-            setShowMenaPulse(false);
-            setShowAlerts(false);
-            setShowSpaceCam(false);
-            setShowDesktopSearch(false);
-          }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="مكتبة الخرائط العامة — إضافة طبقات مرجعية اختيارية" aria-label="مكتبة الخرائط العامة" aria-expanded={showArcGIS}>
-            <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
-            {showArcGIS && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--gold-primary)]"
-              />
-            )}
-            {arcgisLayers.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-[var(--gold-primary)] text-black text-[9px] font-mono font-bold leading-none px-0.5">{arcgisLayers.length}</span>}
+          <button type="button" onClick={() => { setShowArcGIS(v => !v); setShowAlerts(false); setShowDesktopSearch(false); }}
+            aria-label="الخرائط" aria-expanded={showArcGIS} title="الخرائط · 2D / 3D"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-200 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-200">
+            <Globe className="h-4 w-4" />
           </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] tracking-wider text-white/90 bg-[#05080d]/65 backdrop-blur-xl rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">مكتبة الخرائط</span>
-          <AnimatePresence>
-            {showArcGIS && (
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-[340px]">
-                <div className="rounded-2xl border border-white/10 bg-[#05080d]/52 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl max-h-[70vh] overflow-y-auto styled-scrollbar">
-                  <ArcGISPanel
-                    onImportLayer={(layer) => setArcgisLayers(prev => [...prev.filter(l => l.id !== layer.id), { ...layer, color: layer.color || '#D4AF37', visible: true, opacity: layer.opacity ?? 0.8 }])}
-                    onRemoveLayer={(id) => setArcgisLayers(prev => prev.filter(l => l.id !== id))}
-                    onUpdateLayer={(id, updates) => setArcgisLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l))}
-                    importedLayers={arcgisLayers}
-                    mapBounds={mapCenter?.bounds || null}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <span className="pointer-events-none absolute right-11 top-1/2 -translate-y-1/2 rounded bg-[#05080d]/65 px-2 py-1 text-[11px] text-white opacity-0 backdrop-blur-xl group-hover:opacity-100">الخرائط</span>
+          {showArcGIS && <section dir="rtl" aria-label="عرض الخرائط" className="absolute right-12 top-1/2 w-60 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#0b1721]/65 p-3 text-slate-100 shadow-xl backdrop-blur-2xl">
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-xs font-semibold">الخرائط</h2><button type="button" aria-label="إغلاق الخرائط" onClick={() => setShowArcGIS(false)}><X className="h-4 w-4" /></button></div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" aria-pressed={mapProjection === 'mercator'} onClick={selectFlatMap} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-xs ${mapProjection === 'mercator' ? 'border-cyan-200/60 bg-cyan-100/10' : 'border-white/15'}`}><MapPinned className="h-5 w-5" />2D</button>
+              <button type="button" aria-pressed={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-xs ${mapProjection === 'globe' ? 'border-cyan-200/60 bg-cyan-100/10' : 'border-white/15'}`}><Globe className="h-5 w-5" />3D</button>
+            </div>
+          </section>}
         </div>
-
 
         {/* Separator */}
         <div className="w-4 h-px bg-white/10 mx-auto" />
@@ -2355,7 +2393,7 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>منشآت</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel {...terrainPanelProps} data={sdkDisplayData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
+                      <LayerPanel hasMapAccess={hasMapAccess} onRequestAccess={() => setShowMapAccess(true)} {...terrainPanelProps} data={sdkDisplayData} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} setActiveLayers={setActiveLayers} isMobile={true} theme={worldTheme} setTheme={setWorldTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
                       </div>
@@ -2387,7 +2425,7 @@ export default function Dashboard() {
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar center={mapCenter ? { lat: mapCenter.lat, lng: mapCenter.lng } : null} onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }} />
-                      <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
+                      <SharePanel mapView={mapView} activeLayers={visibleMapLayers(activeLayers, hasMapAccess)} mouseCoords={null} />
                     </div>
                   )}
                 </div>
@@ -2420,7 +2458,7 @@ export default function Dashboard() {
       {/* Scale bar is now integrated into the map controls section above */}
 
       {/* ── Region Dossier ── */}
-      {!embedMode && (regionDossier || dossierLoading) && (
+      {hasMapAccess && !embedMode && (regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
           <div className="glass-panel p-5 world-glow">
             <div className="flex items-center justify-between mb-3">
@@ -2514,6 +2552,9 @@ export default function Dashboard() {
       {!embedMode && <KeyboardShortcuts />}
 
       {/* ── GLOBAL STATUS TICKER (bottom) ── */}
+      {!hasPublishedMapAccess && <button type="button" onClick={() => setShowMapAccess(true)}
+        className="absolute top-20 left-4 z-[220] rounded-xl border border-amber-200/25 bg-black/45 px-4 py-2 text-xs text-amber-100 backdrop-blur-xl">كود الدعوة</button>}
+      {showMapAccess && <MapAccessGate onClose={() => setShowMapAccess(false)} onAccess={grant => { acceptMapAccess(grant); setShowMapAccess(false); }} />}
       <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />
 
       {/* Shortcut hint — more visible */}

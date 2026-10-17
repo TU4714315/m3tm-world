@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
   CloudLightning, Ship, Network, Database, Ghost,
-  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal
+  Flame, Tv, Radio, Mountain, Anchor, Megaphone, SlidersHorizontal, LockKeyhole, Shield, Route, Layers3
 } from 'lucide-react';
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
+import { layerRequiresInvitation } from '@/lib/mapAccessPolicy';
+import { selectDataLayers } from '@/lib/layerBulkSelection';
 
 interface LayerPanelProps {
   data: any;
@@ -23,6 +25,8 @@ interface LayerPanelProps {
   onTerrainRetry?: () => void;
   onTerrainFocus?: () => void;
   on3DModeSelected?: () => void;
+  hasMapAccess?: boolean;
+  onRequestAccess?: () => void;
 }
 
 interface LayerDef {
@@ -46,13 +50,13 @@ interface LayerGroupDef {
   layers: LayerDef[];
 }
 
-const LAYER_GROUPS: LayerGroupDef[] = [
+const LAYER_CATALOG: LayerGroupDef[] = [
   {
     label: 'عام',
     fullLabel: 'بيانات M3TM.WORLD العامة',
     icon: Network,
     layers: [
-      { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'كابلات ثابتة؛ السفن حسب توفر AIS' },
+      { key: 'sdk_sea', label: 'الكابلات والسفن', dataKey: 'submarine_cables', description: 'الكابلات والملاحة البحرية' },
       { key: 'sdk_naval', label: 'رصد الأحداث', dataKey: 'gdelt', description: 'أحداث عامة محددة الموقع' },
     ],
   },
@@ -63,7 +67,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     layers: [
       { key: 'sdk_air', label: 'الطيران المدني الإضافي', dataKey: 'commercial_flights', description: 'مشاهدات طيران مدنية دورية؛ يفعّل العرض الجوي فقط' },
       { key: 'flights', label: 'التجارية', dataKey: 'commercial_flights' },
-      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'رصد ADS-B عام مُجمّع؛ عدم الظهور لا يعني عدم وجود طائرة، ولا تُستنتج مواقع غير مرصودة' },
+      { key: 'military_activity', label: 'نشاط جوي عسكري عام', dataKey: 'military_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مواقع طائرات منفردة' },
       { key: 'private', label: 'الخاصة', dataKey: 'private_flights' },
       { key: 'jets', label: 'الطائرات الخاصة', dataKey: 'private_jets' },
     ],
@@ -74,7 +78,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Ship,
     layers: [
       { key: 'maritime', label: 'الملاحة البحرية العامة', dataKey: 'maritime_ships,maritime_ports,maritime_chokepoints' },
-      { key: 'naval_activity', label: 'نشاط بحري عسكري عام', dataKey: 'naval_activity', description: 'تجميع إقليمي من AIS عام عند توفره؛ لا أسماء سفن أو MMSI أو سرعة/اتجاه أو مسارات دقيقة' },
+      { key: 'naval_activity', label: 'نشاط بحري عسكري عام', dataKey: 'naval_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مسارات سفن منفردة' },
     ],
   },
   {
@@ -83,9 +87,9 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Satellite,
     layers: [
       { key: 'satellites', label: 'كل الأقمار الصناعية', dataKey: 'satellites' },
-      { key: 'sat_comms', label: 'ستارلينك / اتصالات', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'تجميع إقليمي واسع من TLE عامة؛ لا أسماء ولا NORAD IDs ولا مسارات فردية دقيقة' },
-      { key: 'sat_navigation', label: 'GPS / ملاحة', dataKey: 'satellites', catKey: 'navigation' },
+      { key: 'sat_comms', label: 'أقمار الاتصالات', dataKey: 'satellites', catKey: 'comms' },
+      { key: 'sat_military', label: 'نشاط أقمار عسكرية/حكومية عام', dataKey: 'military_satellite_activity', description: 'نشاط إقليمي مجمّع؛ لا يحدد مسارات أقمار منفردة' },
+      { key: 'sat_navigation', label: 'أقمار الملاحة', dataKey: 'satellites', catKey: 'navigation' },
       { key: 'sat_earth', label: 'رصد الأرض', dataKey: 'satellites', catKey: 'earth_obs' },
       { key: 'sat_science', label: 'محطات / تلسكوبات', dataKey: 'satellites', catKey: 'science' },
     ],
@@ -98,7 +102,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'cctv', label: 'كاميرات المراقبة', dataKey: 'cameras' },
       { key: 'cctv_previews', label: 'معاينات حية', dataKey: '', parent: 'cctv' },
       { key: 'live_news', label: 'بث مباشر وأخبار الخريطة المدمجة', dataKey: 'live_feeds', description: 'القنوات العامة والأخبار المتزامنة من M3TM.APP عند التضمين' },
-      { key: 'app_news', label: 'أخبار M3TM.APP على الخريطة', dataKey: 'app_news', description: 'عناصر منشورة ذات إحداثيات متاحة، في خلايا إقليمية 0.5°؛ لا يُستنتج موقع حادثة من عنوان الخبر' },
+      { key: 'app_news', label: 'أخبار الخريطة', dataKey: 'app_news', description: 'عناصر منشورة ذات إحداثيات متاحة، في خلايا إقليمية 0.5°؛ لا يُستنتج موقع حادثة من عنوان الخبر' },
     ],
   },
   {
@@ -107,6 +111,10 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: CloudLightning,
     layers: [
       { key: 'fires', label: 'حرائق نشطة', dataKey: 'fires' },
+      { key: 'wind', label: 'الرياح', dataKey: '' },
+      { key: 'wind_controls', label: 'وقت الرياح', dataKey: '', parent: 'wind' },
+      { key: 'rain', label: 'الأمطار', dataKey: '' },
+      { key: 'rain_controls', label: 'وقت الأمطار', dataKey: '', parent: 'rain' },
       { key: 'weather', label: 'طقس شديد', dataKey: 'weather_events' },
     ],
   },
@@ -116,15 +124,16 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'المنشآت النووية', dataKey: 'infrastructure' },
-      { key: 'country_borders', label: 'الحدود الجغرافية المرجعية', dataKey: 'country_boundaries.features', description: 'Natural Earth 1:110m: خطوط عامة ثابتة، وخطوط متنازع عليها متقطعة؛ ليست مرجعًا سياديًا أو حدود نزاع لحظية' },
-      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق سياقية مع أحداث GDELT مبلّغ عنها؛ لا توجد نقاط اصطناعية', dataKey: 'conflict_zones,conflict_live_events' },
-      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'خريطة حرارية من بلاغات GDELT وACLED المجمعة مع وزن للحداثة وقوة التغطية', dataKey: 'conflict_live_events' },
+      { key: 'country_borders', label: 'الحدود', dataKey: 'country_boundaries.features', description: 'حدود عامة؛ المتنازع عليها متقطعة' },
+      { key: 'conflict_zones', label: 'مناطق الحروب والنزاعات', description: 'مناطق النزاع والأحداث المنشورة', dataKey: 'conflict_zones,conflict_live_events' },
+      { key: 'conflict_density', label: 'كثافة النزاع الحديثة', description: 'كثافة التقارير الحديثة', dataKey: 'conflict_live_events' },
       { key: 'frontlines', label: 'خطوط/مناطق جبهة منشورة', description: 'هندسة منشورة من مصدر عام؛ عرض سياقي غير تشغيلي', dataKey: 'frontlines.features' },
-      { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'رابط جغرافي معمّم بين Actor1Geo وActionGeo في GDELT؛ ليس مسار حركة أو سلاح فعليًا', dataKey: 'reported_routes' },
+      { key: 'reference_atlas', label: 'مناطق النفوذ والمعالم', description: 'مناطق النفوذ المنشورة والمعالم المصنفة', dataKey: 'reference_atlas.features.features' },
+      { key: 'reported_routes', label: 'روابط أحداث منشورة', description: 'روابط بين الأحداث؛ ليست مسارات حركة فعلية', dataKey: 'reported_routes' },
       { key: 'alert_pins', label: 'تنبيهات ميدانية منشورة', description: 'رموز مميزة حسب النوع: ضربة، مسيّرة، صاروخ، دفاع جوي، قتال بري، حدث بحري أو معدات؛ كلها كما يذكرها الناشر وبإحداثيات منشورة معمّمة 0.5°', dataKey: 'alert_pins' },
       { key: 'global_incidents', label: 'بلاغات وأحداث عالمية', description: 'رمز مختلف للزلزال والفيضان والإعصار والبركان والحريق والجفاف عند توفر نوع الحدث من المصدر', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'تصنيف CAMEO مع رموز مستقلة للأسلحة الجوية والثقيلة والتفجيرات والاشتباكات والاعتداءات؛ مواقع عامة مُعمّمة وليست تتبعًا عملياتيًا', dataKey: 'gdelt_events' },
-      { key: 'civil_unrest', label: 'احتجاجات واضطرابات مُبلّغ عنها', description: 'أحداث CAMEO 14 المنشورة والمحددة الموقع؛ لا تُعامل الاحتجاجات تلقائيًا كعنف', dataKey: 'civil_unrest' },
+      { key: 'gdelt_events', label: 'القصف والاشتباكات والأحداث المبلّغ عنها', description: 'أحداث مصنفة ومواقع إقليمية عامة', dataKey: 'gdelt_events' },
+      { key: 'civil_unrest', label: 'احتجاجات واضطرابات مُبلّغ عنها', description: 'احتجاجات واضطرابات منشورة', dataKey: 'civil_unrest' },
     ],
   },
   {
@@ -133,7 +142,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: Network,
     layers: [
       { key: 'malware', label: 'برمجيات خبيثة حية', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'رصد بنية التهديدات الشبكية', description: 'مشاهدات عامة مُجمعة على مستوى البلد من Feodo/Cloudflare، دون مسارات هجوم أو IP فردي', dataKey: 'cf_attack_origins' },
+      { key: 'cyber_attacks', label: 'رصد بنية التهديدات الشبكية', description: 'مؤشرات تهديد مجمّعة؛ لا تحدد هوية المهاجم', dataKey: 'cf_attack_origins' },
     ],
   },
   {
@@ -141,8 +150,8 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'الشبكة والأحداث',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'Cloudflare Radar عند تهيئته؛ وإلا أحداث سيبرانية منشورة من GDELT CAMEO 176. لا يُفترض أن كل بلاغ يمثل انقطاعًا شاملاً.', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'Cloudflare Layer 3 عند تهيئته؛ وإلا تجميع بلدي لبنية C2 المرصودة من abuse.ch/Feodo. البلد هو موقع البنية المرصودة وليس إسنادًا لهوية المهاجم.', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
+      { key: 'cf_outages', label: 'أحداث واضطرابات الشبكة', description: 'اضطرابات شبكة منشورة؛ لا تثبت انقطاعًا شاملاً', dataKey: 'cf_outages', requires: 'cloudflare' },
+      { key: 'cf_attacks', label: 'مؤشرات تهديد شبكي مرصودة', description: 'بنية تهديد مرصودة؛ لا تحدد هوية المهاجم', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
@@ -153,9 +162,31 @@ const LAYER_GROUPS: LayerGroupDef[] = [
       { key: 'day_night', label: 'دورة الليل / النهار', dataKey: '' },
       { key: 'terrain_3d', label: 'مبانٍ ثلاثية الأبعاد', description: 'تفاصيل المدن · تكبير 14.5+', dataKey: '' },
       { key: 'terrain_elevation', label: 'تضاريس ثلاثية الأبعاد', description: 'جبال · تكبير 10+', dataKey: '' },
-      { key: 'terrain_etopo_2022', label: 'NOAA ETOPO 2022 · تضاريس وأعماق', description: 'تظليل ملون من بيانات NOAA الأحدث للعرض العالمي؛ لا يغيّر ارتفاعات الخريطة ثلاثية الأبعاد ولا يصلح للملاحة', dataKey: '' },
+      { key: 'terrain_etopo_2022', label: 'تضاريس وأعماق', description: 'تظليل التضاريس والأعماق؛ غير مخصص للملاحة', dataKey: '' },
     ],
   },
+];
+
+// Group the existing capabilities without changing their keys, data, or access policy.
+const definitions = LAYER_CATALOG.flatMap(group => group.layers);
+const selectLayers = (...keys: string[]) => keys.map(key => {
+  const layer = definitions.find(item => item.key === key);
+  if (!layer) throw new Error(`Unknown map layer: ${key}`);
+  return layer;
+});
+const militaryKeys = ['military_activity', 'naval_activity', 'sat_military'];
+const frontKeys = ['country_borders', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas', 'reported_routes'];
+const airKeys = ['sdk_air', 'flights', 'private', 'jets'];
+const seaSpaceKeys = ['sdk_sea', 'maritime', 'satellites', 'sat_comms', 'sat_navigation', 'sat_earth', 'sat_science'];
+const displayKeys = LAYER_CATALOG.find(group => group.label === 'العرض')!.layers.map(layer => layer.key);
+const assigned = new Set([...militaryKeys, ...frontKeys, ...airKeys, ...seaSpaceKeys, ...displayKeys]);
+const LAYER_GROUPS: LayerGroupDef[] = [
+  { label: 'العسكري', fullLabel: 'العسكري', icon: Shield, layers: selectLayers(...militaryKeys) },
+  { label: 'خطوط وجبهات', fullLabel: 'خطوط وجبهات', icon: Route, layers: selectLayers(...frontKeys) },
+  { label: 'الطيران', fullLabel: 'الطيران', icon: Plane, layers: selectLayers(...airKeys) },
+  { label: 'البحر والفضاء', fullLabel: 'البحر والفضاء', icon: Satellite, layers: selectLayers(...seaSpaceKeys) },
+  { label: 'الأحداث', fullLabel: 'الأحداث', icon: Megaphone, layers: definitions.filter(layer => !assigned.has(layer.key)) },
+  { label: 'العرض', fullLabel: 'العرض', icon: Sun, layers: selectLayers(...displayKeys) },
 ];
 
 /* ── Minimal Toggle Switch ── */
@@ -207,7 +238,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected, hasMapAccess = false, onRequestAccess }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -227,6 +258,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   }, [pinnedGroup]);
 
   const toggle = (key: string) => {
+    if (!hasMapAccess && layerRequiresInvitation(key)) { onRequestAccess?.(); return; }
     // Sub-layers cannot become active independently of their parent, even
     // during rapid clicks while React is applying queued state updates.
     const definitions = LAYER_GROUPS.flatMap(group => group.layers);
@@ -250,22 +282,15 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
       <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
       {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
-      <p className="mt-2 text-white/35">تفاصيل المناطق القريبة فقط · بلاطات مخزنة مؤقتًا</p>
-      <p className="mt-1 text-white/35">المصدر الحالي: AWS Mapzen / Tilezen Terrarium، وليس DEM حديثًا تلقائي التحديث.</p>
-      <a className="mt-1 inline-block underline underline-offset-2 text-[var(--gold-primary)]" href="/terrain-sources" target="_blank" rel="noopener noreferrer">اعتمادات المصادر والبدائل الأحدث</a>
     </div>
   ) : null;
 
-  /** Switch a whole group at once. Provider availability never locks the toggle:
-   *  an enabled layer with no configured provider remains an honest no-data state. */
-  const toggleGroup = (layers: LayerDef[]) => {
-    const anyOn = layers.some(l => activeLayers[l.key]);
-    if (!anyOn && layers.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
-    setActiveLayers((prev: any) => {
-      const next = { ...prev };
-      for (const l of layers) next[l.key] = !anyOn;
-      return next;
-    });
+  const selectGroup = (layers: LayerDef[], enabled: boolean) => {
+    const canSelect = (key: string) => hasMapAccess || !layerRequiresInvitation(key);
+    if (!layers.some(layer => !layer.parent && !displayKeys.includes(layer.key) && canSelect(layer.key))) {
+      onRequestAccess?.(); return;
+    }
+    setActiveLayers((prev: Record<string, unknown>) => selectDataLayers(prev, layers, enabled, displayKeys, canSelect));
   };
 
   /* Keep credential-gated layers visible and operable. Missing credentials are
@@ -275,7 +300,8 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     layers: g.layers.filter(l => !allowedLayerKeys || allowedLayerKeys.includes(l.key)),
   })).filter(g => g.layers.length > 0);
   const normalizedSearch = mobileSearch.trim().toLocaleLowerCase('ar');
-  const visibleGroups = !isMobile ? availableGroups : availableGroups
+  const desktopGroups = [...availableGroups, { label: 'الكل', fullLabel: 'الكل', icon: Layers3, layers: availableGroups.flatMap(group => group.layers) }];
+  const visibleGroups = !isMobile ? desktopGroups : availableGroups
     .filter(group => mobileGroup === 'الكل' || group.label === mobileGroup)
     .map(group => ({
       ...group,
@@ -313,7 +339,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
           </label>
           <input id="world-layer-search" type="search" value={mobileSearch}
             onChange={event => setMobileSearch(event.target.value)}
-            placeholder="ابحث عن طبقة أو مصدر..."
+            placeholder="ابحث عن طبقة..."
             className="mb-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-xs text-white outline-none placeholder:text-white/45 focus:border-cyan-300/60"
           />
           <div role="group" aria-label="تصفية مجموعات الطبقات"
@@ -337,25 +363,28 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
             </div>
             <div className="flex flex-col gap-1">
               {group.layers.map((layer) => {
-                const isLayerActive = activeLayers[layer.key];
-                const count = getCount(layer.dataKey, layer.catKey);
-                const dormant = !!layer.parent && !activeLayers[layer.parent];
+                const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
+                const isLayerActive = !locked && activeLayers[layer.key];
+                const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
                 return (
                   <button
                     key={layer.key}
                     type="button"
                     onClick={() => toggle(layer.key)}
                     disabled={dormant}
-                    aria-disabled={dormant}
+                    aria-disabled={dormant || locked}
                     aria-pressed={!!isLayerActive}
-                    aria-label={layer.label}
+                    aria-label={locked ? `${layer.label} · كود الدعوة` : layer.label}
                     
                     className={`relative w-full flex items-center gap-3 py-2 rounded-md text-right hover:bg-white/[0.04] transition-colors ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40' : ''}`}
                   >
                     {layer.parent && <SubLayerStem />}
                     <ToggleSwitch active={!!isLayerActive} />
+                    {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                     <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors ${isLayerActive ? 'text-white/80' : 'text-white/40'}`}>
                       {layer.label}
+                      {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                       
                     </span>
                     
@@ -443,7 +472,7 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
         {visibleGroups.map((group) => {
           /* Sub-layers modify a parent rather than draw anything of their own,
              so they do not count towards the rail's reading. */
-          const counted = group.layers.filter(l => !l.parent);
+          const counted = group.layers.filter(l => !l.parent && (hasMapAccess || !layerRequiresInvitation(l.key)));
           const groupActive = counted.some(l => activeLayers[l.key]);
           const isHovered = hoveredGroup === group.label;
           const Icon = group.icon;
@@ -480,10 +509,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     width: 16,
                     height: 16,
                     color: groupActive
-                      ? 'rgba(255,255,255,0.75)'
+                      ? '#C9E5E8'
                       : isOpen
                         ? 'rgba(255,255,255,0.45)'
-                        : 'rgba(255,255,255,0.22)',
+                        : 'rgba(255,255,255,0.65)',
                     filter: groupActive ? 'drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 'none',
                   }}
                 />
@@ -512,9 +541,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, x: -4, filter: 'blur(2px)' }}
                     transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className={`absolute left-[52px] top-1/2 -translate-y-1/2 rounded-xl p-3 z-[100] pointer-events-auto ${group.label === 'شبكة وأحداث' ? 'w-[340px] max-w-[calc(100vw-72px)]' : 'min-w-[220px]'}`}
+                    className={`absolute left-[52px] top-1/2 -translate-y-1/2 rounded-xl p-3 z-[100] pointer-events-auto w-[300px] max-w-[calc(100vw-72px)] max-h-[min(70dvh,580px)] overflow-y-auto`}
                     style={{
-                      background: 'rgba(0,0,0,0.6)',
+                      background: 'rgba(10,23,35,0.42)',
                       backdropFilter: 'blur(40px) saturate(1.5)',
                       WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
                       border: '1px solid rgba(255,255,255,0.06)',
@@ -525,14 +554,22 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-white/35 flex-1">
                         {group.fullLabel}
                       </span>
-                      {/* Switching eight satellite layers one at a time is the
-                          kind of thing that makes a panel feel unfinished. */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleGroup(group.layers); }}
-                        className="px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        {activeCount > 0 ? 'لا شيء' : 'الكل'}
-                      </button>
+                      {group.layers.some(layer => !layer.parent && !displayKeys.includes(layer.key)) && (
+                        <div className="flex items-center gap-1">
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); selectGroup(group.layers, true); }}
+                            aria-label={`تفعيل كل بيانات ${group.fullLabel}`}
+                            className="min-h-8 px-2 rounded text-[10px] text-white/65 hover:text-white hover:bg-white/10 transition-colors">
+                            الكل
+                          </button>
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); selectGroup(group.layers, false); }}
+                            aria-label={`إلغاء بيانات ${group.fullLabel}`}
+                            className="min-h-8 px-2 rounded text-[10px] text-white/65 hover:text-white hover:bg-white/10 transition-colors">
+                            إلغاء
+                          </button>
+                        </div>
+                      )}
                       {isPinned && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setPinnedGroup(null); }}
@@ -545,9 +582,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {group.layers.map((layer) => {
-                        const isLayerActive = activeLayers[layer.key];
-                        const count = getCount(layer.dataKey, layer.catKey);
-                        const dormant = !!layer.parent && !activeLayers[layer.parent];
+                        const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
+                        const isLayerActive = !locked && activeLayers[layer.key];
+                        const count = locked ? null : getCount(layer.dataKey, layer.catKey);
+                        const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
 
                         return (
                           <button
@@ -555,9 +593,9 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                             type="button"
                             onClick={() => toggle(layer.key)}
                             disabled={dormant}
-                            aria-disabled={dormant}
+                            aria-disabled={dormant || locked}
                             aria-pressed={!!isLayerActive}
-                            aria-label={layer.label}
+                            aria-label={locked ? `${layer.label} · كود الدعوة` : layer.label}
                             
                             className={`relative w-full rounded-md hover:bg-white/[0.05] transition-colors text-left focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 ${group.label === 'شبكة وأحداث' ? 'flex flex-col items-stretch gap-1.5 p-2' : 'flex items-center gap-3 py-1.5'} ${layer.parent ? 'pl-[22px] pr-1' : 'px-1'} ${dormant ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
                           >
@@ -565,8 +603,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               <>
                                 <span className="flex w-full min-w-0 items-center gap-2" dir="rtl">
                                   <ToggleSwitch active={!!isLayerActive} />
+                                  {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                                   <span className={`min-w-0 flex-1 text-right text-[11px] font-medium leading-5 ${isLayerActive ? 'text-white/85' : 'text-white/45'}`}>
                                     {layer.label}
+                                    {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                                   </span>
                                 </span>
                                 <span className="flex w-full items-center gap-2" dir="rtl">
@@ -579,8 +619,10 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                               <>
                                 {layer.parent && <SubLayerStem />}
                                 <ToggleSwitch active={!!isLayerActive} />
+                                {locked && <LockKeyhole aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-cyan-100/70" />}
                                 <span className={`text-[11px] font-mono uppercase tracking-wider flex-1 transition-colors duration-200 ${isLayerActive ? 'text-white/70' : 'text-white/35'}`}>
                                   {layer.label}
+                                  {locked && <span className="ms-2 text-[9px] text-cyan-100/60">كود الدعوة</span>}
                                   
                                 </span>
                                 

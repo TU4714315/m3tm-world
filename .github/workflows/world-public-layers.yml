@@ -13,6 +13,26 @@ on:
       - 'public/data/ne110-land-boundaries.geojson'
       - 'src/components/LayerPanel.tsx'
       - 'src/lib/publicLayerData*'
+      - 'src/lib/publicReferenceAtlas*'
+      - 'src/lib/publicGeometryBoundary*'
+      - 'src/lib/publicCountryVisibility*'
+      - 'src/lib/iswnAtlas*'
+      - 'src/app/api/reference-atlas/**'
+      - 'src/components/PriorityNewsCards*'
+      - 'src/components/LiveAlerts*'
+      - 'src/lib/priorityNews*'
+      - 'src/lib/publishedMapPresentation*'
+      - 'src/lib/map-symbols*'
+      - 'src/lib/layerUrlState*'
+      - 'src/lib/publicEmbedView*'
+      - 'src/lib/yemenMapView*'
+      - 'tools/preview-smoke.mjs'
+      - 'src/lib/publicRefreshPolicy*'
+      - 'docs/ISWN_REFERENCE_MAP_CONTRACT_2026-10-15.md'
+      - 'tools/refresh-reference-atlas.mjs'
+      - '.github/workflows/reference-atlas-refresh.yml'
+      - 'package.json'
+      - 'package-lock.json'
       - 'src/lib/publicFieldAlerts*'
       - 'src/lib/publicMilitarySatelliteActivity*'
       - 'src/app/api/flights/route.ts'
@@ -82,6 +102,28 @@ jobs:
       - run: npx tsc --noEmit --incremental false
       - run: npm test
       - run: npm run build
+      - name: Capture Yemen published map regression
+        shell: bash
+        run: |
+          node node_modules/next/dist/bin/next start -p 5194 > /tmp/world-yemen.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:5194/ > /dev/null; then break; fi
+            sleep 1
+          done
+          export CHROME_PATH="$(command -v google-chrome)"
+          export PREVIEW_URL='http://127.0.0.1:5194/?surface=public&layers=reference_atlas,frontlines,gdelt_events,app_news,alert_pins,country_borders&layers_v=5'
+          export SMOKE_SCENARIO=yemen
+          export SMOKE_OUTPUT_DIR=visual-yemen
+          node tools/preview-smoke.mjs
+      - name: Upload Yemen map proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-yemen-map-proof
+          path: visual-yemen/*
+          retention-days: 3
       # Typecheck the deployed Supabase Edge worker independently from Next.
       - uses: denoland/setup-deno@v2
         with:

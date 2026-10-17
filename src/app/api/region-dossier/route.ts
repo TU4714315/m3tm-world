@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { httpJson } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
@@ -175,7 +176,7 @@ async function readCountry(countryName: string): Promise<CountryFacts[]> {
   }];
 }
 
-export async function GET(request: Request) {
+async function providerGET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lat = parseFloat(searchParams.get('lat') || '0');
   const lng = parseFloat(searchParams.get('lng') || '0');
@@ -265,3 +266,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch region data' }, { status: 500 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

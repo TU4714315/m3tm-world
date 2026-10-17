@@ -1,8 +1,9 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { TEXAS_DISTRICTS, TXDOT_BASE } from '../../texas';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: Request) {
+async function providerGET(request: Request) {
   const params = new URL(request.url).searchParams;
   const district = params.get('district') || '';
   const id = params.get('id') || '';
@@ -24,9 +25,11 @@ export async function GET(request: Request) {
       return new Response('Snapshot unavailable', { status: 404, headers: { 'Cache-Control': 'no-store' } });
     }
     return new Response(image, {
-      headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=20', 'X-Content-Type-Options': 'nosniff' },
+      headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' },
     });
   } catch {
     return new Response('Snapshot unavailable', { status: 502, headers: { 'Cache-Control': 'no-store' } });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

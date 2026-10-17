@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
@@ -26,7 +27,7 @@ function decodeEntities(s: string): string {
     .replace(/&amp;/g, '&');
 }
 
-export async function GET() {
+async function providerGET() {
   try {
     const res = await fetch('https://www.gdacs.org/xml/rss.xml', { signal: AbortSignal.timeout(15000),
       next: { revalidate: 300 }, // Cache 5 min
@@ -93,10 +94,12 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       source: 'GDACS RSS API',
     }), {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
     });
   } catch (error) {
     console.error('[OSIRIS] GDACS fetch error:', error);
     return NextResponse.json({ events: [], total: 0, error: 'GDACS unavailable' }, { status: 500 });
   }
 }
+
+export const GET = withRestrictedMapResponse(providerGET);

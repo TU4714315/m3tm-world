@@ -1,3 +1,4 @@
+import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 
 import { NextResponse } from 'next/server';
 
@@ -38,14 +39,16 @@ const LIVE_FEEDS = [
   { id: 'rt',       name: 'RT News',   city: 'Moscow',  country: 'RU', lat: 55.755, lng:  37.617, url: 'https://rumble.com/c/RTNewsEN', embed_allowed: false, category: 'state', language: 'en' },
 ];
 
-export async function GET() {
+async function providerGET() {
   return NextResponse.json({
     feeds: LIVE_FEEDS,
     total: LIVE_FEEDS.length,
     categories: ['mainstream', 'government', 'finance', 'conflict', 'state'],
     timestamp: new Date().toISOString(),
   }, {
-    headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=172800' },
+    headers: { 'Cache-Control': 'private, no-store, max-age=0' },
   });
 }
 
+
+export const GET = withRestrictedMapResponse(providerGET);
