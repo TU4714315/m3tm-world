@@ -350,6 +350,16 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
       ? 'بيانات سابقة · تعذر التحديث' : 'تعذر جلب المصدر';
     if (transport === 'loading') return count && count > 0
       ? `${count.toLocaleString('ar-SA')} عنصر · يجري التحديث` : 'جارٍ جلب البيانات';
+    // HTTP 200 can legitimately wrap a provider-level failure; an empty
+    // aggregate after an ADS-B outage is not proof of zero eligible activity.
+    const militaryMeta = data?.military_activity_meta;
+    if (key === 'military_activity' && transport === 'ok'
+      && militaryMeta?.source_mode === 'public-adsb-observations'
+      && militaryMeta?.provider_healthy === false) {
+      return count && count > 0
+        ? 'بيانات إقليمية سابقة · تعذر تحديث المصدر'
+        : 'تعذر تحديث المصدر';
+    }
     if (count === null) return 'البيانات غير متاحة';
     if (count === 0) return transport === 'ok' ? 'لا أحداث مؤهلة' : 'لم يُتحقق من المصدر';
     return `${count.toLocaleString('ar-SA')} عنصر منشور`;
