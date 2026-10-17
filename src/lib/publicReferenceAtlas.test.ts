@@ -14,6 +14,17 @@ const snapshot = {
   changes: { added: 1, removed: 0, changed: 0 },
 };
 describe('reference atlas public contract', () => {
+  it('rebuilds evidence age from retained publisher metadata regardless of a fresh fetch or claimed current control', () => {
+    const feature = snapshot.features.features[0];
+    const result = publicReferenceAtlas({ ...snapshot, fetchedAt: new Date().toISOString(),
+      evidenceState: 'dated-reference', currentControl: true, sourcePublishedAt: new Date().toISOString(),
+      features: { type: 'FeatureCollection', features: [{ ...feature, properties: { ...feature.properties, sourcePublishedAt: '2024-06-02' } }] },
+    })!;
+    expect(result.evidenceState).toBe('historical');
+    expect(result.currentControl).toBe(false);
+    expect(result.sourcePublishedAt).toBe('2024-06-02T00:00:00.000Z');
+    expect(result.undatedFeatureCount).toBe(0);
+  });
   it('retains generalized published lines through the browser projection without Saudi crossings or collapsed paths', () => {
     const line = (id: string, coordinates: number[][]) => ({
       ...annotation(id, 'yemen', 'Yemen map', []), geometry: { type: 'LineString', coordinates },

@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { isMajorIswnBulletin, MAX_KML_BYTES, parseIswnBulletins, parseIswnKml } from './iswnAtlasParser';
-import { atlasLayers, calculateAtlasChanges } from './iswnAtlas';
+import { atlasEvidence, atlasLayers, calculateAtlasChanges } from './iswnAtlas';
 
 const point = (name = 'Reference', coords = '36.123456,33.56789,0') => `<Placemark><name>${name}</name><description><![CDATA[<img src="https://remote/icon">private markup]]></description><Point><coordinates>${coords}</coordinates></Point></Placemark>`;
 const kml = (body: string) => `<kml><Document>${body}</Document></kml>`;
 const polygon = (hole = '') => `<Polygon><outerBoundaryIs><LinearRing><coordinates>30,30 31,30 31,31 30,30</coordinates></LinearRing></outerBoundaryIs>${hole}</Polygon>`;
 
 describe('ISWN reference KML parser', () => {
+  it('dates evidence only from real publisher metadata, keeps historical and unknown annotations distinct', () => {
+    const dated = parseIswnKml(kml(`<Folder><name>Regions (Last Update: 2024-06-02)</name>${point()}</Folder>`));
+    expect(atlasEvidence(dated.features, Date.parse('2026-10-15T12:00:00Z'))).toMatchObject({
+      evidenceState: 'historical', currentControl: false, sourcePublishedAt: '2024-06-02T00:00:00.000Z', undatedFeatureCount: 0,
+    });
+    const unknown = parseIswnKml(kml(`<Folder><name>Last Update: 2999-01-01</name>${point('Future')}</Folder>`));
+    expect(unknown.features[0].properties.sourcePublishedAt).toBeNull();
+    expect(atlasEvidence([...dated.features, ...unknown.features], Date.parse('2026-10-15T12:00:00Z')).evidenceState).toBe('mixed');
+  });
   it('retains separately published areas with the same actor/name', () => {
     const output = parseIswnKml(kml(`<Placemark><name>AnsarAllah in Lahij</name>${polygon()}</Placemark><Placemark><name>AnsarAllah in Lahij</name>${polygon().replaceAll('30,', '29,')}</Placemark>`));
     expect(output.features).toHaveLength(2);

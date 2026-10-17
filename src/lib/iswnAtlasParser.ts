@@ -37,7 +37,8 @@ function explicitFolderDate(name: string): string | null {
   const match = name.match(/last\s*update(?:d)?\s*:?\s*(\d{4}-\d{2}-\d{2})/i);
   if (!match) return null;
   const value = `${match[1]}T00:00:00.000Z`;
-  return Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value ? value : null;
+  return Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now()
+    && new Date(value).toISOString() === value ? value : null;
 }
 
 export function parseIswnKml(xml: string): AtlasCollection {

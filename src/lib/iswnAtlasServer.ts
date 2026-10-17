@@ -1,12 +1,15 @@
 import { durableGetJson, durableSetJson } from './durableCache';
 import { maskSaudiPublicIndicators } from './publicCountryVisibility';
-import { atlasLayers, calculateAtlasChanges, ISWN_CHECK_MS, ISWN_FEED_URL, ISWN_MAP_URL,
+import { atlasEvidence, atlasLayers, calculateAtlasChanges, validAtlasEventId, ISWN_CHECK_MS, ISWN_FEED_URL, ISWN_MAP_URL,
   ISWN_PUBLISHER_URL, ISWN_REFRESH_MS, type AtlasSnapshot } from './iswnAtlas';
 import { isMajorIswnBulletin, MAX_FEED_BYTES, MAX_KML_BYTES, parseIswnBulletins, parseIswnKml } from './iswnAtlasParser';
 
 const CACHE_KEY = 'm3tm:reference-atlas:iswn:v3';
 const RETENTION_SECONDS = 7 * 24 * 60 * 60;
-interface CacheState { snapshot: AtlasSnapshot; rssCheckedAt: number; lastAttemptAt: number; seenReportIds: string[] }
+interface CacheState {
+  snapshot: AtlasSnapshot; rssCheckedAt: number; lastAttemptAt: number; seenReportIds: string[];
+  seenEventIds?: string[]; pendingEventIds?: string[];
+}
 let inFlight: Promise<AtlasSnapshot> | null = null;
 const mask = (snapshot: AtlasSnapshot): AtlasSnapshot => maskSaudiPublicIndicators({ reference_atlas: snapshot }).reference_atlas;
 
@@ -43,14 +46,19 @@ function emptySnapshot(): AtlasSnapshot {
     featureCount: 0, layers: [], refreshReason: null, changes: null, cacheBackend: 'miss', bulletins: [], error: null };
 }
 
-async function collect(): Promise<AtlasSnapshot> {
+async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
   const now = Date.now(), iso = new Date(now).toISOString();
   const cached = await durableGetJson<CacheState>(CACHE_KEY);
   const previous = cached.value;
   let snapshot = mask(previous?.snapshot ?? emptySnapshot());
   snapshot = { ...snapshot, cacheBackend: cached.backend };
   const state: CacheState = { snapshot, rssCheckedAt: previous?.rssCheckedAt ?? 0,
-    lastAttemptAt: previous?.lastAttemptAt ?? 0, seenReportIds: previous?.seenReportIds ?? [] };
+    lastAttemptAt: previous?.lastAttemptAt ?? 0, seenReportIds: previous?.seenReportIds ?? [],
+    seenEventIds: previous?.seenEventIds ?? [], pendingEventIds: previous?.pendingEventIds ?? [] };
+  const seenEvents = new Set(state.seenEventIds);
+  const pendingEvents = new Set(state.pendingEventIds);
+  const acceptedEvent = Boolean(majorEventId && !seenEvents.has(majorEventId));
+  if (acceptedEvent) pendingEvents.add(majorEventId!);
   const scheduled = !snapshot.fetchedAt || now - Date.parse(snapshot.fetchedAt) >= ISWN_REFRESH_MS;
   const retryAllowed = !state.lastAttemptAt || now - state.lastAttemptAt >= ISWN_CHECK_MS;
   const checkRss = !state.rssCheckedAt || now - state.rssCheckedAt >= ISWN_CHECK_MS;
@@ -67,10 +75,10 @@ async function collect(): Promise<AtlasSnapshot> {
     } catch { /* A bulletin outage does not invalidate a successfully fetched reference map. */ }
   }
   // Retain failed refresh intent even when RSS later fails or drops the headline.
-  const refresh = retryAllowed && (scheduled || majorReport || snapshot.status === 'stale');
+  const refresh = retryAllowed && (scheduled || majorReport || pendingEvents.size > 0 || snapshot.status === 'stale');
   if (refresh) {
     state.lastAttemptAt = now;
-    const reason = !snapshot.fetchedAt ? 'initial' : scheduled ? 'scheduled' : 'major_report';
+    const reason = !snapshot.fetchedAt ? 'initial' : pendingEvents.size > 0 ? 'major_event' : scheduled ? 'scheduled' : 'major_report';
     try {
       const features = parseIswnKml(await boundedXml(ISWN_MAP_URL, MAX_KML_BYTES, 20_000));
       const next = mask({ ...snapshot, status: 'ok', fetchedAt: iso, checkedAt: iso,
@@ -80,6 +88,8 @@ async function collect(): Promise<AtlasSnapshot> {
       snapshot = next;
       // Only a successful full fetch consumes major-event triggers.
       for (const bulletin of snapshot.bulletins) seen.add(bulletin.id);
+      for (const id of pendingEvents) seenEvents.add(id);
+      pendingEvents.clear();
     } catch {
       snapshot = { ...snapshot, status: snapshot.fetchedAt ? 'stale' : 'unavailable', checkedAt: iso,
         nextRefreshAt: new Date(now + ISWN_CHECK_MS).toISOString(), error: 'reference_source_refresh_failed' };
@@ -91,16 +101,28 @@ async function collect(): Promise<AtlasSnapshot> {
     }
   }
   state.seenReportIds = [...seen].slice(-300);
+  state.seenEventIds = [...seenEvents].slice(-300);
+  state.pendingEventIds = [...pendingEvents].slice(-32);
+  snapshot = { ...snapshot, ...atlasEvidence(snapshot.features.features, now),
+    majorEventState: pendingEvents.size ? 'pending' : 'none',
+    ...(pendingEvents.size ? { nextRefreshAt: new Date(Math.max(now, state.lastAttemptAt + ISWN_CHECK_MS)).toISOString() } : {}) };
   // Apply the public boundary before persistence as well as at the response boundary.
   state.snapshot = mask(snapshot);
-  if (refresh || checkRss) {
+  if (refresh || checkRss || acceptedEvent) {
     const backend = await durableSetJson(CACHE_KEY, state, RETENTION_SECONDS);
     state.snapshot = { ...state.snapshot, cacheBackend: backend };
   }
   return mask(state.snapshot);
 }
 
-export function getReferenceAtlasSnapshot(): Promise<AtlasSnapshot> {
-  if (!inFlight) inFlight = collect().finally(() => { inFlight = null; });
+export async function getReferenceAtlasSnapshot(majorEventId?: string): Promise<AtlasSnapshot> {
+  if (majorEventId !== undefined && !validAtlasEventId(majorEventId)) throw new Error('invalid_event_signal');
+  // A collector event arriving during a browser check must not be swallowed by
+  // that check's singleflight. Serialize it, then consult the durable id ledger.
+  if (inFlight && majorEventId) {
+    await inFlight;
+    return getReferenceAtlasSnapshot(majorEventId);
+  }
+  if (!inFlight) inFlight = collect(majorEventId).finally(() => { inFlight = null; });
   return inFlight;
 }

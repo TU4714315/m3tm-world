@@ -25,6 +25,63 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); clearDurableMemoryCache(); });
 
 describe('reference atlas collection schedule', () => {
+  it('refreshes for a collector event outside the RSS check and schedule, consuming its id only once', async () => {
+    await getReferenceAtlasSnapshot();
+    vi.advanceTimersByTime(15 * 60_000);
+    await getReferenceAtlasSnapshot();
+    vi.advanceTimersByTime(60_000);
+    const refreshed = await getReferenceAtlasSnapshot('published-event:one');
+    expect(refreshed.refreshReason).toBe('major_event');
+    expect(refreshed.majorEventState).toBe('none');
+    expect(mapCalls()).toBe(2);
+    expect(feedCalls()).toBe(2);
+    vi.advanceTimersByTime(15 * 60_000);
+    await getReferenceAtlasSnapshot('published-event:one');
+    expect(mapCalls()).toBe(2);
+  });
+
+  it('persists an event during cooldown and refreshes it on a later ordinary check', async () => {
+    await getReferenceAtlasSnapshot();
+    vi.advanceTimersByTime(60_000);
+    const pending = await getReferenceAtlasSnapshot('published-event:queued');
+    expect(pending.majorEventState).toBe('pending');
+    expect(pending.nextRefreshAt).toBe('2026-10-15T12:15:00.000Z');
+    await getReferenceAtlasSnapshot('published-event:queued');
+    expect(mapCalls()).toBe(1);
+    vi.advanceTimersByTime(14 * 60_000);
+    expect((await getReferenceAtlasSnapshot()).refreshReason).toBe('major_event');
+    expect(mapCalls()).toBe(2);
+  });
+
+  it('does not lose an event behind an ordinary in-flight check, and retries failed event refreshes', async () => {
+    await getReferenceAtlasSnapshot();
+    vi.advanceTimersByTime(15 * 60_000);
+    failMap = true;
+    const [, failed] = await Promise.all([getReferenceAtlasSnapshot(), getReferenceAtlasSnapshot('published-event:retry')]);
+    expect(failed.majorEventState).toBe('pending');
+    expect(failed.status).toBe('stale');
+    expect(mapCalls()).toBe(2);
+    failMap = false;
+    vi.advanceTimersByTime(15 * 60_000);
+    const retried = await getReferenceAtlasSnapshot();
+    expect(retried.majorEventState).toBe('none');
+    expect(retried.status).toBe('ok');
+    expect(mapCalls()).toBe(3);
+    await getReferenceAtlasSnapshot('published-event:retry');
+    expect(mapCalls()).toBe(3);
+  });
+
+  it('never treats a successful new collection as current control or invents source evidence dates', async () => {
+    const first = await getReferenceAtlasSnapshot();
+    expect(first).toMatchObject({ status: 'ok', evidenceState: 'unknown', currentControl: false,
+      sourcePublishedAt: null, sourceOldestPublishedAt: null, undatedFeatureCount: 1 });
+    vi.advanceTimersByTime(12 * 60 * 60_000);
+    const next = await getReferenceAtlasSnapshot();
+    expect(next.fetchedAt).not.toBe(first.fetchedAt);
+    expect(next.sourcePublishedAt).toBeNull();
+    expect(next.evidenceState).toBe('unknown');
+    expect(next.currentControl).toBe(false);
+  });
   it('singleflights and reuses snapshots, checks RSS every 15 minutes and refreshes KML after 12 hours', async () => {
     const [first, concurrent] = await Promise.all([getReferenceAtlasSnapshot(), getReferenceAtlasSnapshot()]);
     expect(first).toEqual(concurrent);

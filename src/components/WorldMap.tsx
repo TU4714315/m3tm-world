@@ -31,7 +31,7 @@ import { applyMapProjection } from '@/lib/map-projection';
 import { buildAntimeridianSafeLine } from '@/lib/publicRouteGeometry';
 import { coarseFlightSourceStale, coarseFlightMapFeatures } from '@/lib/menaSignals';
 import { civilianFlightMapFeatures } from '@/lib/civilianFlightAggregate';
-import { referenceAtlasFeatures, referenceAtlasDate, type ReferenceAtlasKind } from '@/lib/referenceAtlasView';
+import { referenceAtlasFeatures, referenceAtlasEvidenceLabel, type ReferenceAtlasKind } from '@/lib/referenceAtlasView';
 import type { AtlasSnapshot } from '@/lib/iswnAtlas';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
@@ -2086,7 +2086,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(e.lngLat).setHTML(`<div dir="rtl" style="padding:10px;color:#DEE7EB;background:#0C1922;font-size:12px;line-height:1.8;border-radius:12px;">
         <strong>${htmlEsc(p.name || 'معلم')}</strong><div>${htmlEsc(side || kinds[p.symbol] || (p.kind === 'reference_line' ? 'خط مرجعي منشور · ليس مسار حركة' : 'منطقة منشورة'))}</div>
-        ${p.sourcePublishedAt ? `<time style="font-size:10px;opacity:.65">${htmlEsc(referenceAtlasDate(p.sourcePublishedAt))}</time>` : ''}
+        <time style="font-size:10px;opacity:.75">${htmlEsc(referenceAtlasEvidenceLabel(p.sourcePublishedAt))}</time>
       </div>`).addTo(map);
     };
     map.on('click', 'reference-atlas-dots', onReferenceAtlasClick);

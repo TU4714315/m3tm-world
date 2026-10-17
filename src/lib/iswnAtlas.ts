@@ -26,9 +26,37 @@ export interface AtlasSnapshot {
   sourceUrl: string; publisherUrl: string; fetchedAt: string | null; checkedAt: string | null;
   nextRefreshAt: string | null; sourcePublishedAt: string | null;
   contentKind: 'reference_annotations'; features: AtlasCollection; featureCount: number;
-  layers: AtlasLayer[]; refreshReason: 'scheduled' | 'major_report' | 'initial' | null;
+  layers: AtlasLayer[]; refreshReason: 'scheduled' | 'major_report' | 'major_event' | 'initial' | null;
+  /** Retrieval health never establishes present-day territorial control. */
+  evidenceState?: 'unknown' | 'historical' | 'dated-reference' | 'mixed';
+  sourceOldestPublishedAt?: string | null;
+  undatedFeatureCount?: number;
+  currentControl?: false;
+  majorEventState?: 'pending' | 'none';
   changes: { added: number; removed: number; changed: number } | null;
   cacheBackend: string; bulletins: AtlasBulletin[]; error: string | null;
+}
+
+/** Only publisher metadata dates the evidence; collection time is irrelevant. */
+export function atlasEvidence(features: AtlasFeature[], now = Date.now()) {
+  const dates = features.flatMap(feature => {
+    const date = feature.properties.sourcePublishedAt;
+    const time = typeof date === 'string' ? Date.parse(date) : NaN;
+    return Number.isFinite(time) && time <= now ? [time] : [];
+  }).sort((a, b) => a - b);
+  const undatedFeatureCount = features.length - dates.length;
+  const historical = dates.filter(time => now - time >= ISWN_REFRESH_MS).length;
+  const evidenceState: NonNullable<AtlasSnapshot['evidenceState']> = !dates.length ? 'unknown'
+    : undatedFeatureCount > 0 || (historical > 0 && historical < dates.length) ? 'mixed'
+      : historical === dates.length ? 'historical' : 'dated-reference';
+  return { evidenceState, currentControl: false as const, undatedFeatureCount,
+    sourcePublishedAt: dates.length ? new Date(dates[dates.length - 1]).toISOString() : null,
+    sourceOldestPublishedAt: dates.length ? new Date(dates[0]).toISOString() : null };
+}
+
+/** Bounded opaque ids are data, never upstream addresses or instructions. */
+export function validAtlasEventId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(value);
 }
 
 export function atlasLayers(features: AtlasFeature[]): AtlasLayer[] {

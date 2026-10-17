@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AtlasFeature, AtlasSnapshot } from './iswnAtlas';
-import { referenceAtlasDate, referenceAtlasExternalUrl, referenceAtlasFeatures, referenceAtlasLayerLabel, referenceAtlasStateLabel, referenceAtlasTime } from './referenceAtlasView';
+import { referenceAtlasDate, referenceAtlasEvidenceLabel, referenceAtlasExternalUrl, referenceAtlasFeatures, referenceAtlasLayerLabel, referenceAtlasStateLabel, referenceAtlasTime } from './referenceAtlasView';
 
 const feature = (id: string, layerId: string, kind: 'reference_point' | 'reference_area'): AtlasFeature => ({
   type: 'Feature',
@@ -33,6 +33,9 @@ describe('reference atlas presentation contract', () => {
     expect(JSON.stringify(snapshot)).toBe(before);
   });
   it('keeps unknown source dates unknown and separate from fetch timestamps', () => {
+    expect(referenceAtlasEvidenceLabel(null)).toBe('مرجع غير مؤرّخ');
+    expect(referenceAtlasEvidenceLabel('invalid')).toBe('مرجع غير مؤرّخ');
+    expect(referenceAtlasEvidenceLabel(snapshot.sourcePublishedAt)).toBe('مرجع منشور · 2024-06-02');
     expect(referenceAtlasDate(null)).toBe('غير مؤرّخ');
     expect(referenceAtlasDate('not-a-date')).toBe('غير مؤرّخ');
     expect(referenceAtlasDate(snapshot.sourcePublishedAt)).toBe('2024-06-02');

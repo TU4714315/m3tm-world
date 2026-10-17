@@ -1,6 +1,7 @@
 /** Explicit browser contract: no KML HTML, network links, exact point locations,
  * private fields or caller-supplied publisher URLs cross this projection. */
 import type { AtlasFeature, AtlasGeometry, AtlasPosition, AtlasSnapshot } from './iswnAtlas';
+import { atlasEvidence } from './iswnAtlas';
 import { isSaudiPublicIndicator } from './publicCountryVisibility';
 const SOURCE = 'https://www.google.com/maps/d/viewer?mid=1M-_ymjR9xwOK7KMikOcUFSAE1ac';
 const PUBLISHER = 'https://english.iswnews.com/';
@@ -71,8 +72,8 @@ export function publicReferenceAtlas(value: unknown): AtlasSnapshot | null {
     version: 1, provider: 'iswn', status: source.status === 'ok' || source.status === 'stale' ? source.status : 'unavailable',
     contentKind: 'reference_annotations', sourceUrl: SOURCE, publisherUrl: PUBLISHER,
     fetchedAt: date(source.fetchedAt), checkedAt: date(source.checkedAt), nextRefreshAt: date(source.nextRefreshAt),
-    sourcePublishedAt: date(source.sourcePublishedAt), features: { type: 'FeatureCollection', features }, featureCount: features.length, layers,
-    refreshReason: source.refreshReason === 'scheduled' || source.refreshReason === 'major_report' || source.refreshReason === 'initial' ? source.refreshReason : null,
+    ...atlasEvidence(features), features: { type: 'FeatureCollection', features }, featureCount: features.length, layers,
+    refreshReason: source.refreshReason === 'scheduled' || source.refreshReason === 'major_report' || source.refreshReason === 'major_event' || source.refreshReason === 'initial' ? source.refreshReason : null,
     changes: features.length === (Array.isArray(rawFeatures) ? rawFeatures.length : 0)
       && counts.every(n => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 10_000)
       ? { added: Number(changes.added), removed: Number(changes.removed), changed: Number(changes.changed) } : null,

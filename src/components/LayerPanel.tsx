@@ -10,6 +10,7 @@ import {
 import StyleStudio from './StyleStudio';
 import { TERRAIN_MIN_ZOOM, type TerrainStatus } from '@/lib/map-terrain';
 import { RESTRICTED_MAP_LAYERS } from '@/lib/mapAccessPolicy';
+import { selectDataLayers } from '@/lib/layerBulkSelection';
 
 interface LayerPanelProps {
   data: any;
@@ -284,18 +285,12 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     </div>
   ) : null;
 
-  /** Switch a whole group at once. Provider availability never locks the toggle:
-   *  an enabled layer with no configured provider remains an honest no-data state. */
-  const toggleGroup = (layers: LayerDef[]) => {
-    const available = layers.filter(layer => !layer.parent && (hasMapAccess || !RESTRICTED_MAP_LAYERS.has(layer.key)));
-    if (!available.length) { onRequestAccess?.(); return; }
-    const anyOn = available.some(l => activeLayers[l.key]);
-    if (!anyOn && available.some(l => l.key === 'terrain_elevation' || l.key === 'terrain_3d')) on3DModeSelected?.();
-    setActiveLayers((prev: any) => {
-      const next = { ...prev };
-      for (const l of available) next[l.key] = !anyOn;
-      return next;
-    });
+  const selectGroup = (layers: LayerDef[], enabled: boolean) => {
+    const canSelect = (key: string) => hasMapAccess || !RESTRICTED_MAP_LAYERS.has(key);
+    if (!layers.some(layer => !layer.parent && !displayKeys.includes(layer.key) && canSelect(layer.key))) {
+      onRequestAccess?.(); return;
+    }
+    setActiveLayers((prev: Record<string, unknown>) => selectDataLayers(prev, layers, enabled, displayKeys, canSelect));
   };
 
   /* Keep credential-gated layers visible and operable. Missing credentials are
@@ -559,14 +554,22 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
                       <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-white/35 flex-1">
                         {group.fullLabel}
                       </span>
-                      {/* Switching eight satellite layers one at a time is the
-                          kind of thing that makes a panel feel unfinished. */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleGroup(group.layers); }}
-                        className="px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                      >
-                        {activeCount > 0 ? 'لا شيء' : 'الكل'}
-                      </button>
+                      {group.layers.some(layer => !layer.parent && !displayKeys.includes(layer.key)) && (
+                        <div className="flex items-center gap-1">
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); selectGroup(group.layers, true); }}
+                            aria-label={`تفعيل كل بيانات ${group.fullLabel}`}
+                            className="min-h-8 px-2 rounded text-[10px] text-white/65 hover:text-white hover:bg-white/10 transition-colors">
+                            الكل
+                          </button>
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); selectGroup(group.layers, false); }}
+                            aria-label={`إلغاء بيانات ${group.fullLabel}`}
+                            className="min-h-8 px-2 rounded text-[10px] text-white/65 hover:text-white hover:bg-white/10 transition-colors">
+                            إلغاء
+                          </button>
+                        </div>
+                      )}
                       {isPinned && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setPinnedGroup(null); }}

@@ -32,6 +32,12 @@ export function referenceAtlasDate(value: string | null | undefined): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+/** Published reference dates never assert current territorial control. */
+export function referenceAtlasEvidenceLabel(value: string | null | undefined): string {
+  const date = referenceAtlasDate(value);
+  return date === 'غير مؤرّخ' ? 'مرجع غير مؤرّخ' : `مرجع منشور · ${date}`;
+}
+
 export function referenceAtlasTime(value: string | null | undefined): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'غير متاح';
   return `${new Date(value).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
