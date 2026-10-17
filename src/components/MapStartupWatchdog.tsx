@@ -6,6 +6,9 @@ import { useEffect, useState } from 'react';
 export function isMapStartupDelayDue(ready: boolean, visible: boolean, elapsedMs: number, waitMs: number): boolean {
   return !ready && visible && elapsedMs >= waitMs;
 }
+export function remainingVisibleStartupMs(waitMs: number, visibleElapsedMs: number): number {
+  return Math.max(0, waitMs - visibleElapsedMs);
+}
 
 /**
  * Covers failures that occur *before* the lazy WorldMap chunk mounts, when
@@ -40,7 +43,7 @@ export default function MapStartupWatchdog({
       }
       if (document.hidden) return;
       visibleStart = Date.now();
-      const remaining = Math.max(0, waitMs - visibleElapsed);
+      const remaining = remainingVisibleStartupMs(waitMs, visibleElapsed);
       timeoutId = setTimeout(() => {
         const elapsed = visibleElapsed + (Date.now() - visibleStart);
         setTimedOut(isMapStartupDelayDue(ready, !document.hidden, elapsed, waitMs));
