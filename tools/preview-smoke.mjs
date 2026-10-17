@@ -268,8 +268,8 @@ try {
     // Production-only acceptance ledger: a successful HTTP request to the
     // public access probe does not imply a private grant or published event.
     measurements.livePublicRequests = {
-      mapAccess: [...network.values()].filter(r=>/\\/api\\/map-access(?:\\?|$)/.test(r.url)).length,
-      news: [...network.values()].filter(r=>/\\/api\\/news(?:\\?|$)/.test(r.url)).map(r=>({status:r.status,state:r.state,bytes:r.bytes??null})).slice(0,8),
+      mapAccess: [...network.values()].filter(r=>r.url.includes('/api/map-access')).length,
+      news: [...network.values()].filter(r=>r.url.includes('/api/news')).map(r=>({status:r.status,state:r.state,bytes:r.bytes??null})).slice(0,8),
       satelliteTiles: [...network.values()].filter(r=>/World_Imagery/.test(r.url)).length,
     };
     await check('No horizontal overflow in deployed WORLD viewport', "document.documentElement.scrollWidth <= window.innerWidth+2");
