@@ -220,7 +220,9 @@ try {
       }
       // Desktop layer groups are intentionally collapsed. Open the published
       // conflict group through the visible control before testing a child.
-      await evaluate("(()=>{const b=[...document.querySelectorAll('button')].find(el=>el.title==='الحروب والأحداث العامة');b?.click();return !!b})()");
+      await evaluate("(()=>{let b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(!b){window.dispatchEvent(new KeyboardEvent('keydown',{key:'l',bubbles:true}));}return true;})()");
+      await pause(250);
+      await evaluate("(()=>{const b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(b?.getAttribute('aria-expanded')!=='true')b?.click();return !!b;})()");
       await pause(400);
       const toggle = await evaluate("document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')");
       measurements.alertToggleBefore = toggle ?? null;
