@@ -153,6 +153,24 @@ try {
       .then(x=>(x.targetInfos||[]).filter(t=>t.type==='iframe'||t.type==='page')
         .map(t=>({type:t.type,url:t.url,attached:t.attached,openerId:t.openerId})))
       .catch(e=>({error:String(e)}));
+    // Inspect the public WORLD out-of-process iframe from isolated Chromium.
+    // No credentials or private API content; only the public map's render state.
+    const iframeTarget = await command('Target.getTargets', {}, null)
+      .then(x=>(x.targetInfos||[]).find(t=>t.type==='iframe' && t.url.startsWith('https://m3tm-world-recovery.onrender.com/')))
+      .catch(()=>null);
+    if (iframeTarget) {
+      try {
+        const attached = await command('Target.attachToTarget',{targetId:iframeTarget.targetId,flatten:true},null);
+        await command('Runtime.enable',{},attached.sessionId);
+        const status = await command('Runtime.evaluate',{
+          expression:"({url:location.href,state:document.readyState,body:document.body?.innerText?.slice(0,480),scripts:document.scripts.length,canvases:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),iframeContext:window.parent!==window})",
+          returnByValue:true
+        },attached.sessionId);
+        measurements.iframeRuntime = status.result?.value ?? {error:status.exceptionDetails?.text};
+        await command('Target.detachFromTarget',{sessionId:attached.sessionId},null).catch(()=>{});
+      } catch(e) { measurements.iframeRuntime={error:String(e)}; }
+    }
+
     measurements.frameLoadingState = await evaluate("({frameReady:document.querySelector('iframe[data-testid=\\\"m3tm-world-frame\\\"]')?.contentDocument?.readyState||'cross-origin',frameLoadedPerformance:performance.getEntriesByType('resource').filter(x=>x.name.includes('m3tm-world-recovery.onrender.com')).map(x=>({name:x.name,start:x.startTime,duration:x.duration,responseEnd:x.responseEnd})).slice(0,4)})");
     measurements.browserResponses = [...network.values()]
       .filter(x=>/m3tm-world|_next|api\/news/.test(x.url))
