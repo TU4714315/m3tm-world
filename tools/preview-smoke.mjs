@@ -173,6 +173,10 @@ try {
         await click('عرض الأقمار الصناعية'); await pause(3800);
         await check('Satellite switch restores active map without dropping canvas', "document.querySelector('button[title=\"عرض الأقمار الصناعية\"]')?.getAttribute('aria-pressed')==='true' && document.querySelectorAll('.maplibregl-canvas').length===1");
       }
+      // Desktop layer groups are intentionally collapsed. Open the published
+      // conflict group through the visible control before testing a child.
+      await evaluate("(()=>{const b=[...document.querySelectorAll('button')].find(el=>el.title==='الحروب والأحداث العامة');b?.click();return !!b})()");
+      await pause(400);
       const toggle = await evaluate("document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')");
       measurements.alertToggleBefore = toggle ?? null;
       if (toggle != null) {
