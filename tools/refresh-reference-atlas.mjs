@@ -1,4 +1,5 @@
-// Server collector credential grants only this refresh, never map viewing.
+// Ordinary checks use the same published-read boundary as visitors. A collector
+// credential is still mandatory for an explicit major-event dispatch.
 const allowedOrigins = new Set([
   'https://m3tm-world-recovery.onrender.com',
   'https://m3tm-world.vercel.app',
@@ -6,7 +7,7 @@ const allowedOrigins = new Set([
 const origin = process.env.REFERENCE_ATLAS_ORIGIN || 'https://m3tm-world-recovery.onrender.com';
 if (!allowedOrigins.has(origin)) throw new Error('Unsupported reference atlas origin');
 const token = process.env.WORLD_MAP_REFRESH_TOKEN;
-if (!token || token.length < 32) throw new Error('Collector authorization is not configured');
+if (token && token.length < 32) throw new Error('Collector authorization is invalid');
 const eventId = process.env.REFERENCE_ATLAS_MAJOR_EVENT_ID || '';
 if (process.env.REFERENCE_ATLAS_TRIGGER === 'repository_dispatch' && !eventId) {
   throw new Error('A major published event requires an idempotent event id');
@@ -14,8 +15,9 @@ if (process.env.REFERENCE_ATLAS_TRIGGER === 'repository_dispatch' && !eventId) {
 if (eventId && !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(eventId)) {
   throw new Error('Invalid major event id');
 }
+if (eventId && !token) throw new Error('Major event collector authorization is not configured');
 const response = await fetch(`${origin}/api/reference-atlas`, {
-  headers: { Accept: 'application/json', Authorization: `Bearer ${token}`,
+  headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(eventId ? { 'X-M3TM-Atlas-Event-Id': eventId } : {}) }, redirect: 'error', signal: AbortSignal.timeout(55_000),
 });
 if (!response.ok) throw new Error(`Reference atlas check returned HTTP ${response.status}`);
