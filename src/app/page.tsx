@@ -206,6 +206,7 @@ export default function Dashboard() {
   publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
   const newsRequestSequenceRef = useRef(0);
+  const latestAppliedNewsRequestRef = useRef(0);
   const [dataVersion, setDataVersion] = useState(0);
   const [endpointStatus, setEndpointStatus] = useState<Record<string, 'loading' | 'ok' | 'error'>>({});
   const markEndpointStatus = useCallback((endpoint: string, status: 'loading' | 'ok' | 'error') => {
@@ -903,7 +904,8 @@ export default function Dashboard() {
       && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
     const endpointKey = url.split('?')[0];
     const newsSeq = endpointKey === '/api/news' ? ++newsRequestSequenceRef.current : null;
-    const supersededNews = () => newsSeq !== null && newsSeq !== newsRequestSequenceRef.current;
+    // A newer failed retry never supersedes an older successful response.
+    const supersededNews = () => newsSeq !== null && newsSeq < latestAppliedNewsRequestRef.current;
     markEndpointStatus(endpointKey, 'loading');
     try {
       // Force the browser to bypass its local disk cache for real-time data
@@ -914,6 +916,8 @@ export default function Dashboard() {
         const json = await res.json();
         if (generation !== accessGeneration.current || supersededNews()) return false;
         const d = transform ? transform(json) : json;
+        if (supersededNews()) return false;
+        if (newsSeq !== null) latestAppliedNewsRequestRef.current = newsSeq;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
         markEndpointStatus(endpointKey, 'ok');
@@ -955,7 +959,7 @@ export default function Dashboard() {
     // An HTTP-200 response may contain only external RSS after an APP source
     // timeout. Make two bounded attempts for the approved APP ticker without
     // presenting the external rows as M3TM.APP news.
-    let approvedNewsRetryTimer: ReturnType<typeof window.setTimeout> | null = null;
+    let approvedNewsRetryTimer: number | null = null;
     let approvedNewsRetryCount = 0;
     let approvedNewsPendingVisibility = false;
     const runApprovedNewsRetry = () => {
