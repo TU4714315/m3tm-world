@@ -955,7 +955,7 @@ export default function Dashboard() {
     // An HTTP-200 response may contain only external RSS after an APP source
     // timeout. Make two bounded attempts for the approved APP ticker without
     // presenting the external rows as M3TM.APP news.
-    let approvedNewsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let approvedNewsRetryTimer: ReturnType<typeof window.setTimeout> | null = null;
     let approvedNewsRetryCount = 0;
     let approvedNewsPendingVisibility = false;
     const runApprovedNewsRetry = () => {
