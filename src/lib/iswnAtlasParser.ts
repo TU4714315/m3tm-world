@@ -33,14 +33,6 @@ function xmlDocument(xml: string, maxBytes: number): Node {
     parseTagValue: false, processEntities: false, trimValues: true }).parse(xml));
 }
 
-function explicitFolderDate(name: string): string | null {
-  const match = name.match(/last\s*update(?:d)?\s*:?\s*(\d{4}-\d{2}-\d{2})/i);
-  if (!match) return null;
-  const value = `${match[1]}T00:00:00.000Z`;
-  return Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now()
-    && new Date(value).toISOString() === value ? value : null;
-}
-
 export function parseIswnKml(xml: string): AtlasCollection {
   const doc = object(object(xmlDocument(xml, MAX_KML_BYTES).kml).Document);
   if (!Object.keys(doc).length) throw new Error('missing_kml_document');
@@ -98,7 +90,9 @@ export function parseIswnKml(xml: string): AtlasCollection {
     // Time-bearing gx:Track, NetworkLink and remote icons remain excluded.
     return result;
   }
-  function walk(node: Node, layerName: string, path: string, sourceDate: string | null, depth = 0) {
+  // Folder labels can describe only some countries. They are not feature
+  // publication/modification times; retain labels but never inherit their dates.
+  function walk(node: Node, layerName: string, path: string, depth = 0) {
     if (depth > 16) throw new Error('folder_depth_limit');
     const layerId = `iswn-${hash(path)}`;
     for (const candidate of list(node.Placemark)) {
@@ -120,7 +114,7 @@ export function parseIswnKml(xml: string): AtlasCollection {
         if (geometry.type !== 'Point') areaOccurrences.set(areaKey, occurrence + 1);
         const id = `iswn-${hash(`${areaKey}:${geometry.type === 'Point' ? geometry.coordinates.join(',') : occurrence}`)}`;
         features.push({ type: 'Feature', geometry, properties: { id, name, layerId, layerName,
-          kind: geometry.type === 'Point' ? 'reference_point' : geometry.type === 'LineString' ? 'reference_line' : 'reference_area', sourcePublishedAt: sourceDate,
+          kind: geometry.type === 'Point' ? 'reference_point' : geometry.type === 'LineString' ? 'reference_line' : 'reference_area', sourcePublishedAt: null,
           sourceUrl: ISWN_MAP_URL, attribution: 'Islamic World News (ISWN) — publisher map claim',
           precision: geometry.type === 'Point' ? 'regional' : geometry.type === 'LineString' ? 'generalized_line' : 'published_area' } });
       }
@@ -128,10 +122,10 @@ export function parseIswnKml(xml: string): AtlasCollection {
     for (const [index, candidate] of list(node.Folder).entries()) {
       const folder = object(candidate);
       const name = plain(folder.name) || `Layer ${index + 1}`;
-      walk(folder, name, `${path}/${name}`, explicitFolderDate(name) ?? sourceDate, depth + 1);
+      walk(folder, name, `${path}/${name}`, depth + 1);
     }
   }
-  walk(doc, 'ISWN reference map', 'iswn', null);
+  walk(doc, 'ISWN reference map', 'iswn');
   if (!features.length) throw new Error('no_supported_annotations');
   // Collapse exact generalized duplicates to prevent coincident IDs in map components.
   return { type: 'FeatureCollection', features: [...new Map(features.map(feature => [feature.properties.id, feature])).values()] };

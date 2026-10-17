@@ -23,7 +23,7 @@ describe('WORLD mobile layer discovery', () => {
       setActiveLayers: () => {}, isMobile: true, hasMapAccess: true,
     }));
     for (const label of ['العسكري', 'خطوط وجبهات', 'الطيران', 'البحر والفضاء', 'الأحداث', 'الكل',
-      'التجارية', 'مناطق ومعالم', 'نشاط جوي عسكري عام', 'كل الأقمار الصناعية', 'الرياح', 'الأمطار']) {
+      'التجارية', 'مناطق النفوذ والمعالم', 'نشاط جوي عسكري عام', 'كل الأقمار الصناعية', 'الرياح', 'الأمطار']) {
       expect(html).toContain(label);
     }
     expect(html.match(/aria-label="التجارية"/g)).toHaveLength(1);

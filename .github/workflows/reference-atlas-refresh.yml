@@ -3,7 +3,7 @@ name: Refresh published reference atlas
 on:
   schedule:
     # Lightweight checks discover recent major publisher reports. The server
-    # downloads the full map only every 12h or for an unseen qualifying report.
+    # downloads the full map when its five-minute cache is due or for a qualifying report.
     - cron: '3,18,33,48 * * * *'
   workflow_dispatch:
     inputs:

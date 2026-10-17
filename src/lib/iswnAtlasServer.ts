@@ -4,7 +4,7 @@ import { atlasEvidence, atlasLayers, calculateAtlasChanges, validAtlasEventId, I
   ISWN_PUBLISHER_URL, ISWN_REFRESH_MS, type AtlasSnapshot } from './iswnAtlas';
 import { isMajorIswnBulletin, MAX_FEED_BYTES, MAX_KML_BYTES, parseIswnBulletins, parseIswnKml } from './iswnAtlasParser';
 
-const CACHE_KEY = 'm3tm:reference-atlas:iswn:v3';
+const CACHE_KEY = 'm3tm:reference-atlas:iswn:v4';
 const RETENTION_SECONDS = 7 * 24 * 60 * 60;
 interface CacheState {
   snapshot: AtlasSnapshot; rssCheckedAt: number; lastAttemptAt: number; seenReportIds: string[];
@@ -49,9 +49,19 @@ function emptySnapshot(): AtlasSnapshot {
 async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
   const now = Date.now(), iso = new Date(now).toISOString();
   const cached = await durableGetJson<CacheState>(CACHE_KEY);
-  const previous = cached.value;
+  const legacy = cached.value ? null : await durableGetJson<CacheState>('m3tm:reference-atlas:iswn:v3');
+  const previous = cached.value ?? legacy?.value;
+  const migrated = !cached.value && Boolean(previous);
   let snapshot = mask(previous?.snapshot ?? emptySnapshot());
-  snapshot = { ...snapshot, cacheBackend: cached.backend };
+  if (migrated) {
+    // Preserve the last-good geometry on upgrade/outage, but discard dates
+    // previously inherited from mixed-country folder names.
+    const features = { ...snapshot.features, features: snapshot.features.features.map(feature => ({
+      ...feature, properties: { ...feature.properties, sourcePublishedAt: null },
+    })) };
+    snapshot = { ...snapshot, features, layers: atlasLayers(features.features) };
+  }
+  snapshot = { ...snapshot, cacheBackend: cached.value ? cached.backend : legacy?.backend ?? cached.backend };
   const state: CacheState = { snapshot, rssCheckedAt: previous?.rssCheckedAt ?? 0,
     lastAttemptAt: previous?.lastAttemptAt ?? 0, seenReportIds: previous?.seenReportIds ?? [],
     seenEventIds: previous?.seenEventIds ?? [], pendingEventIds: previous?.pendingEventIds ?? [] };
@@ -108,7 +118,7 @@ async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
     ...(pendingEvents.size ? { nextRefreshAt: new Date(Math.max(now, state.lastAttemptAt + ISWN_CHECK_MS)).toISOString() } : {}) };
   // Apply the public boundary before persistence as well as at the response boundary.
   state.snapshot = mask(snapshot);
-  if (refresh || checkRss || acceptedEvent) {
+  if (refresh || checkRss || acceptedEvent || migrated) {
     const backend = await durableSetJson(CACHE_KEY, state, RETENTION_SECONDS);
     state.snapshot = { ...state.snapshot, cacheBackend: backend };
   }

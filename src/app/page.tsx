@@ -896,7 +896,7 @@ export default function Dashboard() {
     void check();
     const timer = window.setInterval(() => {
       void check(true);
-    }, PUBLIC_REFRESH_MS.referenceAtlasCheck15min);
+    }, PUBLIC_REFRESH_MS.referenceAtlasCheck);
     return () => { window.clearInterval(timer); };
   }, [activeLayers.reference_atlas, fetchEndpoint, hasMapAccess]);
 
@@ -1530,8 +1530,6 @@ export default function Dashboard() {
     alert_pins: buildPublicFieldAlerts(data.news),
     country_boundaries: data.country_boundaries || { type: 'FeatureCollection', features: [] },
   }), [data, embeddedLiveFeeds]);
-  const referenceAreaDate = sdkDisplayData.reference_atlas?.layers
-    .find(layer => /^Regions\b/i.test(layer.name))?.sourcePublishedAt?.slice(0, 10) ?? 'غير مؤرّخ';
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1668,10 +1666,7 @@ export default function Dashboard() {
               {/* Status messages — cycling */}
               <div className="mt-3 h-4 flex items-center justify-center">
                 {[
-                  { text: 'جارٍ تأمين الاتصال الآمن...', delay: 0.5 },
-                  { text: 'تهيئة مصادر البيانات...', delay: 1.1 },
-                  { text: 'معايرة الحساسات...', delay: 1.7 },
-                  { text: 'النظام جاهز', delay: 2.2 },
+                  { text: 'جارٍ التحميل…', delay: 0.5 },
                 ].map((stage, i) => (
                   <motion.span
                     key={i}
@@ -1889,7 +1884,7 @@ export default function Dashboard() {
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
           <button type="button" onClick={focusYemenMonitoring}
             className="rounded-md border border-amber-300/50 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-amber-100 hover:border-amber-200/70 focus-visible:ring-2 focus-visible:ring-amber-300"
-            title="الانتقال إلى اليمن: بلاغات عامة منشورة ومجمعة، دون تتبع مواقع أو تحركات عملياتية دقيقة">
+            title="رصد اليمن">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> رصد اليمن
           </button>
           <button type="button" onClick={() => {
@@ -1922,7 +1917,6 @@ export default function Dashboard() {
             <span className="text-emerald-300">〰 مناطق الحكومة</span>
             <span className="mx-2 text-white/30">|</span>
             <span className="text-slate-200">✈ مطار · ⚓ ميناء · ⛨ منشأة · ▱ مدرعات · ⌁ رادار</span>
-            <span className="block text-[10px] text-white/60">نفوذ منشور بتاريخ {referenceAreaDate}؛ الرموز للنوع المعلن، وليست حصرًا آنيًا للمعدات.</span>
           </div>
         </details>}
         </>}
@@ -1981,14 +1975,14 @@ export default function Dashboard() {
               className="pointer-events-auto mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-cyan-300/30 bg-[#060c16]/85 p-2 text-xs text-white shadow-xl backdrop-blur-md"
               onKeyDown={event => { if (event.key === 'Escape') setShowPublicDisplayControls(false); }}>
               <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
-                title="إظهار أو إخفاء خطوط الحدود المرجعية دون تعديل بيانات الخريطة"
+                title="إظهار الحدود أو إخفاؤها"
                 onClick={() => setActiveLayers(prev => ({ ...prev, country_borders: !prev.country_borders }))}
                 className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-amber-300 ${activeLayers.country_borders ? 'border-amber-300/55 text-amber-100' : 'border-white/25 text-white/75'}`}>
                 {activeLayers.country_borders ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 الحدود: {activeLayers.country_borders ? 'ظاهرة' : 'مخفية'}
               </button>
               <button type="button" aria-pressed={showPublicMapMarkers}
-                title="إظهار أو إخفاء رموز ومؤشرات الخريطة دون حذف الأخبار أو الأحداث"
+                title="إظهار الرموز أو إخفاؤها"
                 onClick={() => setShowPublicMapMarkers(show => !show)}
                 className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border bg-transparent px-2 font-semibold focus-visible:ring-2 focus-visible:ring-cyan-300 ${showPublicMapMarkers ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/75'}`}>
                 {showPublicMapMarkers ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -2006,7 +2000,7 @@ export default function Dashboard() {
               </button>
               <button type="button" onClick={focusYemenMonitoring}
                 className="min-h-10 rounded-xl border border-amber-300/40 bg-transparent px-2 text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300"
-                title="التركيز على اليمن وبلاغاتها العامة المنشورة دون تموضع عسكري دقيق">
+                title="رصد اليمن">
                 رصد اليمن
               </button>
               <button type="button" aria-pressed={mapStyle === 'satellite'}
@@ -2015,7 +2009,7 @@ export default function Dashboard() {
                 {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
               </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
-                title="تقليل كثافة طبقات البلاغات دون مسح بياناتها"
+                title="تقليل الازدحام"
                 onClick={() => {
                   if (!publicEmbedQuiet) {
                     quietPublicLayersBeforeRef.current = { ...activeLayers };
@@ -2041,15 +2035,12 @@ export default function Dashboard() {
                 className="col-span-2 flex min-h-9 items-center justify-center rounded-xl border border-white/15 bg-transparent text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 الأخبار المنشورة
               </a>
-              <p className="col-span-2 px-1 text-center text-[10px] leading-4 text-slate-300">
-                مفاتيح العرض لا تحذف بيانات الأخبار أو الأحداث، وتبقى حدود الدول مرجعية غير سيادية.
-              </p>
             </nav>
           )}
           {showMenaPulse && (
             <section aria-label="ملخص مرصد الشرق الأوسط" className="pointer-events-auto mt-2 max-h-[min(53dvh,360px)] overflow-y-auto rounded-xl border border-cyan-300/25 bg-[#060c16]/80 p-2 shadow-lg backdrop-blur-md">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="text-[10px] text-slate-200">تقارير منشورة ومحايدة؛ المواقع مرجعية أو معممة.</span>
+                <span className="text-[10px] text-slate-200">مرصد الشرق الأوسط</span>
                 <button type="button" aria-label="إخفاء مرصد الشرق الأوسط"
                   onClick={() => setShowMenaPulse(false)}
                   className="shrink-0 rounded-lg border border-white/20 bg-transparent p-2 text-white/80 focus-visible:ring-2 focus-visible:ring-cyan-300">

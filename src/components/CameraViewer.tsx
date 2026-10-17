@@ -260,7 +260,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
             {view === 'resolving' ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-30 backdrop-blur-sm p-4 text-center">
                 <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mb-3" style={{ borderColor: 'var(--gold-dim)', borderTopColor: 'transparent' }} />
-                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>جارٍ تأمين الاتصال</p>
+                <p className="text-[11px] font-mono uppercase tracking-widest" style={{ color: 'var(--gold-primary)' }}>جارٍ تحميل البث</p>
                 <p className="text-[9px] font-mono text-[var(--text-muted)] mt-2 uppercase">جارٍ البحث عن بث مباشر</p>
               </div>
             ) : view === 'offline' ? (

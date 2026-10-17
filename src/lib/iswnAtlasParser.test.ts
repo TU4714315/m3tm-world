@@ -7,23 +7,23 @@ const kml = (body: string) => `<kml><Document>${body}</Document></kml>`;
 const polygon = (hole = '') => `<Polygon><outerBoundaryIs><LinearRing><coordinates>30,30 31,30 31,31 30,30</coordinates></LinearRing></outerBoundaryIs>${hole}</Polygon>`;
 
 describe('ISWN reference KML parser', () => {
-  it('dates evidence only from real publisher metadata, keeps historical and unknown annotations distinct', () => {
-    const dated = parseIswnKml(kml(`<Folder><name>Regions (Last Update: 2024-06-02)</name>${point()}</Folder>`));
-    expect(atlasEvidence(dated.features, Date.parse('2026-10-15T12:00:00Z'))).toMatchObject({
-      evidenceState: 'historical', currentControl: false, sourcePublishedAt: '2024-06-02T00:00:00.000Z', undatedFeatureCount: 0,
+  it('does not assign mixed-country folder dates to Yemen geometries or nested folders', () => {
+    const output = parseIswnKml(kml(`<Folder><name>Regions (Last Update: 2024-06-02 / Ukraine - Palestine map)</name><Placemark><name>AnsarAllah in Lahij</name>${polygon()}</Placemark><Folder><name>Yemen map</name>${point('Aden')}</Folder></Folder>`));
+    expect(output.features).toHaveLength(2);
+    expect(output.features.every(feature => feature.properties.sourcePublishedAt === null)).toBe(true);
+    expect(output.features[0].properties.layerName).toContain('2024-06-02');
+    expect(atlasEvidence(output.features, Date.parse('2026-10-16T12:00:00Z'))).toMatchObject({
+      evidenceState: 'unknown', currentControl: false, sourcePublishedAt: null, undatedFeatureCount: 2,
     });
-    const unknown = parseIswnKml(kml(`<Folder><name>Last Update: 2999-01-01</name>${point('Future')}</Folder>`));
-    expect(unknown.features[0].properties.sourcePublishedAt).toBeNull();
-    expect(atlasEvidence([...dated.features, ...unknown.features], Date.parse('2026-10-15T12:00:00Z')).evidenceState).toBe('mixed');
   });
   it('retains separately published areas with the same actor/name', () => {
     const output = parseIswnKml(kml(`<Placemark><name>AnsarAllah in Lahij</name>${polygon()}</Placemark><Placemark><name>AnsarAllah in Lahij</name>${polygon().replaceAll('30,', '29,')}</Placemark>`));
     expect(output.features).toHaveLength(2);
     expect(new Set(output.features.map(feature => feature.properties.id)).size).toBe(2);
   });
-  it('retains explicit folder date only, generalizes points, and exposes only allowlisted properties', () => {
+  it('retains folder labels without inferring feature dates, generalizes points, and allowlists properties', () => {
     const output = parseIswnKml(kml(`<Folder><name>Regions (Last Update: 2024-06-02)</name><Placemark><name>Area claim</name>${polygon()}</Placemark></Folder><Folder><name>Syria</name>${point()}</Folder>`));
-    expect(output.features[0].properties.sourcePublishedAt).toBe('2024-06-02T00:00:00.000Z');
+    expect(output.features[0].properties.sourcePublishedAt).toBeNull();
     expect(output.features[1].properties.sourcePublishedAt).toBeNull();
     expect(output.features[1].geometry).toEqual({ type: 'Point', coordinates: [36, 33.5] });
     expect(output.features[1].properties.precision).toBe('regional');

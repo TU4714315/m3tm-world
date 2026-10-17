@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearDurableMemoryCache, durableGetJson } from './durableCache';
-import { ISWN_FEED_URL, ISWN_MAP_URL } from './iswnAtlas';
+import { clearDurableMemoryCache, durableGetJson, durableSetJson } from './durableCache';
+import { ISWN_CHECK_MS, ISWN_REFRESH_MS, ISWN_FEED_URL, ISWN_MAP_URL } from './iswnAtlas';
 import { getReferenceAtlasSnapshot } from './iswnAtlasServer';
 
 const map = '<kml><Document><Folder><name>Syria</name><Placemark><name>Reference</name><Point><coordinates>36.12,33.56</coordinates></Point></Placemark></Folder></Document></kml>';
@@ -27,7 +27,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
 describe('reference atlas collection schedule', () => {
   it('refreshes for a collector event outside the RSS check and schedule, consuming its id only once', async () => {
     await getReferenceAtlasSnapshot();
-    vi.advanceTimersByTime(15 * 60_000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     await getReferenceAtlasSnapshot();
     vi.advanceTimersByTime(60_000);
     const refreshed = await getReferenceAtlasSnapshot('published-event:one');
@@ -35,7 +35,7 @@ describe('reference atlas collection schedule', () => {
     expect(refreshed.majorEventState).toBe('none');
     expect(mapCalls()).toBe(2);
     expect(feedCalls()).toBe(2);
-    vi.advanceTimersByTime(15 * 60_000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     await getReferenceAtlasSnapshot('published-event:one');
     expect(mapCalls()).toBe(2);
   });
@@ -45,24 +45,24 @@ describe('reference atlas collection schedule', () => {
     vi.advanceTimersByTime(60_000);
     const pending = await getReferenceAtlasSnapshot('published-event:queued');
     expect(pending.majorEventState).toBe('pending');
-    expect(pending.nextRefreshAt).toBe('2026-10-15T12:15:00.000Z');
+    expect(pending.nextRefreshAt).toBe('2026-10-15T12:02:00.000Z');
     await getReferenceAtlasSnapshot('published-event:queued');
     expect(mapCalls()).toBe(1);
-    vi.advanceTimersByTime(14 * 60_000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS - 60_000);
     expect((await getReferenceAtlasSnapshot()).refreshReason).toBe('major_event');
     expect(mapCalls()).toBe(2);
   });
 
   it('does not lose an event behind an ordinary in-flight check, and retries failed event refreshes', async () => {
     await getReferenceAtlasSnapshot();
-    vi.advanceTimersByTime(15 * 60_000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     failMap = true;
     const [, failed] = await Promise.all([getReferenceAtlasSnapshot(), getReferenceAtlasSnapshot('published-event:retry')]);
     expect(failed.majorEventState).toBe('pending');
     expect(failed.status).toBe('stale');
     expect(mapCalls()).toBe(2);
     failMap = false;
-    vi.advanceTimersByTime(15 * 60_000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     const retried = await getReferenceAtlasSnapshot();
     expect(retried.majorEventState).toBe('none');
     expect(retried.status).toBe('ok');
@@ -75,14 +75,14 @@ describe('reference atlas collection schedule', () => {
     const first = await getReferenceAtlasSnapshot();
     expect(first).toMatchObject({ status: 'ok', evidenceState: 'unknown', currentControl: false,
       sourcePublishedAt: null, sourceOldestPublishedAt: null, undatedFeatureCount: 1 });
-    vi.advanceTimersByTime(12 * 60 * 60_000);
+    vi.advanceTimersByTime(ISWN_REFRESH_MS);
     const next = await getReferenceAtlasSnapshot();
     expect(next.fetchedAt).not.toBe(first.fetchedAt);
     expect(next.sourcePublishedAt).toBeNull();
     expect(next.evidenceState).toBe('unknown');
     expect(next.currentControl).toBe(false);
   });
-  it('singleflights and reuses snapshots, checks RSS every 15 minutes and refreshes KML after 12 hours', async () => {
+  it('singleflights and reuses snapshots, checks reports every two minutes and collects map edits every five minutes', async () => {
     const [first, concurrent] = await Promise.all([getReferenceAtlasSnapshot(), getReferenceAtlasSnapshot()]);
     expect(first).toEqual(concurrent);
     expect(first.status).toBe('ok');
@@ -91,31 +91,48 @@ describe('reference atlas collection schedule', () => {
     expect(mapCalls()).toBe(1); expect(feedCalls()).toBe(1);
     await getReferenceAtlasSnapshot();
     expect(mapCalls()).toBe(1); expect(feedCalls()).toBe(1);
-    vi.advanceTimersByTime(15 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     await getReferenceAtlasSnapshot();
     expect(mapCalls()).toBe(1); expect(feedCalls()).toBe(2);
-    vi.advanceTimersByTime(12 * 60 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_REFRESH_MS);
     expect((await getReferenceAtlasSnapshot()).refreshReason).toBe('scheduled');
+    expect(mapCalls()).toBe(2);
+  });
+
+  it('collects a changed Yemen area on schedule without a breaking headline or caller bypass', async () => {
+    await getReferenceAtlasSnapshot();
+    const updated = map.replace('Reference', 'AnsarAllah in Lahij');
+    fetchMock.mockImplementation(async (url: string) => new Response(url === ISWN_MAP_URL ? updated : currentFeed));
+    vi.advanceTimersByTime(ISWN_REFRESH_MS - 1);
+    expect((await getReferenceAtlasSnapshot()).features.features[0].properties.name).toBe('Reference');
+    expect(mapCalls()).toBe(1);
+    vi.advanceTimersByTime(1);
+    const next = await getReferenceAtlasSnapshot();
+    expect(next.features.features[0].properties.name).toBe('AnsarAllah in Lahij');
+    expect(next.nextRefreshAt).toBe('2026-10-15T12:10:00.000Z');
+    expect(next.currentControl).toBe(false);
+    expect(mapCalls()).toBe(2);
+    await getReferenceAtlasSnapshot();
     expect(mapCalls()).toBe(2);
   });
 
   it('refreshes once for an unseen recent major report; stale RSS cannot replay', async () => {
     await getReferenceAtlasSnapshot();
-    vi.advanceTimersByTime(15 * 60 * 1000);
-    currentFeed = feed('2026-10-15T12:10:00Z', 'Ceasefire agreed', '2');
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
+    currentFeed = feed('2026-10-15T12:01:00Z', 'Ceasefire agreed', '2');
     expect((await getReferenceAtlasSnapshot()).refreshReason).toBe('major_report');
     expect(mapCalls()).toBe(2);
-    vi.advanceTimersByTime(15 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     await getReferenceAtlasSnapshot(); expect(mapCalls()).toBe(2);
     currentFeed = feed('2026-10-01T12:00:00Z', 'Major attack', '3');
-    vi.advanceTimersByTime(15 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     await getReferenceAtlasSnapshot(); expect(mapCalls()).toBe(2);
   });
 
   it('preserves last-good data and original fetchedAt after failure, respects cooldown, retries unconsumed report', async () => {
     const first = await getReferenceAtlasSnapshot();
-    vi.advanceTimersByTime(15 * 60 * 1000);
-    currentFeed = feed('2026-10-15T12:10:00Z', 'Ceasefire agreed', '2');
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
+    currentFeed = feed('2026-10-15T12:01:00Z', 'Ceasefire agreed', '2');
     failMap = true;
     const stale = await getReferenceAtlasSnapshot();
     expect(stale.status).toBe('stale');
@@ -124,9 +141,31 @@ describe('reference atlas collection schedule', () => {
     expect(stale.error).toBe('reference_source_refresh_failed');
     failMap = false;
     await getReferenceAtlasSnapshot(); expect(mapCalls()).toBe(2);
-    vi.advanceTimersByTime(15 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     expect((await getReferenceAtlasSnapshot()).status).toBe('ok');
     expect(mapCalls()).toBe(3);
+  });
+
+  it('migrates last-good geometry through an upstream outage without inheriting old folder dates', async () => {
+    const snapshot = await getReferenceAtlasSnapshot();
+    clearDurableMemoryCache();
+    snapshot.fetchedAt = '2026-10-15T11:54:00.000Z';
+    snapshot.features.features[0].properties.sourcePublishedAt = '2024-06-02T00:00:00.000Z';
+    snapshot.sourcePublishedAt = '2024-06-02T00:00:00.000Z';
+    await durableSetJson('m3tm:reference-atlas:iswn:v3', {
+      snapshot, rssCheckedAt: Date.now(), lastAttemptAt: 0, seenReportIds: [],
+    }, 3600);
+    failMap = true;
+    const migrated = await getReferenceAtlasSnapshot();
+    expect(migrated.status).toBe('stale');
+    expect(migrated.features.features).toHaveLength(1);
+    expect(migrated.features.features[0].geometry).toEqual(snapshot.features.features[0].geometry);
+    expect(migrated.features.features[0].properties.sourcePublishedAt).toBeNull();
+    expect(migrated.sourcePublishedAt).toBeNull();
+    expect(migrated.layers[0].sourcePublishedAt).toBeNull();
+    expect(migrated.fetchedAt).toBe(snapshot.fetchedAt);
+    const persisted = await durableGetJson<{ snapshot: unknown }>('m3tm:reference-atlas:iswn:v4');
+    expect(persisted.value?.snapshot).toEqual(expect.objectContaining({ featureCount: 1, sourcePublishedAt: null }));
   });
 
   it('returns unavailable rather than an empty success on initial source failure', async () => {
@@ -139,11 +178,11 @@ describe('reference atlas collection schedule', () => {
 
   it('retries a failed major refresh even when the next RSS check fails', async () => {
     await getReferenceAtlasSnapshot();
-    vi.advanceTimersByTime(15 * 60 * 1000);
-    currentFeed = feed('2026-10-15T12:10:00Z', 'Ceasefire agreed', '2');
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
+    currentFeed = feed('2026-10-15T12:01:00Z', 'Ceasefire agreed', '2');
     failMap = true;
     expect((await getReferenceAtlasSnapshot()).status).toBe('stale');
-    vi.advanceTimersByTime(15 * 60 * 1000);
+    vi.advanceTimersByTime(ISWN_CHECK_MS);
     fetchMock.mockImplementation(async (url: string) => url === ISWN_FEED_URL
       ? new Response('outage', { status: 503 }) : new Response(map));
     expect((await getReferenceAtlasSnapshot()).status).toBe('ok');
@@ -161,7 +200,7 @@ describe('reference atlas collection schedule', () => {
     const snapshot = await getReferenceAtlasSnapshot();
     expect(snapshot.featureCount).toBe(1);
     expect(snapshot.layers).toHaveLength(1);
-    const persisted = await durableGetJson<{ snapshot: unknown }>('m3tm:reference-atlas:iswn:v3');
+    const persisted = await durableGetJson<{ snapshot: unknown }>('m3tm:reference-atlas:iswn:v4');
     expect(JSON.stringify(persisted.value?.snapshot)).not.toContain('Masked');
     expect(JSON.stringify(persisted.value?.snapshot)).not.toContain('Saudi map');
   });

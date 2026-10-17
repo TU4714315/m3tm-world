@@ -2,8 +2,8 @@
 export const ISWN_MAP_URL = 'https://www.google.com/maps/d/kml?mid=1M-_ymjR9xwOK7KMikOcUFSAE1ac&forcekml=1';
 export const ISWN_PUBLISHER_URL = 'https://english.iswnews.com/';
 export const ISWN_FEED_URL = 'https://english.iswnews.com/feed/';
-export const ISWN_REFRESH_MS = 12 * 60 * 60 * 1000;
-export const ISWN_CHECK_MS = 15 * 60 * 1000;
+export const ISWN_REFRESH_MS = 5 * 60 * 1000;
+export const ISWN_CHECK_MS = 2 * 60 * 1000;
 export type AtlasPosition = [number, number];
 export type AtlasGeometry = { type: 'Point'; coordinates: AtlasPosition }
   | { type: 'LineString'; coordinates: AtlasPosition[] }
@@ -45,7 +45,7 @@ export function atlasEvidence(features: AtlasFeature[], now = Date.now()) {
     return Number.isFinite(time) && time <= now ? [time] : [];
   }).sort((a, b) => a - b);
   const undatedFeatureCount = features.length - dates.length;
-  const historical = dates.filter(time => now - time >= ISWN_REFRESH_MS).length;
+  const historical = dates.filter(time => now - time >= 12 * 60 * 60 * 1000).length;
   const evidenceState: NonNullable<AtlasSnapshot['evidenceState']> = !dates.length ? 'unknown'
     : undatedFeatureCount > 0 || (historical > 0 && historical < dates.length) ? 'mixed'
       : historical === dates.length ? 'historical' : 'dated-reference';

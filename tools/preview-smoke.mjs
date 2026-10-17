@@ -176,6 +176,17 @@ try {
           && Math.abs(camera.lat-15.6)<0.2 && Math.abs(camera.lng-47.5)<0.2 && camera.zoom>=5.4;
       })()`);
       await check('Yemen view retains news and no invitation prompt', `!document.body.innerText.includes('كود الدعوة') && document.querySelectorAll('.maplibregl-canvas').length===1`);
+      await evaluate(`(() => {
+        const summary=[...document.querySelectorAll('summary')].find(node=>node.textContent.includes('دليل الرموز'));
+        if (!summary) throw new Error('Missing symbol legend');
+        if (!summary.parentElement.open) summary.click();
+      })()`);
+      await check('Public legend retains both affiliations without folder dates or system explanations', `(() => {
+        const legend=[...document.querySelectorAll('details')].find(node=>node.querySelector('summary')?.textContent.includes('دليل الرموز'));
+        return legend?.open && legend.innerText.includes('مناطق الحوثيين') && legend.innerText.includes('مناطق الحكومة')
+          && !/نفوذ منشور بتاريخ|2024-06-02|ليست حصرًا|أطلس المصدر/.test(legend.innerText);
+      })()`);
+
     }
     if (scenario === 'zoom') {
       await openDisplay();
