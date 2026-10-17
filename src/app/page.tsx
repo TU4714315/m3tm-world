@@ -2437,7 +2437,7 @@ export default function Dashboard() {
 
       {/* ── BOTTOM CURSOR INFO (desktop) ── */}
       {!embedMode && !isMobile && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-8 z-[200] pointer-events-auto" style={{ left: '72px' }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3, duration: 0.8 }} className="desktop-only absolute bottom-[64px] z-[200] pointer-events-auto" style={{ left: '72px' }}>
           <div className="flex items-center gap-5 text-[9px] font-mono tracking-widest text-[var(--text-muted)] opacity-60">
             <div className="flex gap-2 items-center" title="إحداثيات المؤشر (مرّر فوق الخريطة)">
               <span>المؤشر</span>
@@ -2558,7 +2558,7 @@ export default function Dashboard() {
       <GlobalStatusBar news={Array.isArray(data.news) ? data.news : []} embed={embedMode} />
 
       {/* Shortcut hint — more visible */}
-      {!embedMode && <div className="desktop-only absolute bottom-[26px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
+      {!embedMode && <div className="desktop-only absolute bottom-[64px] right-5 z-[200] pointer-events-none text-[10px] font-mono text-[var(--text-secondary)] opacity-80 tracking-widest" title="اضغط ? لعرض كل اختصارات لوحة المفاتيح">
         اضغط <span className="text-[var(--gold-primary)]">؟</span> للاختصارات · <span className="text-[var(--gold-primary)]">F</span> ملء الشاشة · <span className="text-[var(--gold-primary)]">R</span> إعادة الضبط
       </div>}
 
