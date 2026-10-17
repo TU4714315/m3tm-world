@@ -32,6 +32,8 @@ const network = new Map();
 const warnings = [];
 const checks = [];
 const measurements = {};
+const frameEventTimes = {};
+let accumulatedNetworkBytes = 0;
 let sequence = 0;
 let buffer = '';
 let session;
@@ -66,7 +68,12 @@ chrome.stdio[4].on('data', chunk => {
       if (record) record.status = message.params.response.status;
     } else if (message.method === 'Network.loadingFinished') {
       const record = network.get(message.params.requestId);
-      if (record) record.state = 'complete';
+      if (record) { record.state = 'complete'; record.bytes = message.params.encodedDataLength ?? 0; }
+      accumulatedNetworkBytes += message.params.encodedDataLength ?? 0;
+    } else if (message.method === 'Page.domContentEventFired') {
+      frameEventTimes.domContentEvent = Date.now();
+    } else if (message.method === 'Page.loadEventFired') {
+      frameEventTimes.loadEvent = Date.now();
     } else if (message.method === 'Network.loadingFailed') {
       const record = network.get(message.params.requestId);
       if (record) record.state = 'failed';
@@ -124,10 +131,18 @@ try {
   await command('Runtime.enable');
   await command('Page.enable');
   await command('Network.enable');
+  await command('Performance.enable');
   const system = await command('SystemInfo.getInfo', {}, null);
   measurements.graphics = { devices: system.gpu.devices, renderer: system.gpu.auxAttributes?.glRenderer, features: system.gpu.featureStatus };
   if (['imagery', 'buildings', 'terrain-camera'].includes(scenario)) await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/geo*` }] });
   if (scenario === 'satellites') await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/satellites` }] });
+  await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__m3tmFirstCanvasMs = null; window.__m3tmFirstReadyMs = null;
+    const inspectMap = () => { const canvas = document.querySelector('.maplibregl-canvas'); if (canvas && canvas.width > 0 && canvas.height > 0) {
+      window.__m3tmFirstCanvasMs ??= performance.now();
+      if (!/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي|تعذر رسم الخريطة/.test(document.body?.innerText || '')) window.__m3tmFirstReadyMs ??= performance.now();
+    }};
+    addEventListener('DOMContentLoaded', () => { inspectMap(); new MutationObserver(inspectMap).observe(document.body, {childList:true,subtree:true,attributes:true,attributeFilter:['class','style']}); });
+  ` });
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__previewLongTasks = []; new PerformanceObserver(list => { for (const e of list.getEntries()) window.__previewLongTasks.push({start: Math.round(e.startTime), ms: Math.round(e.duration)}); }).observe({type: 'longtask', buffered: true});` });
   if (liveAppProbe) await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__publishedWorldReady=[]; window.addEventListener('message',event=>{
     if(event.origin==='https://m3tm-world-recovery.onrender.com' && event.source===document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.contentWindow
@@ -140,6 +155,7 @@ try {
   if (liveAppProbe) {
     await command('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, null).catch(e => { measurements.autoAttachError = String(e); });
   }
+  const browserNavigationWallMs = Date.now();
   await command('Page.navigate', { url });
   if (process.env.PROBE_MAP_NETWORK) {
     const probe = await command('Runtime.evaluate', {
@@ -427,6 +443,29 @@ try {
     cpu.samples?.forEach((id, i) => totals.set(id, (totals.get(id) ?? 0) + cpu.timeDeltas[i]));
     measurements.cpuTop = [...totals].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([id, us]) => ({ ms: Math.round(us / 1000), frame: cpu.nodes.find(n => n.id === id)?.callFrame }));
   }
+  // Same-hardware benchmark fields for comparing deployed baselines. rAF is
+  // explicitly a scheduling proxy, not proof that WebGL actually painted 60 FPS.
+  measurements.performance = await evaluate(`(async () => {
+    let count=0; let last=performance.now(); let intervals=[];
+    await new Promise(resolve=>{const start=performance.now();function sample(t){if(count){intervals.push(t-last)}last=t;count++;if(t-start<2500)requestAnimationFrame(sample);else resolve();}requestAnimationFrame(sample)});
+    const nav=performance.getEntriesByType('navigation')[0];
+    const resources=performance.getEntriesByType('resource');
+    const heap=performance.memory?.usedJSHeapSize ?? null;
+    return {navigation:{responseStartMs:nav?.responseStart??null,domContentLoadedMs:nav?.domContentLoadedEventEnd??null,loadMs:nav?.loadEventEnd??null},
+      firstCanvasMs:window.__m3tmFirstCanvasMs??null,firstUsableMapMs:window.__m3tmFirstReadyMs??null,
+      rafSchedulingHz:Math.round(1000*(count-1)/(intervals.reduce((a,b)=>a+b,0)||1)),rafIntervalP95Ms:intervals.sort((a,b)=>a-b)[Math.floor(intervals.length*.95)]??null,
+      jsHeapUsedBytes:heap,resourceCount:resources.length,
+      resourceDomainCounts:Object.entries(resources.reduce((out,r)=>{try{const h=new URL(r.name).hostname;out[h]=(out[h]||0)+1}catch{}return out},{})).sort((a,b)=>b[1]-a[1]).slice(0,12),
+      mapCanvasCount:document.querySelectorAll('.maplibregl-canvas').length,
+      longTasks:(window.__previewLongTasks||[]).slice(0,40)};
+  })()`);
+  const cdpPerformance = await command('Performance.getMetrics').catch(()=>({metrics:[]}));
+  measurements.performance.cdp = Object.fromEntries((cdpPerformance.metrics||[])
+    .filter(m=>['TaskDuration','JSHeapUsedSize','Nodes','Frames','LayoutCount','ScriptDuration','RecalcStyleDuration'].includes(m.name))
+    .map(m=>[m.name,m.value]));
+  measurements.performance.networkTransferredBytes = accumulatedNetworkBytes;
+  measurements.performance.networkRequestCount = network.size;
+  measurements.performance.documentWallTimeMs = (frameEventTimes.loadEvent ?? Date.now()) - browserNavigationWallMs;
   const visual = await command('Page.captureScreenshot', { format: 'jpeg', quality: 75 });
   await writeFile(join(output, 'visual.jpg'), Buffer.from(visual.data, 'base64'));
   const screenshot = await command('Page.captureScreenshot', { format: 'png' });
