@@ -149,6 +149,11 @@ try {
     // CDP frame tree is non-invasive and discloses the frame navigation URL
     // without bypassing cross-origin restrictions or reading private content.
     measurements.frameTree = await command('Page.getFrameTree').then(x=>x.frameTree).catch(e=>({error:String(e)}));
+    measurements.chromeTargets = await command('Target.getTargets', {}, null)
+      .then(x=>(x.targetInfos||[]).filter(t=>t.type==='iframe'||t.type==='page')
+        .map(t=>({type:t.type,url:t.url,attached:t.attached,openerId:t.openerId})))
+      .catch(e=>({error:String(e)}));
+    measurements.frameLoadingState = await evaluate("({frameReady:document.querySelector('iframe[data-testid=\\\"m3tm-world-frame\\\"]')?.contentDocument?.readyState||'cross-origin',frameLoadedPerformance:performance.getEntriesByType('resource').filter(x=>x.name.includes('m3tm-world-recovery.onrender.com')).map(x=>({name:x.name,start:x.startTime,duration:x.duration,responseEnd:x.responseEnd})).slice(0,4)})");
     measurements.browserResponses = [...network.values()]
       .filter(x=>/m3tm-world|_next|api\/news/.test(x.url))
       .slice(0,35);
