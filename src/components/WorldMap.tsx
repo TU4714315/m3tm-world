@@ -324,6 +324,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       { powerPreference: 'low-power', failIfMajorPerformanceCaveat: false, antialias: false },
     ];
 
+    performance.mark('m3tm:map-constructor-start');
     let map: maplibregl.Map | undefined;
     for (const canvasContextAttributes of attributeFallbacks) {
       try {
@@ -381,6 +382,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     const initialTimeout = window.setTimeout(attemptBasemapRecovery, 14000);
 
     map.on('load', () => {
+      performance.mark('m3tm:basemap-style-loaded');
       basemapLoaded = true;
       window.clearTimeout(initialTimeout);
       if (recoveryTimeout) window.clearTimeout(recoveryTimeout);
@@ -1349,6 +1351,8 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       }, paint: { 'text-color': ['match', ['get','type'], 'military','#D32F2F', 'tanker','#E65100', 'cargo','#26C6DA', '#B0BEC5'], 'text-halo-color': '#000', 'text-halo-width': 1 }});
 
 
+      performance.mark('m3tm:initial-layers-registered');
+      performance.measure('m3tm:layer-registration', 'm3tm:basemap-style-loaded', 'm3tm:initial-layers-registered');
       setMapReady(true);
       setMapLoadState(recoveryAttempted ? 'recovery' : 'loading');
       // Dev-only handle. The map is otherwise unreachable from the console,
