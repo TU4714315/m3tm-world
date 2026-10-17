@@ -145,6 +145,15 @@ try {
     measurements.publishedApp = await evaluate(`({frame:document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src,
       readyMessages:window.__publishedWorldReady, unavailable:!!document.querySelector('[data-testid="m3tm-world-unavailable"]'),
       newsCards:document.querySelectorAll('.gate1-news-panel article').length, visibility:document.visibilityState})`);
+    // The top-level APP can be healthy while its isolated WORLD iframe hangs.
+    // CDP frame tree is non-invasive and discloses the frame navigation URL
+    // without bypassing cross-origin restrictions or reading private content.
+    measurements.frameTree = await command('Page.getFrameTree').then(x=>x.frameTree).catch(e=>({error:String(e)}));
+    measurements.browserResponses = [...network.values()]
+      .filter(x=>/m3tm-world|_next|api\/news/.test(x.url))
+      .slice(0,35);
+    measurements.documentProgress = await evaluate("({state:document.readyState,timing:performance.now(),frameCount:window.frames.length,mode3D:document.body.textContent.includes('3D'),framePresent:!!document.querySelector('iframe[data-testid=\\\"m3tm-world-frame\\\"]')})");
+
     await check('Deployed APP receives map-ready from its exact WORLD frame', `window.__publishedWorldReady?.length>0 && !document.querySelector('[data-testid="m3tm-world-unavailable"]')`);
     await check('Published frame remains on its fixed trusted origin', `document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src==='https://m3tm-world-recovery.onrender.com/?embed=1&surface=public'`);
     await check('Published news has one publisher link per card', `(()=>{const cards=[...document.querySelectorAll('.gate1-news-panel article')];return cards.length>0 && cards.every(card=>card.querySelectorAll('a').length===1)})()`);
