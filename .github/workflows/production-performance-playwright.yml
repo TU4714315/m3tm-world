@@ -1,4 +1,6 @@
 name: Chromium Playwright production latency benchmark
+# Verification-only rerun against Render deploy dep-dba0j9mq1p3s739s73i0 (main 3851f60a).
+# Report observed performance; do not deploy a change from this branch.
 on:
   pull_request:
     paths:
