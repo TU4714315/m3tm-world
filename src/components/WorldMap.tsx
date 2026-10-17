@@ -3022,7 +3022,11 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
 
   useEffect(() => {
     if (!mapReady) return;
-    setGeo('field-alerts', (activeLayers as any).alert_pins && Array.isArray(data.alert_pins)
+    const enabled = Boolean((activeLayers as any).alert_pins);
+    // Hide symbol and label synchronously with the toggle, then clear the
+    // underlying GeoJSON. Other news layers are independent and remain intact.
+    setVis(['field-alert-glow', 'field-alert-icons', 'field-alert-label'], enabled);
+    setGeo('field-alerts', enabled && Array.isArray(data.alert_pins)
       ? data.alert_pins.map((n: any) => ({
           type: 'Feature' as const,
           geometry: { type: 'Point' as const, coordinates: [n.lng, n.lat] },
@@ -3033,7 +3037,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           },
         }))
       : []);
-  }, [mapReady, data.alert_pins, (activeLayers as any).alert_pins, setGeo]);
+  }, [mapReady, data.alert_pins, (activeLayers as any).alert_pins, setGeo, setVis]);
 
   useEffect(() => {
     if (!mapReady) return;
