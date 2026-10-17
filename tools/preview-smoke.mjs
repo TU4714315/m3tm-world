@@ -192,7 +192,7 @@ try {
         const attached = await command('Target.attachToTarget',{targetId:iframeTarget.targetId,flatten:true},null);
         await command('Runtime.enable',{},attached.sessionId);
         const status = await command('Runtime.evaluate',{
-          expression:"({url:location.href,state:document.readyState,body:document.body?.innerText?.slice(0,480),scripts:document.scripts.length,canvases:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),iframeContext:window.parent!==window})",
+          expression:"({url:location.href,state:document.readyState,body:document.body?.innerText?.slice(0,480),scripts:document.scripts.length,scriptSrcs:[...document.scripts].map(e=>e.src).filter(Boolean).slice(-12),mapContainer:[...document.querySelectorAll('[data-map-status],.maplibregl-map')].map(e=>({tag:e.tagName,cls:e.className?.toString().slice(0,120),status:e.getAttribute('data-map-status'),width:e.clientWidth,height:e.clientHeight})).slice(0,6),canvases:[...document.querySelectorAll('canvas')].map(c=>({w:c.width,h:c.height,cls:c.className})).slice(0,8),resources:performance.getEntriesByType('resource').length,frameWidth:window.innerWidth,frameHeight:window.innerHeight,webglSupported:(()=>{try{return !!document.createElement('canvas').getContext('webgl2')}catch{return false}})(),iframeContext:window.parent!==window})",
           returnByValue:true
         },attached.sessionId);
         measurements.iframeRuntime = status.result?.value ?? {error:status.exceptionDetails?.text};
