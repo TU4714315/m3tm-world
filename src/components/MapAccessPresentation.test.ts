@@ -48,7 +48,7 @@ describe('access-aware public map presentation', () => {
     expect(unlocked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
   });
   it('keeps the bottom bar dedicated to news in both standalone and embedded views', () => {
-    const news = [{ id: 'public', title: 'خبر عام متاح', source: 'ناشر', risk_score: 1, published: new Date(Date.now() - 13 * 3_600_000).toISOString() }];
+    const news = [{ id: 'public', feed_origin: 'm3tm-app', title: 'خبر عام متاح', source: 'ناشر', risk_score: 1, published: new Date(Date.now() - 13 * 3_600_000).toISOString() }];
     for (const embed of [false, true]) {
       const html = renderToStaticMarkup(createElement(GlobalStatusBar, { news, embed }));
       expect(html).toContain('خبر عام متاح');
