@@ -238,25 +238,23 @@ try {
       // conflict group through the visible control before testing a child.
       // The layer panel can hydrate after a cold map start. Never toggle the
       // global 'l' shortcut blindly: if already open that would close it.
+      const groupProbe = "(()=>{const matches=[...document.querySelectorAll('button[title]')];return matches.find(b=>b.title==='الحروب والأحداث العامة')||null})()";
       let groupVisible = false;
-      for (let n=0; n<16; n++) {
-        groupVisible = await evaluate("!!document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]')");
+      for (let n=0; n<18; n++) {
+        groupVisible = await evaluate("!!"+groupProbe);
         if (groupVisible) break;
-        await pause(750);
+        await pause(550);
       }
-      if (!groupVisible) {
-        // A reader may have previously collapsed the dock; use its documented
-        // keyboard toggle once, only after confirming the group is absent.
-        await evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{key:'l',bubbles:true}))");
-        for (let n=0; n<12 && !groupVisible; n++) {
-          await pause(500);
-          groupVisible = await evaluate("!!document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]')");
-        }
+      // Don't blindly press the panel keyboard shortcut when the group is
+      // absent: WORLD defaults to showLayers=true, so that closes the dock.
+      measurements.alertPanelBefore = await evaluate("({viewport:innerWidth, visibleGroups:[...document.querySelectorAll('button[title]')].map(b=>b.title).filter(t=>t.includes('الحروب')||t.includes('الطيران')), containsLabel:document.body.textContent?.includes('الحروب والأحداث العامة')})");
+      if (groupVisible) {
+        await evaluate("(()=>{const b=[...document.querySelectorAll('button[title]')].find(x=>x.title==='الحروب والأحداث العامة');if(b?.getAttribute('aria-expanded')!=='true')b?.click()})()");
       }
-      if (groupVisible) await evaluate("(()=>{const b=document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]');if(b.getAttribute('aria-expanded')!=='true')b.click()})()");
-      for (let n=0; n<8 && !await evaluate("!!document.querySelector('button[aria-label=\\\"تنبيهات ميدانية منشورة\\\"]')");n++) await pause(500);
-      measurements.alertPanelState = await evaluate("({panel:!!document.querySelector('button[title=\\\"الحروب والأحداث العامة\\\"]'), fieldToggle:!!document.querySelector('button[aria-label=\\\"تنبيهات ميدانية منشورة\\\"]')})");
-      const toggle = await evaluate("document.querySelector('button[aria-label=\"تنبيهات ميدانية منشورة\"]')?.getAttribute('aria-pressed')");
+      const toggleProbe = "(()=>[...document.querySelectorAll('button[aria-label]')].find(b=>b.getAttribute('aria-label')==='تنبيهات ميدانية منشورة')||null)()";
+      for (let n=0; n<10 && !await evaluate("!!"+toggleProbe);n++) await pause(450);
+      measurements.alertPanelState = await evaluate("({panel:!!"+groupProbe+", fieldToggle:!!"+toggleProbe+"})");
+      const toggle = await evaluate(toggleProbe+".getAttribute('aria-pressed')");
       measurements.alertToggleBefore = toggle ?? null;
       if (toggle != null) {
         await click('تنبيهات ميدانية منشورة'); await pause(350);
