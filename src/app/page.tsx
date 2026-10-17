@@ -3,6 +3,7 @@ import MapAccessGate from '@/components/MapAccessGate';
 import { createMapMemberExchange } from '@/lib/mapMemberExchange';
 import { useMapAccess } from '@/lib/useMapAccess';
 import { canViewPublishedMap, temporaryPublicMapEndpoint, publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
+import { stageMapLayers } from '@/lib/mapStartupLayers';
 
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -439,11 +440,11 @@ export default function Dashboard() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'layers'|'intel'|'search'|null>(null);
   const [showMenaPulse, setShowMenaPulse] = useState(false);
-  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
+  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('mercator');
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [showMobileHudDetails, setShowMobileHudDetails] = useState(false);
   const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('bright');
   const [sweepData, setSweepData] = useState<any>(null);
@@ -468,6 +469,13 @@ export default function Dashboard() {
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
+
+  const [deferredMapReady, setDeferredMapReady] = useState(false);
+  const deferredMapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deferredMapScheduledRef = useRef(false);
+  useEffect(() => () => {
+    if (deferredMapTimerRef.current) clearTimeout(deferredMapTimerRef.current);
+  }, []);
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
@@ -494,6 +502,16 @@ export default function Dashboard() {
     // speculative actor-to-target cyber arc visualization.
     return { ...visible, cf_attacks: visible.cf_attacks || visible.cyber_attacks, cyber_attacks: false };
   }, [activeLayers, embedMode, embedSurface, showPublicMapMarkers]);
+  // Stable identity suppresses full WebGL/GeoJSON updates on unrelated HUD
+  // re-renders. Permission changes still invalidate the public display.
+  const stagedMapLayers = useMemo(
+    () => stageMapLayers(displayedMapLayers, deferredMapReady),
+    [displayedMapLayers, deferredMapReady],
+  );
+  const visibleRenderLayers = useMemo(
+    () => visibleMapLayers(stagedMapLayers, hasMapAccess),
+    [stagedMapLayers, hasMapAccess],
+  );
   const workspaceAutoSaveReadyRef = useRef(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
 
@@ -785,6 +803,11 @@ export default function Dashboard() {
 
   const handleWorldMapReady = useCallback(() => {
     worldMapReadyRef.current = true;
+    if (!deferredMapScheduledRef.current) {
+      deferredMapScheduledRef.current = true;
+      // Only map rendering is staged; user choices and ingestion are untouched.
+      deferredMapTimerRef.current = setTimeout(() => setDeferredMapReady(true), 1600);
+    }
     if (!embedMode) return;
     window.parent.postMessage({
       source: 'm3tm-world',
@@ -1739,7 +1762,7 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={visibleMapLayers(displayedMapLayers, hasMapAccess)}
+          activeLayers={visibleRenderLayers}
           onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
