@@ -2,9 +2,11 @@
 
 import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import dynamic from 'next/dynamic';
+import { createMapSourceWriteGuard } from '@/lib/mapSourceWriteGuard';
 import * as maplibregl from 'maplibre-gl';
-import WindBar from './WindBar';
-import RainBar from './RainBar';
+const WindBar = dynamic(() => import('./WindBar'), { ssr: false });
+const RainBar = dynamic(() => import('./RainBar'), { ssr: false });
 import { DOCK } from './TimeBox';
 import { WIND_ATTRIBUTION } from '@/lib/wind-layer';
 import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHeatmap';
@@ -21,10 +23,13 @@ import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite
 import { MAP_DEFAULTS, MAP_PALETTE_KEYS, readMapPalette, satColorFor, type MapPalette } from '@/lib/map-palette';
 import { STYLE_EVENT } from '@/lib/style-tokens';
 import { arrivalBeacons } from '@/lib/malware-intel';
-import SatelliteCard, { type SatelliteDetail } from '@/components/SatelliteCard';
-import CctvPreviews, { type PreviewCamera } from '@/components/CctvPreviews';
+import type { SatelliteDetail } from '@/components/SatelliteCard';
+const SatelliteCard = dynamic(() => import('@/components/SatelliteCard'), { ssr: false });
+import type { PreviewCamera } from '@/components/CctvPreviews';
+const CctvPreviews = dynamic(() => import('@/components/CctvPreviews'), { ssr: false });
 import MapControls from '@/components/MapControls';
-import LiveNewsPreviews, { type PreviewFeed } from '@/components/LiveNewsPreviews';
+import type { PreviewFeed } from '@/components/LiveNewsPreviews';
+const LiveNewsPreviews = dynamic(() => import('@/components/LiveNewsPreviews'), { ssr: false });
 import { attachTerrain, type TerrainStatus } from '@/lib/map-terrain';
 
 import { applyMapProjection } from '@/lib/map-projection';
@@ -133,6 +138,7 @@ const DOUBLE_RIGHT_SLOP_PX = 12;
 function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', referenceAtlasKind = 'all', onEntityClick, onReady, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', terrainEnabled = false, terrainRetry = 0, terrainFocus = 0, onTerrainStatusChange, onLayerOff, mapStyle = 'dark', satelliteVisual = 'clarity', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: WorldMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const sourceWriteGuard = useRef(createMapSourceWriteGuard());
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapLoadState, setMapLoadState] = useState<'loading' | 'recovery' | 'unavailable'>('loading');
@@ -2422,13 +2428,18 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
   // Helper to set GeoJSON
   const setGeo = useCallback((source: string, features: any[]) => {
     const src = mapRef.current?.getSource(source) as any;
-    if (src) src.setData({ type: 'FeatureCollection', features });
+    if (src) sourceWriteGuard.current(src, features);
   }, []);
 
   const setVis = useCallback((ids: string[], visible: boolean) => {
     const map = mapRef.current;
     if (!map) return;
-    ids.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'); });
+    const target = visible ? 'visible' : 'none';
+    ids.forEach(id => {
+      if (map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== target) {
+        map.setLayoutProperty(id, 'visibility', target);
+      }
+    });
   }, []);
 
   // Flight data → GeoJSON (GPU rendered)
@@ -4179,14 +4190,14 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
           خريطة بديلة
         </div>
       )}
-      {mapReady && mapRef.current && (
+      {mapReady && mapRef.current && !!activeLayers.cctv && !!activeLayers.cctv_previews && (
         <CctvPreviews
           mapRef={mapRef}
           active={!!activeLayers.cctv && !!activeLayers.cctv_previews}
           onOpen={(cam: PreviewCamera) => onEntityClick?.({ type: 'cctv', ...cam })}
         />
       )}
-      {mapReady && (
+      {mapReady && !!activeLayers.live_news && (
         <LiveNewsPreviews
           mapRef={mapRef}
           active={!!activeLayers.live_news}
