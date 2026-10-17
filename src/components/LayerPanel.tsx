@@ -14,6 +14,7 @@ import { selectDataLayers } from '@/lib/layerBulkSelection';
 
 interface LayerPanelProps {
   data: any;
+  endpointStatus?: Record<string, 'loading' | 'ok' | 'error'>;
   activeLayers: any;
   setActiveLayers: React.Dispatch<React.SetStateAction<any>>;
   isMobile?: boolean;
@@ -238,7 +239,7 @@ function SubLayerStem() {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected, hasMapAccess = false, onRequestAccess }: LayerPanelProps) {
+function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, allowedLayerKeys, terrainStatus = 'idle', onTerrainRetry, onTerrainFocus, on3DModeSelected, hasMapAccess = false, onRequestAccess }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -332,14 +333,26 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
   // An enabled switch is not evidence of observations. Expose the distinction
   // only for layers whose event arrays are present in the public payload.
   const observedKeys = new Set(['alert_pins', 'app_news', 'military_activity',
-    'naval_activity', 'gdelt_events', 'civil_unrest', 'conflict_zones']);
+    'naval_activity', 'gdelt_events', 'civil_unrest', 'conflict_zones', 'frontlines', 'reference_atlas']);
+  const endpointForLayer: Record<string, string> = {
+    alert_pins: '/api/news', app_news: '/api/news',
+    military_activity: '/api/flights', naval_activity: '/api/maritime',
+    gdelt_events: '/api/gdelt-events', civil_unrest: '/api/gdelt-events',
+    conflict_zones: '/api/conflicts', frontlines: '/api/frontlines',
+    reference_atlas: '/api/reference-atlas',
+  };
   const layerObservationState = (key: string, count: number | null): string | null => {
     if (!observedKeys.has(key)) return null;
     if (!activeLayers[key]) return 'متوقفة';
+    const transport = endpointStatus[endpointForLayer[key]];
     const failure = data?.layer_errors?.[key] ?? data?.source_errors?.[key];
-    if (failure) return 'تعذر جلب المصدر';
+    if (failure || transport === 'error') return count && count > 0
+      ? 'بيانات سابقة · تعذر التحديث' : 'تعذر جلب المصدر';
+    if (transport === 'loading') return count && count > 0
+      ? `${count.toLocaleString('ar-SA')} عنصر · يجري التحديث` : 'جارٍ جلب البيانات';
     if (count === null) return 'البيانات غير متاحة';
-    return count === 0 ? 'لا أحداث مؤهلة' : `${count.toLocaleString('ar-SA')} عنصر منشور`;
+    if (count === 0) return transport === 'ok' ? 'لا أحداث مؤهلة' : 'لم يُتحقق من المصدر';
+    return `${count.toLocaleString('ar-SA')} عنصر منشور`;
   };
 
   /* ── MOBILE ── */
