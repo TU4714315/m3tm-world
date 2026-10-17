@@ -107,7 +107,7 @@ const deadline = setTimeout(() => {
   console.error('Browser test timed out');
   chrome.kill();
   process.exitCode = 1;
-}, liveAppProbe || liveWorldProbe ? 230_000 : 100_000);
+}, liveAppProbe || liveWorldProbe ? 280_000 : 100_000);
 try {
   const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await command('Target.attachToTarget', { targetId, flatten: true }));
@@ -153,7 +153,7 @@ try {
     // and no internal credentials. Keep external-source failures observable.
     for (let i = 0; i < 25 && !await evaluate("!!document.querySelector('.world-news-ticker')"); i++) await pause(1000);
     // Differentiate a delayed Next.js RSC/client bootstrap from a map failure.
-    for (let i = 0; i < 60 && !await evaluate("!![...document.querySelectorAll('.maplibregl-canvas')].find(c=>c.width>0&&c.height>0)"); i++) await pause(1000);
+    for (let i = 0; i < 105 && !await evaluate("!!document.querySelector('.maplibregl-canvas') && !/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي/.test(document.body.innerText)"); i++) await pause(1000);
     measurements.bootstrap = await evaluate("({state:document.readyState,scriptCount:document.scripts.length,externalScripts:[...document.scripts].map(s=>s.src).filter(Boolean).slice(0,18),hasNextData:!!document.getElementById('__NEXT_DATA__'),nextScripts:[...document.querySelectorAll('link[rel=modulepreload],link[rel=preload]')].length,reactRoot:!!document.getElementById('__next'),title:document.title,elapsedMs:Math.round(performance.now())})");
     measurements.responseLedger = [...network.values()].filter(x => /_next|api\/news|maplibre/.test(x.url)).slice(0,28);
     const state = await evaluate("({headlineLinks:[...document.querySelectorAll('.world-news-ticker a[href*=\"story=\"]')].map(a=>({url:a.href,title:a.textContent.trim()})),tickerText:document.querySelector('.world-news-ticker')?.innerText?.slice(0,1200),canvas:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),embed:document.querySelector('.world-news-ticker')?.getAttribute('data-embed'),title:document.title})");
@@ -161,6 +161,7 @@ try {
     await check('Published WORLD renders the branded expanded ticker', "document.querySelector('.world-news-ticker')?.innerText.includes('M3TM')");
     await check('Ticker links only to M3TM.APP internal story URLs', "(()=>{const links=[...document.querySelectorAll('.world-news-ticker a')];return links.length>0 && links.every(a=>a.href.startsWith('https://m3tm.app/news'))})()");
     await check('WORLD uses a real MapLibre canvas, not a placeholder', "!![...document.querySelectorAll('.maplibregl-canvas')].find(c=>c.width>0&&c.height>0)");
+    await check('Published basemap leaves the loading overlay and is ready for use', "!!document.querySelector('.maplibregl-canvas') && !/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي|تعذر رسم الخريطة/.test(document.body.innerText)");
     await check('Public WORLD stays separate from private OSINT', "!document.body.innerText.includes('Scan Target') && !document.body.innerText.includes('Port Scanner')");
     await check('Arabic right-to-left document direction', "document.documentElement.dir==='rtl' || document.querySelector('main')?.getAttribute('dir')==='rtl' || getComputedStyle(document.body).direction==='rtl'");
     if (!smokeMobile && !url.includes('embed=1')) {
