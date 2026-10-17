@@ -30,6 +30,7 @@ on:
       - 'src/lib/publicRefreshPolicy*'
       - 'docs/ISWN_REFERENCE_MAP_CONTRACT_2026-10-15.md'
       - 'tools/refresh-reference-atlas.mjs'
+      - 'tools/atlas-stale-retry-policy*'
       - '.github/workflows/reference-atlas-refresh.yml'
       - 'package.json'
       - 'package-lock.json'
