@@ -291,3 +291,14 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **NARROW FIX:** Memoize the public projection using `[hasMapAccess, dataVersion]`. Every dataRef write already advances dataVersion; permission changes always invalidate immediately. No changes to sources, precision, masking, access policy, 24 default layers, selected satellite/geographic mode, or polling cadence. Add test to prevent accidental regression.
 
 **GATE:** Run all required WORLD CI, security and runtime checks. Benchmark actual browser frame load/paint separately; a projection memoization does not prove tile latency, cold Render startup, GPU overload or provider errors disappeared. Do not touch mixed local workspace changes; use remote branch and exact-head PR.
+
+
+## 2026-10-17 — Lightweight progressive WORLD map startup (#141)
+
+**EVIDENCE BEFORE:** Chromium production baseline on Render main 35d4645, workflow 39069523295: WORLD desktop responseStart 0.914s / first canvas 27.263s / first usable map 35.069s; mobile 0.922s / 30.796s / 45.353s; direct embed 0.816s / 70.592s / 73.473s. ArcGIS imagery counts: 67 desktop and 151 mobile requests. Headless SwiftShader rAF scheduling 2–11 Hz is not actual MapLibre WebGL FPS. These samples prove significant startup/render cost, not one exclusive bottleneck.
+
+**DONE:** First-visit defaults change from Globe/ArcGIS satellite to Mercator/dark (explicit 3D and satellite choices remain). The selected user layer preferences and server ingestion are unchanged. Before the first ready callback, only costly visual sets are staged: reference atlas/frontlines/density/routes, SDK sea cables, full/comms satellite catalogue and decorative overlays. After 1600ms, the exact requested flags are restored. MENA conflict events, APP news, field alerts, country borders and public military/naval regional aggregates stay available immediately. Visible map layer props now use stable memo identity instead of new objects on every HUD redraw. Permission/access boundary remains reactive, Saudi public masking and private OSINT unchanged.
+
+**VERIFY:** Full current-head WORLD CI, TypeScript, unit/build/privacy and APP frame gate first. After deployment, rerun the identical PR #139 read-only live browser benchmark on desktop/mobile/embedded, collect first usable map, TTFB, resources, JS heap and rAF proxy. Do not claim a gain or WebGL FPS before measurement. Validate style/3D switching, RTL, alerts and correct APP headline deep links.
+
+**BLOCKERS:** External ArcGIS/Carto tile latency, OpenSky 429, GDELT timeouts and separate viewer snapshot HTTP404 may persist. Do not display stale source data as live or invent missing regional events. Mixed local workspace must not be reset; untracked backup requires independent verification.
