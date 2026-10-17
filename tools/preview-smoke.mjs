@@ -24,6 +24,8 @@ const chrome = spawn(process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/
 ], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
 const pending = new Map();
 const errors = [];
+const childErrors = [];
+const childSessionIds = new Set();
 const requests = [];
 const requestUrls = new Map();
 const network = new Map();
@@ -44,8 +46,14 @@ chrome.stdio[4].on('data', chunk => {
       pending.delete(message.id);
       if (message.error) task?.reject(new Error(JSON.stringify(message.error)));
       else task?.resolve(message.result);
+    } else if (message.method === 'Target.attachedToTarget' && message.params?.targetInfo?.type === 'iframe') {
+      const sid = message.params.sessionId;
+      childSessionIds.add(sid);
+      void command('Runtime.enable', {}, sid).catch(e=>childErrors.push(String(e)));
+      void command('Network.enable', {}, sid).catch(e=>childErrors.push(String(e)));
     } else if (message.method === 'Runtime.exceptionThrown') {
-      errors.push(message.params.exceptionDetails);
+      if (message.sessionId && childSessionIds.has(message.sessionId)) childErrors.push(message.params.exceptionDetails);
+      else errors.push(message.params.exceptionDetails);
     } else if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
       errors.push(message.params.args.map(value => value.description || value.value));
     } else if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'warning') {
@@ -129,6 +137,9 @@ try {
   await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile' || smokeMobile
     ? { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
     : { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  if (liveAppProbe) {
+    await command('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, null).catch(e => { measurements.autoAttachError = String(e); });
+  }
   await command('Page.navigate', { url });
   if (process.env.PROBE_MAP_NETWORK) {
     const probe = await command('Runtime.evaluate', {
@@ -149,6 +160,8 @@ try {
     // CDP frame tree is non-invasive and discloses the frame navigation URL
     // without bypassing cross-origin restrictions or reading private content.
     measurements.frameTree = await command('Page.getFrameTree').then(x=>x.frameTree).catch(e=>({error:String(e)}));
+    measurements.iframeConsoleExceptions = childErrors.slice(0,15);
+    measurements.iframeSessionCount = childSessionIds.size;
     measurements.chromeTargets = await command('Target.getTargets', {}, null)
       .then(x=>(x.targetInfos||[]).filter(t=>t.type==='iframe'||t.type==='page')
         .map(t=>({type:t.type,url:t.url,attached:t.attached,openerId:t.openerId})))
