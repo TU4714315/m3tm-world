@@ -280,3 +280,36 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **VERIFY:** CI must run unit, TypeScript, build and privacy on this follow-up; only merge and deploy after all required checks and reviews. Previously validated APP #443 Pages SHA f4d4923bad682f1f215594653d0e8f86e4744255 remains unchanged.
 
 **NEXT/BLOCKER:** Ads-B upstream availability is external; OpenSky 429 cannot be fabricated away. Keep clear age/availability semantics and observe real aggregate availability after provider recovery. This is a display/provenance correction only, not proof that public military data is presently flowing.
+
+
+## 2026-10-17 — Narrow public map projection performance patch
+
+**EVIDENCE:** Live WORLD main e1138adc remains Render Live; Chromium acceptance WORLD #139 intermittently had slow initial MapLibre canvas, while direct WORLD/APP embed succeeded in other runs. The page has 24 initially enabled layers (of 49), starting as globe + satellite, while published atlas fetch can return 7544 reference features. Render app logs also showed source errors including OpenSky HTTP429, transport ECONNRESET and bounded frontlines retry. None individually proves an exclusive slowdown root cause.
+
+**CODE-LEVEL FINDING:** In `src/app/page.tsx`, `publicMapClientProjection(dataRef.current)` was invoked during *every* React rerender even when no source payload had changed; it allocates new regional aggregate arrays and a new masked object. `sdkDisplayData = useMemo(...,[data,embeddedLiveFeeds])` therefore always invalidated, needlessly processing map data when toggling panels, map view, backend status, or hover state.
+
+**NARROW FIX:** Memoize the public projection using `[hasMapAccess, dataVersion]`. Every dataRef write already advances dataVersion; permission changes always invalidate immediately. No changes to sources, precision, masking, access policy, 24 default layers, selected satellite/geographic mode, or polling cadence. Add test to prevent accidental regression.
+
+**GATE:** Run all required WORLD CI, security and runtime checks. Benchmark actual browser frame load/paint separately; a projection memoization does not prove tile latency, cold Render startup, GPU overload or provider errors disappeared. Do not touch mixed local workspace changes; use remote branch and exact-head PR.
+
+
+## 2026-10-17 — Lightweight progressive WORLD map startup (#141)
+
+**EVIDENCE BEFORE:** Chromium production baseline on Render main 35d4645, workflow 39069523295: WORLD desktop responseStart 0.914s / first canvas 27.263s / first usable map 35.069s; mobile 0.922s / 30.796s / 45.353s; direct embed 0.816s / 70.592s / 73.473s. ArcGIS imagery counts: 67 desktop and 151 mobile requests. Headless SwiftShader rAF scheduling 2–11 Hz is not actual MapLibre WebGL FPS. These samples prove significant startup/render cost, not one exclusive bottleneck.
+
+**DONE:** First-visit defaults change from Globe/ArcGIS satellite to Mercator/dark (explicit 3D and satellite choices remain). The selected user layer preferences and server ingestion are unchanged. Before the first ready callback, only costly visual sets are staged: reference atlas/frontlines/density/routes, SDK sea cables, full/comms satellite catalogue and decorative overlays. After 1600ms, the exact requested flags are restored. MENA conflict events, APP news, field alerts, country borders and public military/naval regional aggregates stay available immediately. Visible map layer props now use stable memo identity instead of new objects on every HUD redraw. Permission/access boundary remains reactive, Saudi public masking and private OSINT unchanged.
+
+**VERIFY:** Full current-head WORLD CI, TypeScript, unit/build/privacy and APP frame gate first. After deployment, rerun the identical PR #139 read-only live browser benchmark on desktop/mobile/embedded, collect first usable map, TTFB, resources, JS heap and rAF proxy. Do not claim a gain or WebGL FPS before measurement. Validate style/3D switching, RTL, alerts and correct APP headline deep links.
+
+**BLOCKERS:** External ArcGIS/Carto tile latency, OpenSky 429, GDELT timeouts and separate viewer snapshot HTTP404 may persist. Do not display stale source data as live or invent missing regional events. Mixed local workspace must not be reset; untracked backup requires independent verification.
+
+
+## 2026-10-17 — Approved APP news ticker bounded recovery (#142)
+
+**Evidence:** Chromium live WORLD desktop after #141 (run 39070866442) had a working map but a truthful empty approved-news ticker; an independently queried live /api/news subsequently contained 94 items, including 42 feed_origin=m3tm-app and 52 independent-rss. This is an intermittent source timing/fetch condition, not evidence that external RSS should be rebranded as APP news.
+
+**DONE:** The WORLD public news loader now retries twice at 12 and 32 seconds after cold start only if no valid M3TM.APP-origin item is present, then returns to its existing 60-second refresh cycle. Retry windows are cancelled on unmount; hidden pages do not issue the extra requests. Original publisher provenance remains unchanged; neither empty nor failed cycles create synthetic articles. Unit tests guard valid approved input, external-only response, missing timestamps and bounded retry. In addition, the public APP iframe no longer resets its initial basemap to the costly ArcGIS satellite imagery after #141 selected lightweight 2D/dark defaults. Both 3D and satellite remain manually selectable, and no public event source or layer grant is modified.
+
+**VERIFY:** Full current-head unit/build/privacy CI and read-only browser acceptance; if the approved feed remains empty because the original APP endpoint itself is empty or unreachable, the UI must continue to show honest no-news state. #139 still tracks live desktop alert-panel access and variable third-party map load.
+
+**BLOCKER:** No guarantee that every cold Render request receives fresh APP feed content; CDN/provider conditions may vary. This patch cannot convert unverified/older independent RSS items into approved M3TM.APP titles.

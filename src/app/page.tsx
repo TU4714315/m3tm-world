@@ -3,6 +3,8 @@ import MapAccessGate from '@/components/MapAccessGate';
 import { createMapMemberExchange } from '@/lib/mapMemberExchange';
 import { useMapAccess } from '@/lib/useMapAccess';
 import { canViewPublishedMap, temporaryPublicMapEndpoint, publicMapClientProjection, restrictedMapEndpoint, visibleMapLayers } from '@/lib/mapAccessPolicy';
+import { stageMapLayers } from '@/lib/mapStartupLayers';
+import { needsApprovedAppNewsRetry, isSupersededNewsResponse } from '@/lib/appNewsRetry';
 
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -203,12 +205,21 @@ export default function Dashboard() {
   const publishedRef = useRef(hasPublishedMapAccess);
   publishedRef.current = hasPublishedMapAccess;
   const dataRef = useRef<any>({});
+  const newsRequestSequenceRef = useRef(0);
+  const latestAppliedNewsRequestRef = useRef(0);
   const [dataVersion, setDataVersion] = useState(0);
   const [endpointStatus, setEndpointStatus] = useState<Record<string, 'loading' | 'ok' | 'error'>>({});
   const markEndpointStatus = useCallback((endpoint: string, status: 'loading' | 'ok' | 'error') => {
     setEndpointStatus(prev => prev[endpoint] === status ? prev : { ...prev, [endpoint]: status });
   }, []);
-  const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);
+  // A new source payload increments dataVersion. Keep this expensive public
+  // boundary/aggregate projection stable across unrelated UI renders (mouse,
+  // map view, panels, status) so the MapLibre GeoJSON sources are not re-fed.
+  // Permission changes must always invalidate it to preserve the public gate.
+  const data = useMemo(
+    () => hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current),
+    [hasMapAccess, dataVersion],
+  );
 
   useEffect(() => {
     void recordWorldVisitOnce();
@@ -432,11 +443,11 @@ export default function Dashboard() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'layers'|'intel'|'search'|null>(null);
   const [showMenaPulse, setShowMenaPulse] = useState(false);
-  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
+  const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('mercator');
   const [terrainFocus, setTerrainFocus] = useState(0);
   const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('idle');
   const [terrainRetry, setTerrainRetry] = useState(0);
-  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('satellite');
+  const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [showMobileHudDetails, setShowMobileHudDetails] = useState(false);
   const [satelliteVisual, setSatelliteVisual] = useState<SatelliteVisualPreset>('bright');
   const [sweepData, setSweepData] = useState<any>(null);
@@ -461,6 +472,13 @@ export default function Dashboard() {
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
+
+  const [deferredMapReady, setDeferredMapReady] = useState(false);
+  const deferredMapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deferredMapScheduledRef = useRef(false);
+  useEffect(() => () => {
+    if (deferredMapTimerRef.current) clearTimeout(deferredMapTimerRef.current);
+  }, []);
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
@@ -487,6 +505,16 @@ export default function Dashboard() {
     // speculative actor-to-target cyber arc visualization.
     return { ...visible, cf_attacks: visible.cf_attacks || visible.cyber_attacks, cyber_attacks: false };
   }, [activeLayers, embedMode, embedSurface, showPublicMapMarkers]);
+  // Stable identity suppresses full WebGL/GeoJSON updates on unrelated HUD
+  // re-renders. Permission changes still invalidate the public display.
+  const stagedMapLayers = useMemo(
+    () => stageMapLayers(displayedMapLayers, deferredMapReady),
+    [displayedMapLayers, deferredMapReady],
+  );
+  const visibleRenderLayers = useMemo(
+    () => visibleMapLayers(stagedMapLayers, hasMapAccess),
+    [stagedMapLayers, hasMapAccess],
+  );
   const workspaceAutoSaveReadyRef = useRef(false);
   const [saveConfirmed, setSaveConfirmed] = useState(false);
 
@@ -513,9 +541,10 @@ export default function Dashboard() {
     if (!embedMode || embedSurface !== 'public') return;
     const frameId = window.requestAnimationFrame(() => {
       setActiveLayers(PUBLIC_EMBED_ACTIVE_LAYERS);
-      // Start embedded visitors on the same clear imagery as the public map.
-
-      setMapStyle('satellite');
+      // Preserve the lightweight 2D/dark first-paint default in the APP
+      // iframe too. Previously this reset forced expensive ArcGIS satellite
+      // imagery during hydration even after the standalone performance fix.
+      // Users can still opt into satellite imagery and 3D explicitly.
       setMapProjection('mercator');
       setShowLayers(false);
       setShowAlerts(false);
@@ -778,6 +807,11 @@ export default function Dashboard() {
 
   const handleWorldMapReady = useCallback(() => {
     worldMapReadyRef.current = true;
+    if (!deferredMapScheduledRef.current) {
+      deferredMapScheduledRef.current = true;
+      // Only map rendering is staged; user choices and ingestion are untouched.
+      deferredMapTimerRef.current = setTimeout(() => setDeferredMapReady(true), 1600);
+    }
     if (!embedMode) return;
     window.parent.postMessage({
       source: 'm3tm-world',
@@ -869,26 +903,34 @@ export default function Dashboard() {
     if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
       && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
     const endpointKey = url.split('?')[0];
+    const newsSeq = endpointKey === '/api/news' ? ++newsRequestSequenceRef.current : null;
+    // A newer failed retry never supersedes an older successful response.
+    const supersededNews = () => newsSeq !== null && isSupersededNewsResponse(newsSeq, latestAppliedNewsRequestRef.current);
     markEndpointStatus(endpointKey, 'loading');
     try {
       // Force the browser to bypass its local disk cache for real-time data
       const generation = accessGeneration.current;
       const res = await fetch(url, { ...options, cache: 'no-store', headers: { ...options?.headers, ...mapAccessHeaders() } });
-      if (generation !== accessGeneration.current) return false;
+      if (generation !== accessGeneration.current || supersededNews()) return false;
       if (res.ok) {
         const json = await res.json();
-        if (generation !== accessGeneration.current) return false;
+        if (generation !== accessGeneration.current || supersededNews()) return false;
         const d = transform ? transform(json) : json;
+        if (supersededNews()) return false;
+        if (newsSeq !== null) latestAppliedNewsRequestRef.current = newsSeq;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
         markEndpointStatus(endpointKey, 'ok');
         setBackendStatus('connected');
         return true;
       }
+      if (supersededNews()) return false;
       markEndpointStatus(endpointKey, 'error');
       return false;
     } catch (e) {
+      if (supersededNews()) return false;
       console.warn('[M3TM.WORLD] Suppressed error:', e instanceof Error ? e.message : e);
+      if (supersededNews()) return false;
       markEndpointStatus(endpointKey, 'error');
       setBackendStatus('error');
       return false;
@@ -913,7 +955,31 @@ export default function Dashboard() {
   useEffect(() => {
     // Priority 1: Core feeds (always needed for panels)
     // Earthquake feed disabled by owner; do not fetch USGS on startup.
-    fetchEndpoint('/api/news');
+    void fetchEndpoint('/api/news');
+    // An HTTP-200 response may contain only external RSS after an APP source
+    // timeout. Make two bounded attempts for the approved APP ticker without
+    // presenting the external rows as M3TM.APP news.
+    let approvedNewsRetryTimer: number | null = null;
+    let approvedNewsRetryCount = 0;
+    let approvedNewsPendingVisibility = false;
+    const runApprovedNewsRetry = () => {
+      if (document.hidden) {
+        approvedNewsPendingVisibility = true;
+        return;
+      }
+      approvedNewsPendingVisibility = false;
+      if (!needsApprovedAppNewsRetry(dataRef.current.news, approvedNewsRetryCount)) return;
+      approvedNewsRetryCount += 1;
+      void fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true });
+      if (approvedNewsRetryCount < 2) {
+        approvedNewsRetryTimer = window.setTimeout(runApprovedNewsRetry, 20_000);
+      }
+    };
+    const onNewsPageVisible = () => {
+      if (!document.hidden && approvedNewsPendingVisibility) runApprovedNewsRetry();
+    };
+    document.addEventListener('visibilitychange', onNewsPageVisible);
+    approvedNewsRetryTimer = window.setTimeout(runApprovedNewsRetry, 12_000);
     /* A cold start can time out every upstream quote and return an all-empty
        feed. Waiting a full poll interval to find out leaves the panel blank for
        15 minutes, so retry a few times up-front until instruments actually land. */
@@ -943,6 +1009,8 @@ export default function Dashboard() {
       clearTimeout(marketTimer);
       marketRetries.forEach(clearTimeout);
       clearTimeout(spaceTimer);
+      if (approvedNewsRetryTimer) clearTimeout(approvedNewsRetryTimer);
+      document.removeEventListener('visibilitychange', onNewsPageVisible);
       intervals.forEach(clearInterval);
     };
   }, [fetchEndpoint, hasMapAccess]);
@@ -1732,7 +1800,7 @@ export default function Dashboard() {
         <WorldMap
           key={worldTheme}
           data={sdkDisplayData}
-          activeLayers={visibleMapLayers(displayedMapLayers, hasMapAccess)}
+          activeLayers={visibleRenderLayers}
           onReady={handleWorldMapReady}
           projection={mapProjection === 'mercator' ? 'mercator' : 'globe'}
           terrainEnabled={activeLayers.terrain_elevation && mapProjection === 'globe'}
