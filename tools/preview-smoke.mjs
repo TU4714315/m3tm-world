@@ -238,7 +238,7 @@ try {
       // conflict group through the visible control before testing a child.
       // The layer panel can hydrate after a cold map start. Never toggle the
       // global 'l' shortcut blindly: if already open that would close it.
-      const groupProbe = "(()=>{const matches=[...document.querySelectorAll('button[title]')];return matches.find(b=>b.title==='الحروب والأحداث العامة')||null})()";
+      const groupProbe = "(()=>{const matches=[...document.querySelectorAll('button[title]')];return matches.find(b=>b.title==='الأحداث')||null})()";
       let groupVisible = false;
       for (let n=0; n<18; n++) {
         groupVisible = await evaluate("!!"+groupProbe);
@@ -247,9 +247,9 @@ try {
       }
       // Don't blindly press the panel keyboard shortcut when the group is
       // absent: WORLD defaults to showLayers=true, so that closes the dock.
-      measurements.alertPanelBefore = await evaluate("({viewport:innerWidth, visibleGroups:[...document.querySelectorAll('button[title]')].map(b=>b.title).filter(t=>t.includes('الحروب')||t.includes('الطيران')), containsLabel:document.body.textContent?.includes('الحروب والأحداث العامة')})");
+      measurements.alertPanelBefore = await evaluate("({viewport:innerWidth, visibleGroups:[...document.querySelectorAll('button[title]')].map(b=>b.title).filter(t=>t.includes('الأحداث')||t.includes('الطيران')), containsLabel:document.body.textContent?.includes('الحروب والأحداث العامة')})");
       if (groupVisible) {
-        await evaluate("(()=>{const b=[...document.querySelectorAll('button[title]')].find(x=>x.title==='الحروب والأحداث العامة');if(b?.getAttribute('aria-expanded')!=='true')b?.click()})()");
+        await evaluate("(()=>{const b=[...document.querySelectorAll('button[title]')].find(x=>x.title==='الأحداث');if(b?.getAttribute('aria-expanded')!=='true')b?.click()})()");
       }
       const toggleProbe = "(()=>[...document.querySelectorAll('button[aria-label]')].find(b=>b.getAttribute('aria-label')==='تنبيهات ميدانية منشورة')||null)()";
       for (let n=0; n<10 && !await evaluate("!!"+toggleProbe);n++) await pause(450);
