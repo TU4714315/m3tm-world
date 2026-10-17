@@ -29,6 +29,14 @@ describe('WORLD public defaults and branding', () => {
     expect(brand).not.toContain('<rect');
   });
 
+  it('reuses public map data between unrelated UI renders but invalidates on access/payload changes', () => {
+    expect(page).toContain('const data = useMemo(');
+    expect(page).toContain('() => hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current)');
+    expect(page).toContain('[hasMapAccess, dataVersion]');
+    expect(page).toContain('setDataVersion(v => v + 1)');
+    expect(page).not.toContain('const data = hasMapAccess ? dataRef.current : publicMapClientProjection(dataRef.current);');
+  });
+
   it('keeps operational explanations collapsed in the public map chrome', () => {
     expect(page).toContain('دليل الرموز ▾');
     expect(page).not.toContain('open={!isMobile}');
