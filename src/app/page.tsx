@@ -32,6 +32,7 @@ import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import { hidePublicMapMarkers, reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
+import { restoreYemenMapLayers, YEMEN_MAP_FOCUS } from '@/lib/yemenMapView';
 import LiveAlerts from '@/components/LiveAlerts';
 import MenaPulse from '@/components/MenaPulse';
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
@@ -464,6 +465,16 @@ export default function Dashboard() {
   const [showPublicMapMarkers, setShowPublicMapMarkers] = useState(true);
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
+  const focusYemenMonitoring = () => {
+    selectFlatMap();
+    setShowMenaPulse(false);
+    setMobilePanel(null);
+    setShowPublicMapMarkers(true);
+    setPublicEmbedQuiet(false);
+    quietPublicLayersBeforeRef.current = null;
+    setActiveLayers(previous => restoreYemenMapLayers(previous));
+    setFlyToLocation({ ...YEMEN_MAP_FOCUS, ts: Date.now() });
+  };
   // This affects map rendering only, not source ingestion or the user's saved layer preferences.
   const displayedMapLayers = useMemo(() => {
     const visible = embedMode && embedSurface === 'public'
@@ -1876,11 +1887,7 @@ export default function Dashboard() {
         {(!isMobile || showMobileHudDetails) && <>
         {/* One-touch regional operations layout, independent of source layers. */}
         <div dir="rtl" className="flex max-w-[min(92vw,520px)] flex-wrap items-center gap-1.5 pointer-events-auto rounded-xl border border-white/20 bg-[rgba(7,12,20,0.14)] p-1.5 shadow-[0_5px_18px_rgba(0,0,0,.2)] backdrop-blur-sm" aria-label="عرض الرصد ووضوح القمر الصناعي">
-          <button type="button" onClick={() => {
-              selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
-              if (isMobile) setMobilePanel('intel');
-              setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
-            }}
+          <button type="button" onClick={focusYemenMonitoring}
             className="rounded-md border border-amber-300/50 bg-transparent px-2.5 py-1.5 text-xs font-semibold text-amber-100 hover:border-amber-200/70 focus-visible:ring-2 focus-visible:ring-amber-300"
             title="الانتقال إلى اليمن: بلاغات عامة منشورة ومجمعة، دون تتبع مواقع أو تحركات عملياتية دقيقة">
             <MapPinned className="inline h-3.5 w-3.5 ms-1"/> رصد اليمن
@@ -1997,10 +2004,7 @@ export default function Dashboard() {
                 className="min-h-10 rounded-xl border border-cyan-300/30 bg-transparent px-2 text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 مرصد الشرق الأوسط
               </button>
-              <button type="button" onClick={() => {
-                  selectFlatMap(); setShowMenaPulse(false); setActiveLayers(previous => ({ ...previous, reference_atlas: true }));
-                  setFlyToLocation({ lat: 15.6, lng: 47.5, zoom: 5.5, ts: Date.now() });
-                }}
+              <button type="button" onClick={focusYemenMonitoring}
                 className="min-h-10 rounded-xl border border-amber-300/40 bg-transparent px-2 text-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300"
                 title="التركيز على اليمن وبلاغاتها العامة المنشورة دون تموضع عسكري دقيق">
                 رصد اليمن
