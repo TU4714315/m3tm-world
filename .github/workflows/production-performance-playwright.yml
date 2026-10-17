@@ -15,6 +15,9 @@ jobs:
     timeout-minutes: 14
     strategy:
       fail-fast: false
+      # Do not saturate the one-instance Render Free service with 3 concurrent
+      # 3-iteration cold benchmark workloads; keep each scenario isolated.
+      max-parallel: 1
       matrix:
         scenario: [world-desktop, world-mobile, app-iframe]
     steps:
