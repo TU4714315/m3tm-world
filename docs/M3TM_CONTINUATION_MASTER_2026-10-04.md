@@ -269,3 +269,14 @@ VERIFY:1047tests pass/20skips;18collector tests cover stalled fetch/read/cancel 
 **BLOCKERS:** Final CI/required comments and release checks must pass before merge. Cross-project APP #443 must be live before WORLD links to it. Workspace Core old checkout contains many mixed/unstaged changes and must not be reset or overwritten. Exact isolated CONTINUE_HERE.md was not present in the mounted project root; verify its detached worktree separately if available.
 
 **NEXT:** Resolve current reviews, merge APP #443 first, then WORLD #137 using exact-head guard; trigger one coordinated Render deploy (autoDeploy off) and verify actual deployed commit plus API/iframe/map controls and Saudi public geographic masking. Report empty versus technically failed layers from observed runtime signals, never fabricate an event.
+
+
+## 2026-10-17 — Post-deploy provider state follow-up
+
+**EVIDENCE:** WORLD #137 was merged at f57a581868cebb170af3d8b92509cb2513a45192 and Render deploy dep-db9qp1gm7kps73ed8n10 became live at 17:14:04 UTC. The main-commit scheduled atlas run 39052951120 passed with fetchedAt 2026-10-17T17:14:50.566Z, featureCount 7544, sourcePublishedAt null. This is successful retrieval of reported cartographic features, not independent confirmation of military events. Runtime logs after deployment include OpenSky 429 and a flight-fetch timeout; the public military regional layer must not display a successful-empty message merely because /api/flights returned HTTP200 with provider_healthy=false.
+
+**DONE:** Follow-up branch fixes the regional military layer status to consult the published aggregate's provider_healthy flag after successful transport. Shows unavailable-provider wording for zero observations and identifies existing observations as potentially previous data. The display never reveals aircraft identifiers, exact movement tracks or unpublished positions. Regression test covers unhealthy/healthy and last-good states.
+
+**VERIFY:** CI must run unit, TypeScript, build and privacy on this follow-up; only merge and deploy after all required checks and reviews. Previously validated APP #443 Pages SHA f4d4923bad682f1f215594653d0e8f86e4744255 remains unchanged.
+
+**NEXT/BLOCKER:** Ads-B upstream availability is external; OpenSky 429 cannot be fabricated away. Keep clear age/availability semantics and observe real aggregate availability after provider recovery. This is a display/provenance correction only, not proof that public military data is presently flowing.
