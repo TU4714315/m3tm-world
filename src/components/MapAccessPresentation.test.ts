@@ -47,6 +47,21 @@ describe('access-aware public map presentation', () => {
     expect(locked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="التجارية"/);
     expect(unlocked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
   });
+  it('separates successful empty field alerts from failed/unfinished API loads', () => {
+    const props = { data: { alert_pins: [] }, activeLayers: { alert_pins: true }, setActiveLayers: vi.fn(), isMobile: true };
+    const renderState = (status?: 'loading' | 'ok' | 'error') =>
+      renderToStaticMarkup(createElement(LayerPanel, { ...props,
+        endpointStatus: status ? { '/api/news': status } : {},
+      }));
+    expect(renderState('ok')).toContain('لا أحداث مؤهلة');
+    expect(renderState('error')).toContain('تعذر جلب المصدر');
+    expect(renderState('loading')).toContain('جارٍ جلب البيانات');
+    expect(renderState()).toContain('لم يُتحقق من المصدر');
+    expect(renderToStaticMarkup(createElement(LayerPanel, { ...props,
+      activeLayers: { alert_pins: false }, endpointStatus: { '/api/news': 'ok' },
+    }))).toContain('متوقفة');
+  });
+
   it('keeps the bottom bar dedicated to news in both standalone and embedded views', () => {
     const news = [{ id: 'public', feed_origin: 'm3tm-app', title: 'خبر عام متاح', source: 'ناشر', risk_score: 1, published: new Date(Date.now() - 13 * 3_600_000).toISOString() }];
     for (const embed of [false, true]) {
