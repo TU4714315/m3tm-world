@@ -8,7 +8,10 @@ const url = process.env.PREVIEW_URL || 'http://127.0.0.1:3001';
 const scenario = process.env.SMOKE_SCENARIO || 'startup';
 // A single read-only deployed APP check is permitted on an isolated CI runner.
 const liveAppProbe = process.env.CI === 'true' && scenario === 'app-frame' && new URL(url).href === 'https://m3tm.app/';
-if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname) && !liveAppProbe) {
+const liveWorldProbe = process.env.CI === 'true' && scenario === 'world-live' &&
+  new URL(url).origin === 'https://m3tm-world-recovery.onrender.com';
+const smokeMobile = process.env.SMOKE_MOBILE === '1';
+if (!['127.0.0.1', 'localhost'].includes(new URL(url).hostname) && !liveAppProbe && !liveWorldProbe) {
   throw new Error('This smoke test only accepts localhost previews.');
 }
 const profile = await mkdtemp(join(tmpdir(), 'osiris-smoke-'));
@@ -21,12 +24,16 @@ const chrome = spawn(process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/
 ], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
 const pending = new Map();
 const errors = [];
+const childErrors = [];
+const childSessionIds = new Set();
 const requests = [];
 const requestUrls = new Map();
 const network = new Map();
 const warnings = [];
 const checks = [];
 const measurements = {};
+const frameEventTimes = {};
+let accumulatedNetworkBytes = 0;
 let sequence = 0;
 let buffer = '';
 let session;
@@ -41,8 +48,14 @@ chrome.stdio[4].on('data', chunk => {
       pending.delete(message.id);
       if (message.error) task?.reject(new Error(JSON.stringify(message.error)));
       else task?.resolve(message.result);
+    } else if (message.method === 'Target.attachedToTarget' && message.params?.targetInfo?.type === 'iframe') {
+      const sid = message.params.sessionId;
+      childSessionIds.add(sid);
+      void command('Runtime.enable', {}, sid).catch(e=>childErrors.push(String(e)));
+      void command('Network.enable', {}, sid).catch(e=>childErrors.push(String(e)));
     } else if (message.method === 'Runtime.exceptionThrown') {
-      errors.push(message.params.exceptionDetails);
+      if (message.sessionId && childSessionIds.has(message.sessionId)) childErrors.push(message.params.exceptionDetails);
+      else errors.push(message.params.exceptionDetails);
     } else if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
       errors.push(message.params.args.map(value => value.description || value.value));
     } else if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'warning') {
@@ -55,7 +68,12 @@ chrome.stdio[4].on('data', chunk => {
       if (record) record.status = message.params.response.status;
     } else if (message.method === 'Network.loadingFinished') {
       const record = network.get(message.params.requestId);
-      if (record) record.state = 'complete';
+      if (record) { record.state = 'complete'; record.bytes = message.params.encodedDataLength ?? 0; }
+      accumulatedNetworkBytes += message.params.encodedDataLength ?? 0;
+    } else if (message.method === 'Page.domContentEventFired') {
+      frameEventTimes.domContentEvent = Date.now();
+    } else if (message.method === 'Page.loadEventFired') {
+      frameEventTimes.loadEvent = Date.now();
     } else if (message.method === 'Network.loadingFailed') {
       const record = network.get(message.params.requestId);
       if (record) record.state = 'failed';
@@ -104,7 +122,7 @@ const deadline = setTimeout(() => {
   console.error('Browser test timed out');
   chrome.kill();
   process.exitCode = 1;
-}, liveAppProbe ? 130_000 : 100_000);
+}, liveAppProbe || liveWorldProbe ? 280_000 : 100_000);
 try {
   const { targetId } = await command('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await command('Target.attachToTarget', { targetId, flatten: true }));
@@ -113,19 +131,31 @@ try {
   await command('Runtime.enable');
   await command('Page.enable');
   await command('Network.enable');
+  await command('Performance.enable');
   const system = await command('SystemInfo.getInfo', {}, null);
   measurements.graphics = { devices: system.gpu.devices, renderer: system.gpu.auxAttributes?.glRenderer, features: system.gpu.featureStatus };
   if (['imagery', 'buildings', 'terrain-camera'].includes(scenario)) await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/geo*` }] });
   if (scenario === 'satellites') await command('Fetch.enable', { patterns: [{ urlPattern: `${new URL(url).origin}/api/satellites` }] });
+  await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__m3tmFirstCanvasMs = null; window.__m3tmFirstReadyMs = null;
+    const inspectMap = () => { const canvas = document.querySelector('.maplibregl-canvas'); if (canvas && canvas.width > 0 && canvas.height > 0) {
+      window.__m3tmFirstCanvasMs ??= performance.now();
+      if (!/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي|تعذر رسم الخريطة/.test(document.body?.innerText || '')) window.__m3tmFirstReadyMs ??= performance.now();
+    }};
+    addEventListener('DOMContentLoaded', () => { inspectMap(); new MutationObserver(inspectMap).observe(document.body, {childList:true,subtree:true,attributes:true,attributeFilter:['class','style']}); });
+  ` });
   await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__previewLongTasks = []; new PerformanceObserver(list => { for (const e of list.getEntries()) window.__previewLongTasks.push({start: Math.round(e.startTime), ms: Math.round(e.duration)}); }).observe({type: 'longtask', buffered: true});` });
   if (liveAppProbe) await command('Page.addScriptToEvaluateOnNewDocument', { source: `window.__publishedWorldReady=[]; window.addEventListener('message',event=>{
     if(event.origin==='https://m3tm-world-recovery.onrender.com' && event.source===document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.contentWindow
       && event.data?.source==='m3tm-world' && event.data?.type==='m3tm:ready' && event.data?.version===1) window.__publishedWorldReady.push({origin:event.origin,at:Date.now()});
   });` });
   if (scenario === 'recovery') await command('Network.setBlockedURLs', { urls: [`${new URL(url).origin}/dark-matter-style.json*`] });
-  await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile'
+  await command('Emulation.setDeviceMetricsOverride', scenario === 'mobile' || smokeMobile
     ? { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }
     : { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  if (liveAppProbe) {
+    await command('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, null).catch(e => { measurements.autoAttachError = String(e); });
+  }
+  const browserNavigationWallMs = Date.now();
   await command('Page.navigate', { url });
   if (process.env.PROBE_MAP_NETWORK) {
     const probe = await command('Runtime.evaluate', {
@@ -142,9 +172,123 @@ try {
     measurements.publishedApp = await evaluate(`({frame:document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src,
       readyMessages:window.__publishedWorldReady, unavailable:!!document.querySelector('[data-testid="m3tm-world-unavailable"]'),
       newsCards:document.querySelectorAll('.gate1-news-panel article').length, visibility:document.visibilityState})`);
+    // The top-level APP can be healthy while its isolated WORLD iframe hangs.
+    // CDP frame tree is non-invasive and discloses the frame navigation URL
+    // without bypassing cross-origin restrictions or reading private content.
+    measurements.frameTree = await command('Page.getFrameTree').then(x=>x.frameTree).catch(e=>({error:String(e)}));
+    measurements.iframeConsoleExceptions = childErrors.slice(0,15);
+    measurements.iframeSessionCount = childSessionIds.size;
+    measurements.chromeTargets = await command('Target.getTargets', {}, null)
+      .then(x=>(x.targetInfos||[]).filter(t=>t.type==='iframe'||t.type==='page')
+        .map(t=>({type:t.type,url:t.url,attached:t.attached,openerId:t.openerId})))
+      .catch(e=>({error:String(e)}));
+    // Inspect the public WORLD out-of-process iframe from isolated Chromium.
+    // No credentials or private API content; only the public map's render state.
+    const iframeTarget = await command('Target.getTargets', {}, null)
+      .then(x=>(x.targetInfos||[]).find(t=>t.type==='iframe' && t.url.startsWith('https://m3tm-world-recovery.onrender.com/')))
+      .catch(()=>null);
+    if (iframeTarget) {
+      try {
+        const attached = await command('Target.attachToTarget',{targetId:iframeTarget.targetId,flatten:true},null);
+        await command('Runtime.enable',{},attached.sessionId);
+        const status = await command('Runtime.evaluate',{
+          expression:"({url:location.href,state:document.readyState,body:document.body?.innerText?.slice(0,480),scripts:document.scripts.length,scriptSrcs:[...document.scripts].map(e=>e.src).filter(Boolean).slice(-12),mapContainer:[...document.querySelectorAll('[data-map-status],.maplibregl-map')].map(e=>({tag:e.tagName,cls:e.className?.toString().slice(0,120),status:e.getAttribute('data-map-status'),width:e.clientWidth,height:e.clientHeight})).slice(0,6),canvases:[...document.querySelectorAll('canvas')].map(c=>({w:c.width,h:c.height,cls:c.className})).slice(0,8),resources:performance.getEntriesByType('resource').length,frameWidth:window.innerWidth,frameHeight:window.innerHeight,webglSupported:(()=>{try{return !!document.createElement('canvas').getContext('webgl2')}catch{return false}})(),iframeContext:window.parent!==window})",
+          returnByValue:true
+        },attached.sessionId);
+        measurements.iframeRuntime = status.result?.value ?? {error:status.exceptionDetails?.text};
+        await command('Target.detachFromTarget',{sessionId:attached.sessionId},null).catch(()=>{});
+      } catch(e) { measurements.iframeRuntime={error:String(e)}; }
+    }
+
+    measurements.frameLoadingState = await evaluate("({frameReady:document.querySelector('iframe[data-testid=\\\"m3tm-world-frame\\\"]')?.contentDocument?.readyState||'cross-origin',frameLoadedPerformance:performance.getEntriesByType('resource').filter(x=>x.name.includes('m3tm-world-recovery.onrender.com')).map(x=>({name:x.name,start:x.startTime,duration:x.duration,responseEnd:x.responseEnd})).slice(0,4)})");
+    measurements.browserResponses = [...network.values()]
+      .filter(x=>/m3tm-world|_next|api\/news/.test(x.url))
+      .slice(0,35);
+    measurements.documentProgress = await evaluate("({state:document.readyState,timing:performance.now(),frameCount:window.frames.length,mode3D:document.body.textContent.includes('3D'),framePresent:!!document.querySelector('iframe[data-testid=\\\"m3tm-world-frame\\\"]')})");
+
     await check('Deployed APP receives map-ready from its exact WORLD frame', `window.__publishedWorldReady?.length>0 && !document.querySelector('[data-testid="m3tm-world-unavailable"]')`);
     await check('Published frame remains on its fixed trusted origin', `document.querySelector('iframe[data-testid="m3tm-world-frame"]')?.src==='https://m3tm-world-recovery.onrender.com/?embed=1&surface=public'`);
     await check('Published news has one publisher link per card', `(()=>{const cards=[...document.querySelectorAll('.gate1-news-panel article')];return cards.length>0 && cards.every(card=>card.querySelectorAll('a').length===1)})()`);
+  } else if (liveWorldProbe) {
+    // A real Chromium loads the public deployed WORLD runtime. No API fixtures
+    // and no internal credentials. Keep external-source failures observable.
+    for (let i = 0; i < 25 && !await evaluate("!!document.querySelector('.world-news-ticker')"); i++) await pause(1000);
+    // Differentiate a delayed Next.js RSC/client bootstrap from a map failure.
+    for (let i = 0; i < 105 && !await evaluate("!!document.querySelector('.maplibregl-canvas') && !/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي/.test(document.body.innerText)"); i++) await pause(1000);
+    measurements.bootstrap = await evaluate("({state:document.readyState,scriptCount:document.scripts.length,externalScripts:[...document.scripts].map(s=>s.src).filter(Boolean).slice(0,18),hasNextData:!!document.getElementById('__NEXT_DATA__'),nextScripts:[...document.querySelectorAll('link[rel=modulepreload],link[rel=preload]')].length,reactRoot:!!document.getElementById('__next'),title:document.title,elapsedMs:Math.round(performance.now())})");
+    measurements.responseLedger = [...network.values()].filter(x => /_next|api\/news|maplibre/.test(x.url)).slice(0,28);
+    const state = await evaluate("({headlineLinks:[...document.querySelectorAll('.world-news-ticker a[href*=\"story=\"]')].map(a=>({url:a.href,title:a.textContent.trim()})),tickerText:document.querySelector('.world-news-ticker')?.innerText?.slice(0,1200),canvas:[...document.querySelectorAll('.maplibregl-canvas')].map(c=>({w:c.width,h:c.height})),embed:document.querySelector('.world-news-ticker')?.getAttribute('data-embed'),title:document.title})");
+    measurements.publishedWorld = state;
+    await check('Published WORLD renders the branded expanded ticker', "document.querySelector('.world-news-ticker')?.innerText.includes('M3TM')");
+    await check('Ticker links only to M3TM.APP internal story URLs', "(()=>{const links=[...document.querySelectorAll('.world-news-ticker a')];return links.length>0 && links.every(a=>a.href.startsWith('https://m3tm.app/news'))})()");
+    await check('WORLD uses a real MapLibre canvas, not a placeholder', "!![...document.querySelectorAll('.maplibregl-canvas')].find(c=>c.width>0&&c.height>0)");
+    await check('Published basemap leaves the loading overlay and is ready for use', "!!document.querySelector('.maplibregl-canvas') && !/جارٍ تجهيز الخريطة العامة|تعذر تحميل النمط الأساسي|تعذر رسم الخريطة/.test(document.body.innerText)");
+    await check('Public WORLD stays separate from private OSINT', "!document.body.innerText.includes('Scan Target') && !document.body.innerText.includes('Port Scanner')");
+    await check('Arabic right-to-left document direction', "document.documentElement.dir==='rtl' || document.querySelector('main')?.getAttribute('dir')==='rtl' || getComputedStyle(document.body).direction==='rtl'");
+    if (!smokeMobile && !url.includes('embed=1')) {
+      const hasDesktopStyle = await evaluate("!!document.querySelector('button[title=\"الوضع الليلي\"]') && !!document.querySelector('button[title=\"عرض الأقمار الصناعية\"]')");
+      checks.push({name:'Both geographic and satellite controls are present',passed:hasDesktopStyle});
+      if (hasDesktopStyle) {
+        await click('الوضع الليلي'); await pause(3800);
+        await check('Night basemap switch changes active control without dropping canvas', "document.querySelector('button[title=\"الوضع الليلي\"]')?.getAttribute('aria-pressed')==='true' && document.querySelectorAll('.maplibregl-canvas').length===1");
+        await click('عرض الأقمار الصناعية'); await pause(3800);
+        await check('Satellite switch restores active map without dropping canvas', "document.querySelector('button[title=\"عرض الأقمار الصناعية\"]')?.getAttribute('aria-pressed')==='true' && document.querySelectorAll('.maplibregl-canvas').length===1");
+      }
+      // Desktop layer groups are intentionally collapsed. Open the published
+      // conflict group through the visible control before testing a child.
+      // The layer panel can hydrate after a cold map start. Never toggle the
+      // global 'l' shortcut blindly: if already open that would close it.
+      const groupProbe = "(()=>{const matches=[...document.querySelectorAll('button[title]')];return matches.find(b=>b.title==='الأحداث')||null})()";
+      let groupVisible = false;
+      for (let n=0; n<18; n++) {
+        groupVisible = await evaluate("!!"+groupProbe);
+        if (groupVisible) break;
+        await pause(550);
+      }
+      // Don't blindly press the panel keyboard shortcut when the group is
+      // absent: WORLD defaults to showLayers=true, so that closes the dock.
+      measurements.alertPanelBefore = await evaluate("({viewport:innerWidth, visibleGroups:[...document.querySelectorAll('button[title]')].map(b=>b.title).filter(t=>t.includes('الأحداث')||t.includes('الطيران')), containsLabel:document.body.textContent?.includes('الحروب والأحداث العامة')})");
+      if (groupVisible) {
+        await evaluate("(()=>{const b=[...document.querySelectorAll('button[title]')].find(x=>x.title==='الأحداث');if(b?.getAttribute('aria-expanded')!=='true')b?.click()})()");
+      }
+      const toggleProbe = "(()=>[...document.querySelectorAll('button[aria-label]')].find(b=>b.getAttribute('aria-label')==='تنبيهات ميدانية منشورة')||null)()";
+      for (let n=0; n<10 && !await evaluate("!!"+toggleProbe);n++) await pause(450);
+      measurements.alertPanelState = await evaluate("({panel:!!"+groupProbe+", fieldToggle:!!"+toggleProbe+"})");
+      const toggle = await evaluate(toggleProbe+"?.getAttribute('aria-pressed')");
+      measurements.alertToggleBefore = toggle ?? null;
+      if (toggle != null) {
+        await click('تنبيهات ميدانية منشورة'); await pause(350);
+        await check('Field-alert layer switch changes state', "[...document.querySelectorAll(\"button\")].find(b=>b.getAttribute(\"aria-label\")===\"تنبيهات ميدانية منشورة\")?.getAttribute(\"aria-pressed\")!=="+JSON.stringify(toggle));
+        await click('تنبيهات ميدانية منشورة');
+      } else checks.push({name:'Public field-alert switch is reachable',passed:false});
+    }
+    measurements.liveAssets = await evaluate("({mapTiles:performance.getEntriesByType('resource').filter(e=>/World_Imagery|cartocdn|tiles/.test(e.name)).length,viewport:window.innerWidth,overflow:document.documentElement.scrollWidth>window.innerWidth})");
+    // Production-only acceptance ledger: a successful HTTP request to the
+    // public access probe does not imply a private grant or published event.
+    measurements.livePublicRequests = {
+      mapAccess: [...network.values()].filter(r=>r.url.includes('/api/map-access')).length,
+      news: [...network.values()].filter(r=>r.url.includes('/api/news')).map(r=>({status:r.status,state:r.state,bytes:r.bytes??null})).slice(0,8),
+      satelliteTiles: [...network.values()].filter(r=>/World_Imagery/.test(r.url)).length,
+    };
+    await check('No horizontal overflow in deployed WORLD viewport', "document.documentElement.scrollWidth <= window.innerWidth+2");
+    if (!smokeMobile && !url.includes('embed=1')) {
+      const firstLink = measurements.publishedWorld.headlineLinks?.[0]?.url;
+      if (firstLink) {
+        const beforeStory = await command('Page.captureScreenshot', { format: 'png' });
+        await writeFile(join(output, 'world-before-story.png'), Buffer.from(beforeStory.data, 'base64'));
+        const requestedId = new URL(firstLink).searchParams.get('story');
+        await command('Page.navigate', { url: firstLink });
+        for (let i=0; i<20 && !await evaluate("!!document.querySelector('[data-news-id]')"); i++) await pause(1000);
+        measurements.storyNavigation = await evaluate("({url:location.href,cards:document.querySelectorAll('[data-news-id]').length,selected:[...document.querySelectorAll('[data-news-id].is-linked')].map(e=>e.getAttribute('data-news-id'))})");
+        await check('Approved WORLD headline opens its exact public APP card', "(()=>{const id=new URLSearchParams(location.search).get('story');return id==="+JSON.stringify(requestedId)+"&&!![...document.querySelectorAll('[data-news-id].is-linked')].find(e=>e.getAttribute('data-news-id')===id)})()" );
+      } else {
+        // A no-feed response is a source-availability condition, not proof
+        // that the internal navigation is broken. Keep it explicitly
+        // unverified rather than declaring it passed or inventing a headline.
+        checks.push({ name: 'Approved APP headline deep-link browser navigation', passed: null,
+          skipped: true, reason: 'No approved M3TM.APP headlines currently published to WORLD' });
+      }
+    }
   } else if (scenario === 'recovery') {
     await check('Failed style shows recovery state', `document.querySelector('[data-map-status]')?.dataset.mapStatus === 'error' && document.body.innerText.includes('Retry map')`);
     await command('Network.setBlockedURLs', { urls: [] });
@@ -325,6 +469,29 @@ try {
     cpu.samples?.forEach((id, i) => totals.set(id, (totals.get(id) ?? 0) + cpu.timeDeltas[i]));
     measurements.cpuTop = [...totals].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([id, us]) => ({ ms: Math.round(us / 1000), frame: cpu.nodes.find(n => n.id === id)?.callFrame }));
   }
+  // Same-hardware benchmark fields for comparing deployed baselines. rAF is
+  // explicitly a scheduling proxy, not proof that WebGL actually painted 60 FPS.
+  measurements.performance = await evaluate(`(async () => {
+    let count=0; let last=performance.now(); let intervals=[];
+    await new Promise(resolve=>{const start=performance.now();function sample(t){if(count){intervals.push(t-last)}last=t;count++;if(t-start<2500)requestAnimationFrame(sample);else resolve();}requestAnimationFrame(sample)});
+    const nav=performance.getEntriesByType('navigation')[0];
+    const resources=performance.getEntriesByType('resource');
+    const heap=performance.memory?.usedJSHeapSize ?? null;
+    return {navigation:{responseStartMs:nav?.responseStart??null,domContentLoadedMs:nav?.domContentLoadedEventEnd??null,loadMs:nav?.loadEventEnd??null},
+      firstCanvasMs:window.__m3tmFirstCanvasMs??null,firstUsableMapMs:window.__m3tmFirstReadyMs??null,
+      rafSchedulingHz:Math.round(1000*(count-1)/(intervals.reduce((a,b)=>a+b,0)||1)),rafIntervalP95Ms:intervals.sort((a,b)=>a-b)[Math.floor(intervals.length*.95)]??null,
+      jsHeapUsedBytes:heap,resourceCount:resources.length,
+      resourceDomainCounts:Object.entries(resources.reduce((out,r)=>{try{const h=new URL(r.name).hostname;out[h]=(out[h]||0)+1}catch{}return out},{})).sort((a,b)=>b[1]-a[1]).slice(0,12),
+      mapCanvasCount:document.querySelectorAll('.maplibregl-canvas').length,
+      longTasks:(window.__previewLongTasks||[]).slice(0,40)};
+  })()`);
+  const cdpPerformance = await command('Performance.getMetrics').catch(()=>({metrics:[]}));
+  measurements.performance.cdp = Object.fromEntries((cdpPerformance.metrics||[])
+    .filter(m=>['TaskDuration','JSHeapUsedSize','Nodes','Frames','LayoutCount','ScriptDuration','RecalcStyleDuration'].includes(m.name))
+    .map(m=>[m.name,m.value]));
+  measurements.performance.networkTransferredBytes = accumulatedNetworkBytes;
+  measurements.performance.networkRequestCount = network.size;
+  measurements.performance.documentWallTimeMs = (frameEventTimes.loadEvent ?? Date.now()) - browserNavigationWallMs;
   const visual = await command('Page.captureScreenshot', { format: 'jpeg', quality: 75 });
   await writeFile(join(output, 'visual.jpg'), Buffer.from(visual.data, 'base64'));
   const screenshot = await command('Page.captureScreenshot', { format: 'png' });
@@ -335,7 +502,7 @@ try {
   const report = { scenario, checks, measurements, page: JSON.parse(result.result.value), errors, warnings, failedRequests: requests, screenshot: join(output, 'preview.png') };
   await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ scenario, checks, measurements, errors, warnings, failedRequests: requests, report: join(output, 'report.json'), screenshot: report.screenshot }, null, 2));
-  process.exitCode = errors.length || checks.some(c => !c.passed) ? 1 : 0;
+  process.exitCode = errors.length || checks.some(c => c.passed === false) ? 1 : 0;
 } finally {
   clearTimeout(deadline);
   await command('Browser.close', {}, undefined).catch(() => {});
