@@ -6,7 +6,8 @@
  */
 export const DEFERRED_STARTUP_VISUALS = Object.freeze([
   'reference_atlas', 'conflict_density', 'frontlines', 'reported_routes',
-  'cables', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+  'cables', 'sdk_sea', 'satellites', 'sat_comms',
+  'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
   'cf_attacks', 'cf_outages', 'fires',
 ] as const);
 
