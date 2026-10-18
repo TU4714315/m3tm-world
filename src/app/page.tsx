@@ -577,13 +577,14 @@ export default function Dashboard() {
     setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
     setMapProjection('mercator');
   };
-  // Explicit 3D mode combines real imagery, DEM and measured-height buildings.
+  // Explicit 3D mode combines real imagery, DEM and sourced building footprints.
   // Close-range terrain and building sources keep their existing lazy thresholds.
   const selectRealistic3DMap = () => {
     setMapProjection('globe');
     setMapStyle('satellite');
     setSatelliteVisual('original');
-    setActiveLayers(prev => ({ ...prev, terrain_elevation: true, terrain_3d: true }));
+    // NOAA relief hides the satellite raster; the imagery preset must win.
+    setActiveLayers(prev => ({ ...prev, terrain_elevation: true, terrain_3d: true, terrain_etopo_2022: false }));
   };
   const terrainPanelProps = {
     terrainStatus,
@@ -1966,7 +1967,7 @@ export default function Dashboard() {
       >
         {/* Unified Control Strip */}
         <div className="flex w-fit max-w-full items-center justify-center gap-[3px] p-[4px] pointer-events-auto rounded-2xl border border-white/20 bg-[rgba(7,9,16,0.16)] backdrop-blur-sm shadow-[0_5px_16px_rgba(0,0,0,0.2)]">
-          <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={selectRealistic3DMap} title="صور جوية وتضاريس حقيقية ومبانٍ ذات ارتفاع منشور" icon={Globe} label="3D" />
+          <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={selectRealistic3DMap} title="صور جوية وتضاريس ارتفاع فعلية؛ ارتفاعات المباني تقريبية بحسب مزود الخرائط" icon={Globe} label="3D" />
           <ViewSegment layoutId="view-projection" active={mapProjection === 'mercator'} onClick={selectFlatMap} title="خريطة ثنائية الأبعاد" icon={MapPinned} label="2D" />
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
           <ViewSegment layoutId="view-style" active={mapStyle === 'dark'} onClick={() => setMapStyle('dark')} title="الوضع الليلي" icon={Moon} label="خريطة" />
@@ -2123,7 +2124,7 @@ export default function Dashboard() {
                 {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
               </button>
               <button type="button" aria-pressed={mapProjection === 'globe'}
-                title="3D ببيانات ارتفاع منشورة أو العودة إلى العرض المسطح"
+                title="3D بتضاريس مصدرية ومبانٍ بارتفاعات تقريبية، أو العودة إلى 2D"
                 onClick={() => mapProjection === 'globe' ? selectFlatMap() : selectRealistic3DMap()}
                 className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${mapProjection === 'globe' ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
                 {mapProjection === 'globe' ? 'العودة إلى 2D' : 'عرض 3D واقعي'}

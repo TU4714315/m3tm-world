@@ -21,8 +21,7 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
   const originalPitchLimit = map.getMaxPitch();
   const originalPixelRatio = map.getPixelRatio();
   map.setMaxPitch(Math.min(originalPitchLimit, 60));
-  // Retina screens otherwise multiply the terrain framebuffers' pixel count.
-  if (originalPixelRatio > 1.5) map.setPixelRatio(1.5);
+  // Keep the native, high-resolution overview until the DEM activates.
 
   const report = (next: TerrainStatus) => {
     if (disposed || next === status) return;
@@ -35,6 +34,7 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
     if (map.getSource(TERRAIN_SOURCE)) map.removeSource(TERRAIN_SOURCE);
     restoreLayerOrder?.();
     restoreLayerOrder = undefined;
+    if (originalPixelRatio > 1.5) map.setPixelRatio(originalPixelRatio);
   };
   const cancelActivation = () => {
     clearTimeout(activationTimer);
@@ -47,6 +47,8 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
     active = true;
     report('loading');
     try {
+      // Retina terrain framebuffers are costly; cap only while DEM is active.
+      if (originalPixelRatio > 1.5) map.setPixelRatio(1.5);
       map.addSource(TERRAIN_SOURCE, {
         type: 'raster-dem',
         tiles: ['osiris-dem://{z}/{x}/{y}'],

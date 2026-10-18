@@ -9,14 +9,16 @@ describe('realistic three-dimensional mode', () => {
     expect(page).toContain('const selectRealistic3DMap = () => {');
     expect(page).toContain("setMapStyle('satellite')");
     expect(page).toContain("setSatelliteVisual('original')");
-    expect(page).toContain('terrain_elevation: true, terrain_3d: true');
+    expect(page).toContain('terrain_elevation: true, terrain_3d: true, terrain_etopo_2022: false');
     expect(page.match(/onClick={selectRealistic3DMap}/g)).toHaveLength(2);
     expect(page).toContain("mapProjection === 'globe' ? selectFlatMap() : selectRealistic3DMap()");
     expect(page).toContain('عرض 3D واقعي');
   });
 
-  it('does not invent buildings where height is not available', () => {
-    expect(map).toContain("filter: ['all', ['has', 'render_height']");
+  it('presents building extrusion as approximate and guards regional pitch', () => {
+    expect(map).toContain("filter: ['>', ['to-number', ['get', 'render_height'], 0], 0]");
+    expect(map).toContain('can be derived from levels or a default');
+    expect(map).toContain('map.getZoom() >= 14.5 && map.getPitch() < 40');
     expect(map).toContain("'fill-extrusion-color': '#b0aaa0'");
     expect(map).toContain("15.5, ['to-number', ['get', 'render_height'], 0]");
     expect(map).toContain("15.5, ['to-number', ['get', 'render_min_height'], 0]");
