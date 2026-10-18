@@ -100,8 +100,8 @@ const DEFAULT_ACTIVE_LAYERS = {
   satellites: false, sat_comms: false, sat_military: false, sat_navigation: false,
   sat_earth: false, sat_science: false, balloons: false, cctv: false, cctv_previews: false,
   live_news: true, earthquakes: false, fires: true, weather: false, wind: false, rain: false, wind_controls: true, rain_controls: true, radiation: false,
-  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: true, reference_atlas: true, reported_routes: true, day_night: false,
-  cables: true, sdk_sea: true, sdk_air: false, sdk_naval: true, terrain_3d: false,
+  infrastructure: false, global_incidents: true, conflict_zones: true, conflict_density: true, frontlines: false, reference_atlas: false, reported_routes: false, day_night: false,
+  cables: false, sdk_sea: false, sdk_air: false, sdk_naval: true, terrain_3d: false,
   terrain_elevation: false, terrain_etopo_2022: false, malware: false, cyber_attacks: false, gdelt_events: true, civil_unrest: true,
   cf_outages: true, cf_attacks: true, app_news: true, alert_pins: true, country_borders: true,
 };
@@ -111,7 +111,7 @@ const PUBLIC_EMBED_ACTIVE_LAYERS = Object.fromEntries(
     key,
     [
       'live_news', 'global_incidents', 'conflict_zones', 'conflict_density', 'frontlines', 'reference_atlas', 'gdelt_events',
-      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks', 'sat_military', 'sat_navigation', 'sat_earth', 'sat_science',
+      'reported_routes', 'military_activity', 'naval_activity', 'civil_unrest', 'fires', 'cf_outages', 'cf_attacks',
       // Published, source-backed M3TM.APP news should be visible from the first APP embed paint.
       'app_news', 'alert_pins',
       'country_borders', 'flights', 'wind_controls', 'rain_controls',

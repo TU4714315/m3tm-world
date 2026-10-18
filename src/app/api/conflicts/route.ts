@@ -7,6 +7,7 @@ import {
   ACLED_PUBLICATION_WINDOW_DAYS, ACLED_RECENT_OCCURRENCE_DAYS,
 } from '@/lib/acled';
 import { gdeltWindowTime } from '@/lib/menaSignals';
+import { PUBLIC_CONFLICT_REGION, scopePublicConflictEvents, scopePublicContextZones } from '@/lib/publicConflictRegion';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
@@ -363,9 +364,10 @@ async function providerGET() {
   const previous = await durableGetJson<any>(CONFLICT_CACHE_KEY);
   const servedAt = new Date().toISOString();
   try {
-    const { events: liveEvents, gdeltWindow, gdeltScanned, acledRegionalCounts, acledPublishedUpdates, sourceStatus } = await fetchAllLiveConflictData();
+    const { events: sourceEvents, gdeltWindow, gdeltScanned, acledRegionalCounts, acledPublishedUpdates, sourceStatus } = await fetchAllLiveConflictData();
+    const liveEvents = scopePublicConflictEvents(sourceEvents);
 
-    const zones: ConflictZone[] = KNOWN_CONFLICTS.map(zone => {
+    const zones: ConflictZone[] = scopePublicContextZones(KNOWN_CONFLICTS).map(zone => {
       const zoneEvents = liveEvents.filter(event =>
         event.lat >= zone.bounds.minLat && event.lat <= zone.bounds.maxLat &&
         event.lng >= zone.bounds.minLng && event.lng <= zone.bounds.maxLng
@@ -408,6 +410,8 @@ async function providerGET() {
       totalLiveEvents: liveEvents.length,
       activeWarzones: zones.filter(zone => zone.severity === 'war').length,
       zonesWithRecentReports: zones.filter(zone => zone.eventCount > 0).length,
+      displayRegion: PUBLIC_CONFLICT_REGION,
+      scopeMethod: 'published-generalized-geo-belt',
       categoryCounts,
       timestamp: servedAt,
       source: 'GDELT 2.0 + optional ACLED fusion',
@@ -439,17 +443,31 @@ async function providerGET() {
         // Preserve durable last-good data while correcting the old publisher
         // classification, even when upstream is down.
         liveEvents: Array.isArray(previous.value.liveEvents)
-          ? previous.value.liveEvents.map((event:any) => ({
+          ? scopePublicConflictEvents(previous.value.liveEvents).map((event:any) => ({
               ...event, corroboration: publisherCoverage(event.sources),
             })) : [],
         zones: Array.isArray(previous.value.zones)
-          ? previous.value.zones.map((zone:any) => ({
+          ? scopePublicContextZones(previous.value.zones).map((zone:any) => ({
               ...zone,
               events: Array.isArray(zone.events)
                 ? zone.events.map((event:any) => ({
                     ...event, corroboration: publisherCoverage(event.sources),
                   })) : [],
             })) : [],
+        displayRegion: PUBLIC_CONFLICT_REGION,
+        scopeMethod: 'published-generalized-geo-belt',
+        totalZones: Array.isArray(previous.value.zones) ? scopePublicContextZones(previous.value.zones).length : 0,
+        totalLiveEvents: Array.isArray(previous.value.liveEvents) ? scopePublicConflictEvents(previous.value.liveEvents).length : 0,
+        activeWarzones: Array.isArray(previous.value.zones) ?
+          scopePublicContextZones(previous.value.zones).filter((zone:any) => zone.severity === 'war').length : 0,
+        zonesWithRecentReports: Array.isArray(previous.value.zones) ?
+          scopePublicContextZones(previous.value.zones).filter((zone:any) => Number(zone.eventCount) > 0).length : 0,
+        categoryCounts: Array.isArray(previous.value.liveEvents) ?
+          scopePublicConflictEvents(previous.value.liveEvents).reduce((counts:Record<string,number>, event:any) => {
+            const key = typeof event.type === 'string' ? event.type : 'other';
+            counts[key] = (counts[key] ?? 0) + 1;
+            return counts;
+          }, {}) : {},
         dataState: 'cached-stale',
         cacheBackend: previous.backend,
         durableCacheConfigured: durableCacheConfigured(),
@@ -459,7 +477,7 @@ async function providerGET() {
 
     // Keep contextual zones visible if GDELT is temporarily unavailable, but do
     // not manufacture "live" events or synthetic coordinates.
-    const fallbackZones = KNOWN_CONFLICTS.map(zone => ({
+    const fallbackZones = scopePublicContextZones(KNOWN_CONFLICTS).map(zone => ({
       id: zone.id,
       label: zone.label,
       labelAr: CONFLICT_ARABIC[zone.id]?.label ?? zone.label,
@@ -478,6 +496,8 @@ async function providerGET() {
     return NextResponse.json({
       zones: fallbackZones,
       liveEvents: [],
+      displayRegion: PUBLIC_CONFLICT_REGION,
+      scopeMethod: 'published-generalized-geo-belt',
       totalZones: fallbackZones.length,
       totalLiveEvents: 0,
       activeWarzones: fallbackZones.filter(zone => zone.severity === 'war').length,
