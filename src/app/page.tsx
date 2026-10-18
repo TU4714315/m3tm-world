@@ -2122,6 +2122,12 @@ export default function Dashboard() {
                 className="min-h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white/90 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
               </button>
+              <button type="button" aria-pressed={mapProjection === 'globe'}
+                title="3D ببيانات ارتفاع منشورة أو العودة إلى العرض المسطح"
+                onClick={() => mapProjection === 'globe' ? selectFlatMap() : selectRealistic3DMap()}
+                className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${mapProjection === 'globe' ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
+                {mapProjection === 'globe' ? 'العودة إلى 2D' : 'عرض 3D واقعي'}
+              </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
                 title="تقليل الازدحام"
                 onClick={() => {

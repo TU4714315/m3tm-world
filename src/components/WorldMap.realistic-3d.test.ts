@@ -11,6 +11,8 @@ describe('realistic three-dimensional mode', () => {
     expect(page).toContain("setSatelliteVisual('original')");
     expect(page).toContain('terrain_elevation: true, terrain_3d: true');
     expect(page.match(/onClick={selectRealistic3DMap}/g)).toHaveLength(2);
+    expect(page).toContain("mapProjection === 'globe' ? selectFlatMap() : selectRealistic3DMap()");
+    expect(page).toContain('عرض 3D واقعي');
   });
 
   it('does not invent buildings where height is not available', () => {
