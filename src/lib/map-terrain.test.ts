@@ -55,6 +55,7 @@ describe('lightweight terrain', () => {
     const status = vi.fn();
     const dispose = attachTerrain(fixture.map, status);
     expect(fixture.methods.addSource).not.toHaveBeenCalled();
+    expect(fixture.map.getPixelRatio()).toBe(3);
     expect(fixture.methods.setTerrain).not.toHaveBeenCalled();
     fixture.moveTo(11, true);
     fixture.emit('zoom');
@@ -65,6 +66,7 @@ describe('lightweight terrain', () => {
     expect(fixture.methods.addSource).not.toHaveBeenCalled();
     vi.advanceTimersByTime(TERRAIN_SETTLE_MS);
     expect(fixture.methods.addSource).toHaveBeenCalledTimes(1);
+    expect(fixture.map.getPixelRatio()).toBe(1.5);
     expect(status).toHaveBeenLastCalledWith('loading');
     dispose();
   });

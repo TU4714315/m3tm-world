@@ -577,6 +577,15 @@ export default function Dashboard() {
     setActiveLayers(prev => ({ ...prev, terrain_elevation: false, terrain_3d: false }));
     setMapProjection('mercator');
   };
+  // Explicit 3D mode combines real imagery, DEM and sourced building footprints.
+  // Close-range terrain and building sources keep their existing lazy thresholds.
+  const selectRealistic3DMap = () => {
+    setMapProjection('globe');
+    setMapStyle('satellite');
+    setSatelliteVisual('original');
+    // NOAA relief hides the satellite raster; the imagery preset must win.
+    setActiveLayers(prev => ({ ...prev, terrain_elevation: true, terrain_3d: true, terrain_etopo_2022: false }));
+  };
   const terrainPanelProps = {
     terrainStatus,
     on3DModeSelected: () => setMapProjection('globe'),
@@ -1958,7 +1967,7 @@ export default function Dashboard() {
       >
         {/* Unified Control Strip */}
         <div className="flex w-fit max-w-full items-center justify-center gap-[3px] p-[4px] pointer-events-auto rounded-2xl border border-white/20 bg-[rgba(7,9,16,0.16)] backdrop-blur-sm shadow-[0_5px_16px_rgba(0,0,0,0.2)]">
-          <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} title="كرة ثلاثية الأبعاد" icon={Globe} label="3D" />
+          <ViewSegment layoutId="view-projection" active={mapProjection === 'globe'} onClick={selectRealistic3DMap} title="صور جوية وتضاريس ارتفاع فعلية؛ ارتفاعات المباني تقريبية بحسب مزود الخرائط" icon={Globe} label="3D" />
           <ViewSegment layoutId="view-projection" active={mapProjection === 'mercator'} onClick={selectFlatMap} title="خريطة ثنائية الأبعاد" icon={MapPinned} label="2D" />
           <div className="w-px h-5 mx-1 bg-[var(--border-secondary)]" />
           <ViewSegment layoutId="view-style" active={mapStyle === 'dark'} onClick={() => setMapStyle('dark')} title="الوضع الليلي" icon={Moon} label="خريطة" />
@@ -2113,6 +2122,12 @@ export default function Dashboard() {
                 onClick={() => setMapStyle(style => style === 'dark' ? 'satellite' : 'dark')}
                 className="min-h-10 rounded-xl border border-white/20 bg-transparent px-2 text-white/90 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 {mapStyle === 'dark' ? 'عرض الأقمار' : 'عرض داكن'}
+              </button>
+              <button type="button" aria-pressed={mapProjection === 'globe'}
+                title="3D بتضاريس مصدرية ومبانٍ بارتفاعات تقريبية، أو العودة إلى 2D"
+                onClick={() => mapProjection === 'globe' ? selectFlatMap() : selectRealistic3DMap()}
+                className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${mapProjection === 'globe' ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
+                {mapProjection === 'globe' ? 'العودة إلى 2D' : 'عرض 3D واقعي'}
               </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
                 title="تقليل الازدحام"
@@ -2320,7 +2335,7 @@ export default function Dashboard() {
             <div className="mb-3 flex items-center justify-between"><h2 className="text-xs font-semibold">الخرائط</h2><button type="button" aria-label="إغلاق الخرائط" onClick={() => setShowArcGIS(false)}><X className="h-4 w-4" /></button></div>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={mapProjection === 'mercator'} onClick={selectFlatMap} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-xs ${mapProjection === 'mercator' ? 'border-cyan-200/60 bg-cyan-100/10' : 'border-white/15'}`}><MapPinned className="h-5 w-5" />2D</button>
-              <button type="button" aria-pressed={mapProjection === 'globe'} onClick={() => setMapProjection('globe')} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-xs ${mapProjection === 'globe' ? 'border-cyan-200/60 bg-cyan-100/10' : 'border-white/15'}`}><Globe className="h-5 w-5" />3D</button>
+              <button type="button" aria-pressed={mapProjection === 'globe'} onClick={selectRealistic3DMap} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-xs ${mapProjection === 'globe' ? 'border-cyan-200/60 bg-cyan-100/10' : 'border-white/15'}`}><Globe className="h-5 w-5" />3D واقعي</button>
             </div>
           </section>}
         </div>

@@ -3406,11 +3406,19 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     mapRef.current.flyTo({ center: [flyToLocation.lng, flyToLocation.lat], zoom: flyToLocation.zoom ?? 8, duration: 2000 });
   }, [mapReady, flyToLocation]);
 
-  // 3D buildings are independent of the elevation renderer.
+  // CARTO/OpenMapTiles building footprints are sourced, but render_height
+  // can be derived from levels or a default. These extrusions are illustrative,
+  // NOT a survey, photogrammetric model or confirmed measured elevations.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
     const enabled = activeLayers.terrain_3d;
+    const pitchWhenBuildingsVisible = () => {
+      // At global/regional zoom an oblique skyline hides real map context.
+      if (map.getZoom() >= 14.5 && map.getPitch() < 40) {
+        map.easeTo({ pitch: 50, duration: 750 });
+      }
+    };
 
     try {
       if (enabled) {
@@ -3425,38 +3433,33 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             'source-layer': 'building',
             type: 'fill-extrusion',
             minzoom: 14.5,
+            filter: ['>', ['to-number', ['get', 'render_height'], 0], 0],
             paint: {
-              'fill-extrusion-color': [
-                'interpolate', ['linear'], ['get', 'render_height'],
-                0, '#1a1a2e',
-                20, '#16213e',
-                50, '#0f3460',
-                120, '#533483',
-                300, '#e94560',
-              ],
+              // Physical-material tones avoid fictional neon city silhouettes.
+              'fill-extrusion-color': '#b0aaa0',
               'fill-extrusion-height': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15.5, ['get', 'render_height']
+                15.5, ['to-number', ['get', 'render_height'], 0]
               ],
               'fill-extrusion-base': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15.5, ['get', 'render_min_height']
+                15.5, ['to-number', ['get', 'render_min_height'], 0]
               ],
               'fill-extrusion-opacity': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15, 0.7,
+                15, 0.82,
               ],
             },
           });
         }
 
-        // Pitch the camera to reveal the 3D skyline
-        if (map.getPitch() < 40) {
-          map.easeTo({ pitch: 50, duration: 1200 });
-        }
+        // Register only while 3D buildings are selected. The resting globe
+        // pitch remains intact until buildings become visible at zoom 14.5.
+        map.on('zoomend', pitchWhenBuildingsVisible);
+        pitchWhenBuildingsVisible();
 
       } else {
         // ── DISABLE 3D ──
@@ -3465,6 +3468,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     } catch (e) {
       console.warn('[M3TM.WORLD] 3D terrain toggle error:', e);
     }
+    return () => { if (mapRef.current === map) map.off('zoomend', pitchWhenBuildingsVisible); };
   }, [mapReady, activeLayers.terrain_3d]);
 
   // Satellite / Dark style switching
