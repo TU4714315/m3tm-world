@@ -148,6 +148,12 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Warm CARTO's actual public basemap on the initial HTML response,
+            before the lazy WebGL bundle has parsed. Keep the exact map style
+            and attribution; do not route tiles through Render. */}
+        <link rel="preconnect" href="https://basemaps.cartocdn.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://tiles.basemaps.cartocdn.com" crossOrigin="anonymous" />
+        <link rel="preload" href="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" as="fetch" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/favicon-m3.svg" type="image/svg+xml" sizes="any" />
         <link rel="apple-touch-icon" href="/m3tm-mark.png" />
