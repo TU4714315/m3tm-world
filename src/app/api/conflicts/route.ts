@@ -458,6 +458,16 @@ async function providerGET() {
         scopeMethod: 'published-generalized-geo-belt',
         totalZones: Array.isArray(previous.value.zones) ? scopePublicContextZones(previous.value.zones).length : 0,
         totalLiveEvents: Array.isArray(previous.value.liveEvents) ? scopePublicConflictEvents(previous.value.liveEvents).length : 0,
+        activeWarzones: Array.isArray(previous.value.zones) ?
+          scopePublicContextZones(previous.value.zones).filter((zone:any) => zone.severity === 'war').length : 0,
+        zonesWithRecentReports: Array.isArray(previous.value.zones) ?
+          scopePublicContextZones(previous.value.zones).filter((zone:any) => Number(zone.eventCount) > 0).length : 0,
+        categoryCounts: Array.isArray(previous.value.liveEvents) ?
+          scopePublicConflictEvents(previous.value.liveEvents).reduce((counts:Record<string,number>, event:any) => {
+            const key = typeof event.type === 'string' ? event.type : 'other';
+            counts[key] = (counts[key] ?? 0) + 1;
+            return counts;
+          }, {}) : {},
         dataState: 'cached-stale',
         cacheBackend: previous.backend,
         durableCacheConfigured: durableCacheConfigured(),
