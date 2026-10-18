@@ -18,31 +18,45 @@ import { maskSaudiPublicIndicators, inSaudiPublicBoundary, isSaudiPublicIndicato
 import { buildAppNewsPins } from '@/lib/appNewsPins';
 import { buildPublicFieldAlerts } from '@/lib/publicFieldAlerts';
 import { restoreLayerState, serializeLayerState } from '@/lib/layerUrlState';
-import WorldFeed from '@/components/WorldFeed';
-import ScmPanel from '@/components/ScmPanel';
-import SearchBar from '@/components/SearchBar';
-import DirectionsBar, { type RouteResult, type LiveLocation } from '@/components/DirectionsBar';
-import NavigationView from '@/components/NavigationView';
-import FlightWatchPanel, { type WatchedFlight, type FlightTelemetry, type AircraftDetail, type Airport } from '@/components/FlightWatchPanel';
+
+
+
+
+
+
 import type { NavProgress } from '@/lib/navigation';
 import type { LiveDetection } from '@/lib/malware-intel';
 import ScaleBar from '@/components/ScaleBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { applySettings, loadSavedSettings } from '@/lib/style-tokens';
-import SharePanel from '@/components/SharePanel';
-import ViewPresets from '@/components/ViewPresets';
+
+
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import { hidePublicMapMarkers, reducePublicEventClutter, restorePublicEventClutter } from '@/lib/publicEmbedView';
 import { restoreYemenMapLayers, YEMEN_MAP_FOCUS } from '@/lib/yemenMapView';
-import LiveAlerts from '@/components/LiveAlerts';
-import MenaPulse from '@/components/MenaPulse';
+
+
 import { SATELLITE_VISUAL_PRESETS, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
 import { loadWorldWorkspaceSnapshot, saveWorldWorkspaceSnapshot } from '@/lib/workspacePersistence';
 import { recordWorldVisitOnce } from '@/lib/publicVisitCounter';
 import { hasUsableCivilianFlightData, retryFlightLayerLoad } from '@/lib/flightReliability';
 import WorldBrandMark from '@/components/WorldBrandMark';
 import MapStartupWatchdog from '@/components/MapStartupWatchdog';
+// These components are only requested after a reader opens their respective
+// panels. Do not preload navigation, tracking, search, or the full news
+// workspace into the first interactive map bundle.
+import type { RouteResult, LiveLocation } from '@/components/DirectionsBar';
+import type { WatchedFlight, FlightTelemetry, AircraftDetail, Airport } from '@/components/FlightWatchPanel';
+const WorldFeed = dynamic(() => import('@/components/WorldFeed'), { ssr: false });
+const SearchBar = dynamic(() => import('@/components/SearchBar'), { ssr: false });
+const DirectionsBar = dynamic(() => import('@/components/DirectionsBar'), { ssr: false });
+const NavigationView = dynamic(() => import('@/components/NavigationView'), { ssr: false });
+const FlightWatchPanel = dynamic(() => import('@/components/FlightWatchPanel'), { ssr: false });
+const SharePanel = dynamic(() => import('@/components/SharePanel'), { ssr: false });
+const ViewPresets = dynamic(() => import('@/components/ViewPresets'), { ssr: false });
+const LiveAlerts = dynamic(() => import('@/components/LiveAlerts'), { ssr: false });
+const MenaPulse = dynamic(() => import('@/components/MenaPulse'), { ssr: false });
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
