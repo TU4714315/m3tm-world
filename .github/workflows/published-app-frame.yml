@@ -13,6 +13,7 @@ permissions:
 jobs:
   published-browser:
     # Read-only acceptance against real published APP and WORLD, not fixtures.
+    # Post WORLD #154 (be8d0378): confirm APP #449 and WORLD public behavior without a deploy.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
