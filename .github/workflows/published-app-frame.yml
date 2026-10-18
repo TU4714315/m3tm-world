@@ -1,4 +1,5 @@
 name: Verify published APP and WORLD browser acceptance
+# Read-only postrelease verification of live WORLD 3851f60a; no runtime changes.
 
 on:
   pull_request:
