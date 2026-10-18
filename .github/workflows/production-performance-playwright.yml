@@ -1,4 +1,5 @@
 name: Chromium Playwright production latency benchmark
+# QA read-only: APP Pages 1a0485f + WORLD Render f55b794; run after browser acceptance.
 on:
   pull_request:
     paths:
