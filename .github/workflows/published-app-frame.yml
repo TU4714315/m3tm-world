@@ -17,6 +17,10 @@ jobs:
     timeout-minutes: 5
     strategy:
       fail-fast: false
+      # The public Render instance is small: test one real client at a time.
+      # Parallel browser probes previously caused false iframe startup misses.
+      # Dedicated load tests must measure multi-client behavior separately.
+      max-parallel: 1
       matrix:
         include:
           - id: app-desktop
