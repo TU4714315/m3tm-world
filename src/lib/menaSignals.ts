@@ -1,4 +1,5 @@
 import type { AppNewsPin } from './appNewsPins';
+import { isPublicConflictRegion } from './publicConflictRegion';
 
 /** Public evidence fusion over an expanded Middle East and Red Sea belt. */
 export const isMiddleEastBelt = (lat: unknown, lng: unknown): boolean =>
@@ -31,7 +32,7 @@ export function regionalPublicSignals(data:{
   const seen=new Set<string>();
   const rows=[...(data.conflict_live_events??[]),...(data.gdelt_events??[]),...(data.civil_unrest??[])];
   for(const e of rows){
-    if(!isMiddleEastBelt(e.lat,e.lng))continue;
+    if(!isPublicConflictRegion(e.lat,e.lng))continue;
     const provider=e.provider??e.sourceLabel??'GDELT';
     const id=String(e.id||'').replace(/^gdelt-/,'');
     const key=(provider==='ACLED'?'acled:':'gdelt:')+(id||e.url||e.date||'unspecified');
