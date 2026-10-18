@@ -10,7 +10,10 @@ describe('WORLD public defaults and branding', () => {
 
   it('starts the visible public feeds from the screenshots enabled', () => {
     expect(page).toContain('flights: true, private: false, jets: false');
-    expect(page).toContain('sdk_sea: true, sdk_air: false, sdk_naval: true');
+    expect(page).toContain('sdk_sea: false, sdk_air: false, sdk_naval: true');
+    expect(page).toContain('satellites: false, sat_comms: false');
+    expect(page).toContain('frontlines: false, reference_atlas: false, reported_routes: false');
+    expect(page).toContain('cables: false, sdk_sea: false');
     expect(page).toContain('cf_outages: true, cf_attacks: true');
     expect(page).toContain('earthquakes: false, fires: true');
     expect(page).toContain("'cf_outages', 'cf_attacks'");
