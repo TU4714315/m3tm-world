@@ -3406,7 +3406,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     mapRef.current.flyTo({ center: [flyToLocation.lng, flyToLocation.lat], zoom: flyToLocation.zoom ?? 8, duration: 2000 });
   }, [mapReady, flyToLocation]);
 
-  // 3D buildings are independent of the elevation renderer.
+  // Building footprints and heights come from CARTO, never fabricated.
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
@@ -3425,29 +3425,24 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             'source-layer': 'building',
             type: 'fill-extrusion',
             minzoom: 14.5,
+            filter: ['all', ['has', 'render_height'], ['>', ['to-number', ['get', 'render_height'], 0], 0]],
             paint: {
-              'fill-extrusion-color': [
-                'interpolate', ['linear'], ['get', 'render_height'],
-                0, '#1a1a2e',
-                20, '#16213e',
-                50, '#0f3460',
-                120, '#533483',
-                300, '#e94560',
-              ],
+              // Physical-material tones avoid fictional neon city silhouettes.
+              'fill-extrusion-color': '#b0aaa0',
               'fill-extrusion-height': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15.5, ['get', 'render_height']
+                15.5, ['to-number', ['get', 'render_height'], 0]
               ],
               'fill-extrusion-base': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15.5, ['get', 'render_min_height']
+                15.5, ['to-number', ['get', 'render_min_height'], 0]
               ],
               'fill-extrusion-opacity': [
                 'interpolate', ['linear'], ['zoom'],
                 14.5, 0,
-                15, 0.7,
+                15, 0.82,
               ],
             },
           });
