@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 14
     strategy:
       fail-fast: false
+      # Read-only post-#152 live benchmark: WORLD 980f459, APP 1a0485f. QA only, no deploy.
       # Do not saturate the one-instance Render Free service with 3 concurrent
       # 3-iteration cold benchmark workloads; keep each scenario isolated.
       max-parallel: 1
