@@ -122,6 +122,10 @@ async function providerGET(req: Request) {
             isPublicConflictRegion(route?.target_lat,route?.target_lng)) : [],
         total: Array.isArray(previous.value.events) ?
           scopePublicConflictEvents(previous.value.events).length : 0,
+        reported_routes_total: Array.isArray(previous.value.reported_routes) ?
+          previous.value.reported_routes.filter((route:any) =>
+            isPublicConflictRegion(route?.origin_lat,route?.origin_lng) &&
+            isPublicConflictRegion(route?.target_lat,route?.target_lng)).length : 0,
         priority_region: PUBLIC_CONFLICT_REGION,
         scope_method: 'published-generalized-geo-belt',
         data_state: 'cached-stale',
