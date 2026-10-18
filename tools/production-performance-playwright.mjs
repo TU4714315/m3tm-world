@@ -123,6 +123,25 @@ for(let iteration=1;iteration<=iterations;iteration++){
       resources:resource.length,
       tileRequests:resource.filter(r=>/cartocdn|arcgis|maptiler|openmaptiles/.test(r.name)).length,
       resourceByHost:Object.entries(resource.reduce((m,r)=>{try{const h=new URL(r.name).hostname;m[h]=(m[h]||0)+1}catch{}return m},{})).sort((a,b)=>b[1]-a[1]).slice(0,12),
+      // Key stages already marked by WORLD's runtime. These timestamps
+      // distinguish JS/map constructor, style network load, map layer
+      // registration and first usable frame without modifying production.
+      worldRuntimeMarks:perf.getEntriesByType('mark')
+        .filter(x=>x.name.startsWith('m3tm:'))
+        .map(x=>({name:x.name,atMs:Math.round(x.startTime)})),
+      worldRuntimeMeasures:perf.getEntriesByType('measure')
+        .filter(x=>x.name.startsWith('m3tm:'))
+        .map(x=>({name:x.name,durationMs:Math.round(x.duration)})),
+      slowestResources:resource.filter(x=>x.responseEnd>0)
+        .sort((a,b)=>(b.responseEnd-b.startTime)-(a.responseEnd-a.startTime))
+        .slice(0,12).map(r=>({
+          resource:r.name.includes('/_next/')?'_next/'+r.name.split('/_next/').pop()?.slice(0,80):
+            r.name.replace(/([?&])(token|key|apikey|api_key)=[^&]+/gi,'$1$2=REDACTED').slice(0,130),
+          ms:Math.round(r.responseEnd-r.startTime),
+          transfer:r.transferSize??0,
+          startedMs:Math.round(r.startTime),
+        })),
+      longTaskCount:perf.getEntriesByType('longtask').length,
       rafSchedulerHz:deltas.length*1000/(deltas.reduce((a,b)=>a+b,0)||1),
       canvasCount:candidates.length,
       direction:getComputedStyle(document.body).direction,
