@@ -47,6 +47,8 @@ for(let iteration=1;iteration<=iterations;iteration++){
   const target=scenario==='app-iframe'?app:world+(scenario==='world-mobile'?'':'');
   await page.addInitScript(()=>{
     window.__m3tmPaintObserved={canvas:null,usable:null};
+    window.__m3tmLongTasks=[];
+    try{new PerformanceObserver(list=>{for(const entry of list.getEntries())window.__m3tmLongTasks.push({start:entry.startTime,duration:entry.duration});}).observe({type:'longtask',buffered:true});}catch{}
     const measure=()=>{
       if(!document.body)return;
       const canvas=document.querySelector('.maplibregl-canvas');
@@ -141,7 +143,15 @@ for(let iteration=1;iteration<=iterations;iteration++){
           transfer:r.transferSize??0,
           startedMs:Math.round(r.startTime),
         })),
-      longTaskCount:perf.getEntriesByType('longtask').length,
+      // Performance.getEntriesByType('longtask') is always empty in Chrome;
+      // retain long tasks from a buffered observer installed before navigation.
+      longTaskCount:(window.__m3tmLongTasks||[]).length,
+      longTaskTotalMs:(window.__m3tmLongTasks||[]).reduce((sum,x)=>sum+x.duration,0),
+      mapConstructorStartMs:perf.getEntriesByName('m3tm:map-constructor-start')[0]?.startTime??null,
+      basemapStyleLoadedMs:perf.getEntriesByName('m3tm:basemap-style-loaded')[0]?.startTime??null,
+      initialLayersRegisteredMs:perf.getEntriesByName('m3tm:initial-layers-registered')[0]?.startTime??null,
+      // Resource sizes may be zero for cross-origin entries lacking TAO.
+      visibleScriptTransferBytes:resource.filter(r=>/\.(js|css)(?:\?|$)/.test(r.name)).reduce((n,r)=>n+(r.transferSize||0),0),
       rafSchedulerHz:deltas.length*1000/(deltas.reduce((a,b)=>a+b,0)||1),
       canvasCount:candidates.length,
       direction:getComputedStyle(document.body).direction,
@@ -159,7 +169,7 @@ for(let iteration=1;iteration<=iterations;iteration++){
 }
 await browser.close();
 const summaryFields=['firstCanvasMs','firstUsableMs','serverResponseStartMs','elapsedWallMs',
-  'networkRequests','failedRequests','tileRequests','jsHeapBytes','rafSchedulerHz'];
+  'networkRequests','failedRequests','tileRequests','jsHeapBytes','rafSchedulerHz','longTaskCount','longTaskTotalMs','mapConstructorStartMs','basemapStyleLoadedMs','initialLayersRegisteredMs','visibleScriptTransferBytes'];
 const report={scenario,iterations,successes:entries.filter(x=>x.ready).length,
   statistics:Object.fromEntries(summaryFields.map(k=>[k,summary(entries,k)])),entries,
   note:'rAF scheduler Hz is not actual MapLibre/WebGL rendered FPS; each iteration uses an isolated cold profile and identical CI SwiftShader settings.'};
