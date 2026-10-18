@@ -2,7 +2,8 @@ import { withRestrictedMapResponse } from '@/lib/mapAccessServer';
 import { NextResponse } from 'next/server';
 import { maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { buildGdeltReportedRoutes, publisherCoverage, fetchGdeltEvents, toPublicGdeltEvent } from '@/lib/gdeltEvents';
-import { gdeltWindowTime, isMiddleEastBelt } from '@/lib/menaSignals';
+import { gdeltWindowTime } from '@/lib/menaSignals';
+import { PUBLIC_CONFLICT_REGION, scopePublicConflictEvents, isPublicConflictRegion } from '@/lib/publicConflictRegion';
 import { durableCacheConfigured, durableGetJson, durableSetJson } from '@/lib/durableCache';
 import { observeGdeltWindow } from '@/lib/gdeltCoverageLedger';
 
@@ -64,8 +65,13 @@ async function providerGET(req: Request) {
     // Preserve exactly which 15-minute source export was *actually* decoded.
     // This is metadata sampling, not a fake seven-day event history.
     await observeGdeltWindow(window);
-    const reportedRoutes = buildGdeltReportedRoutes(events);
-    const publicEvents = events.map(toPublicGdeltEvent);
+    // Reduce public transfer/GeoJSON work without fabricating or reclassifying
+    // any source row. Keep source archive provenance and scan counts unchanged.
+    const scopedEvents = scopePublicConflictEvents(events);
+    const reportedRoutes = buildGdeltReportedRoutes(scopedEvents).filter(route =>
+      isPublicConflictRegion(route.origin_lat, route.origin_lng) &&
+      isPublicConflictRegion(route.target_lat, route.target_lng));
+    const publicEvents = scopedEvents.map(toPublicGdeltEvent);
     const payload = {
       events: publicEvents,
       reported_routes: reportedRoutes,
@@ -80,8 +86,9 @@ async function providerGET(req: Request) {
       scanned,
       window,
       source_published_at: gdeltWindowTime(window),
-      priority_region: 'middle-east-red-sea',
-      priority_region_count: publicEvents.filter(e => isMiddleEastBelt(e.lat,e.lng)).length,
+      priority_region: PUBLIC_CONFLICT_REGION,
+      scope_method: 'published-generalized-geo-belt',
+      priority_region_count: publicEvents.length,
       source: 'GDELT 2.0 Events',
       timestamp: new Date().toISOString(),
       data_state: 'live',
@@ -106,9 +113,17 @@ async function providerGET(req: Request) {
         // Old durable payloads were saved with articles>=3 treated as
         // multi-source. Correct the labels even when upstream is unavailable.
         events: Array.isArray(previous.value.events)
-          ? previous.value.events.map((event:any) => ({
+          ? scopePublicConflictEvents(previous.value.events).map((event:any) => ({
               ...event, corroboration: publisherCoverage(event.sources),
             })) : [],
+        reported_routes: Array.isArray(previous.value.reported_routes) ?
+          previous.value.reported_routes.filter((route:any) =>
+            isPublicConflictRegion(route?.origin_lat,route?.origin_lng) &&
+            isPublicConflictRegion(route?.target_lat,route?.target_lng)) : [],
+        total: Array.isArray(previous.value.events) ?
+          scopePublicConflictEvents(previous.value.events).length : 0,
+        priority_region: PUBLIC_CONFLICT_REGION,
+        scope_method: 'published-generalized-geo-belt',
         data_state: 'cached-stale',
         cache_backend: previous.backend,
         durable_cache_configured: durableCacheConfigured(),
