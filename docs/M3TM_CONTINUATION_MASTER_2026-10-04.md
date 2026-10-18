@@ -363,3 +363,14 @@ EXTERNAL LIMITS: OpenSky 429 and GDELT timeouts need backoff and explicitly stal
 **Careful distinction:** CARTO/ArcGIS imagery is *not* a satellite-object tracking catalogue. User requests a monthly catalogue refresh; TLE orbital elements cannot be trusted as 30-day-old live positions. Do not change orbital fetch TTL to 30 days until a separate static monthly catalogue vs live orbital position choice is confirmed. Do not imply a monthly satellite still reflects a current location.
 
 **Verification:** CI/typecheck/unit/privacy, source-backed news and event origin/scope tests, mobile and desktop embedded UI acceptance, then fresh production timings must all pass prior to merge/deployment. No FPS or resource gain claimed before real measurements. This does not change internal OSINT access or Saudi public masking.
+
+
+## 2026-10-18 — Optional panel chunking after WORLD #152
+
+**Baseline:** Prior to #152 at f55b794, the three-iteration cold production Playwright run 39114621103 measured WORLD desktop mean 39.44 s / median 36.62 s / sample P95 67.59 s; mobile mean 31.41 / median 30.83 / sample P95 32.63; APP embed mean 43.78 / median 42.42 / sample P95 48.19. P95 with n=3 is simply the sample maximum. The poor desktop Chromium rAF scheduling reflects headless SwiftShader scheduling, NOT measured MapLibre WebGL-presented FPS. PR #152 subsequently reduced regional conflict payload and tracking defaults; post-#152 live baseline is being measured via existing QA PR #151.
+
+**Implementation:** Move optional WorldFeed, SearchBar, DirectionsBar, NavigationView, FlightWatchPanel, SharePanel, ViewPresets, LiveAlerts and MenaPulse into Next dynamic client chunks, loaded only when corresponding panel is mounted. Preserve type-only navigation/flight models, immediate MapLibre presentation, source-backed M3TM.APP ticker, Arabic RTL, map permissions and Yemen-first visible public conflict / military regional aggregate layers. Do not change network rate limits, provider sources or workspace/local files. Unit regression guards optional import boundaries without unmeasured latency claims.
+
+**Release gate:** Current-head CI, TS/build/privacy/required status, review and guarded merge before production. After deploy repeat three-iteration cold Playwright benchmark (desktop/mobile/APP iframe); compare mean, median, sample max/P95, JS heap and request counts, explicitly noting third-party variability. The published basemap remains dark 2D with Globe/satellite available.
+
+**Unresolved:** M3TM Workspace Core exec_command returned Tool not found in this session. Original mixed local worktrees, git status and backup under M3TM-SAFETY-20261017 cannot be independently verified through that connector. Do not reset/delete them or claim all nested worktree files are archived.
