@@ -3480,7 +3480,12 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             type: 'raster',
             tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
             tileSize: 256,
-            maxzoom: 20,
+            // High-zoom ArcGIS imagery may return an HTTP 200 placeholder JPEG
+            // literally reading "Map data not yet available". MapLibre treats
+            // that as a valid tile, so it cannot automatically fall back.
+            // Prefer consistent imagery at regional resolution and overscale
+            // on close views; vector labels and public overlays stay sharp.
+            maxzoom: 15,
             attribution: ARCGIS_IMAGERY_ATTRIBUTION,
           });
         }
