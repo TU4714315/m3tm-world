@@ -18,6 +18,7 @@ import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
 import { satelliteInsertionAnchor, satelliteRasterPaint, type SatelliteVisualPreset } from '@/lib/satellite-visual-preset';
+import { SATELLITE_IMAGE_SOURCE_MAX_ZOOM, mapViewMaxZoom } from '@/lib/map-quality-limits';
 import { publicClusterOptions } from '@/lib/map-visual-density';
 import { syncEtopo2022Relief } from '@/lib/etopo-relief';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
@@ -303,7 +304,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       // A 390px phone at zoom 4.5 sees a few cities rather than the MENA
       // region. Begin with a regional overview; manual/published flyTo still wins.
       center: [43.5, 26.0] as [number, number],
-      zoom: (window.innerWidth < 768 || (window.innerHeight < 500 && window.innerWidth < 1024)) ? 3.25 : 4.5, minZoom: 1.5, maxZoom: 20,
+      zoom: (window.innerWidth < 768 || (window.innerHeight < 500 && window.innerWidth < 1024)) ? 3.25 : 4.5, minZoom: 1.5, maxZoom: mapViewMaxZoom(mapStyle),
       // Show live attribution for CARTO/OSM, the active Mapzen DEM and imagery.
       // Source declarations alone are invisible when this control is disabled.
       attributionControl: MAP_ATTRIBUTION_OPTIONS,
@@ -3419,8 +3420,10 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     const enabled = activeLayers.terrain_3d;
     const pitchWhenBuildingsVisible = () => {
       // At global/regional zoom an oblique skyline hides real map context.
-      if (map.getZoom() >= 15.5 && map.getPitch() < 40) {
-        map.easeTo({ pitch: 45, duration: 750 });
+      // The imagery source is not photogrammetry. Steep close-up tilt stretches
+      // pixels and creates a false sense of detail over coarse terrain DEMs.
+      if (map.getZoom() >= 15.5 && map.getPitch() < 25) {
+        map.easeTo({ pitch: 30, duration: 600 });
       }
     };
 
@@ -3493,7 +3496,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             // that as a valid tile, so it cannot automatically fall back.
             // Prefer consistent imagery at regional resolution and overscale
             // on close views; vector labels and public overlays stay sharp.
-            maxzoom: 15,
+            maxzoom: SATELLITE_IMAGE_SOURCE_MAX_ZOOM,
             attribution: ARCGIS_IMAGERY_ATTRIBUTION,
           });
         }
@@ -3528,6 +3531,15 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       console.warn('Style switch failed:', e);
     }
   }, [mapReady, mapStyle, satelliteVisual, activeLayers.terrain_etopo_2022]);
+
+  // Do not overscale 256px World Imagery past its useful resolution. Keep all
+  // vector map zoom levels available when switching back to the dark basemap.
+  // MapLibre safely clamps an existing higher zoom when the limit is lowered.
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    map.setMaxZoom(mapViewMaxZoom(mapStyle));
+  }, [mapReady, mapStyle]);
 
   useEffect(() => {
     const map = mapRef.current;

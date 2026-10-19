@@ -89,6 +89,25 @@ describe('lightweight terrain', () => {
     expect(fixture.map.getPixelRatio()).toBe(3);
     expect(fixture.map.getMaxPitch()).toBe(85);
   });
+  it('releases low-resolution DEM above its useful close-range level, and restores Retina quality', () => {
+    const fixture = createMap(11);
+    const dispose = attachTerrain(fixture.map, vi.fn());
+    vi.advanceTimersByTime(TERRAIN_SETTLE_MS);
+    expect(fixture.sources.has(TERRAIN_SOURCE)).toBe(true);
+    fixture.moveTo(15.6);
+    fixture.emit('zoom');
+    fixture.emit('moveend');
+    expect(fixture.sources.has(TERRAIN_SOURCE)).toBe(false);
+    expect(fixture.map.getPixelRatio()).toBe(3);
+    vi.advanceTimersByTime(TERRAIN_SETTLE_MS * 4);
+    expect(fixture.methods.addSource).toHaveBeenCalledTimes(1);
+    fixture.moveTo(14.5);
+    fixture.emit('zoom');
+    fixture.emit('moveend');
+    vi.advanceTimersByTime(TERRAIN_SETTLE_MS);
+    expect(fixture.methods.addSource).toHaveBeenCalledTimes(2);
+    dispose();
+  });
 
   it('unloads during zoom-out and avoids source churn near the zoom threshold', () => {
     const fixture = createMap();

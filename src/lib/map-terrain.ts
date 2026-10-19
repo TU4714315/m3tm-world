@@ -1,6 +1,7 @@
 import type { Map, MapSourceDataEvent, ErrorEvent } from 'maplibre-gl';
 import { batchTerrainLayers } from './terrain-layer-order';
 import { TILEZEN_TERRAIN_ATTRIBUTION } from './terrain-source-attribution';
+import { TERRAIN_LAST_USEFUL_ZOOM, TERRAIN_HIGH_ZOOM_RELEASE } from './map-quality-limits';
 
 export const TERRAIN_SOURCE = 'osiris-terrain-dem';
 export type TerrainStatus = 'idle' | 'waiting' | 'loading' | 'ready' | 'error';
@@ -43,7 +44,7 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
   const hidden = () => typeof document !== 'undefined' && document.hidden;
   const activate = () => {
     activationTimer = undefined;
-    if (disposed || active || failed || map.isMoving() || hidden() || map.getZoom() < TERRAIN_MIN_ZOOM) return;
+    if (disposed || active || failed || map.isMoving() || hidden() || map.getZoom() < TERRAIN_MIN_ZOOM || map.getZoom() > TERRAIN_LAST_USEFUL_ZOOM) return;
     active = true;
     report('loading');
     try {
@@ -72,7 +73,7 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
   const update = () => {
     if (disposed || active || failed) return;
     cancelActivation();
-    if (map.getZoom() < TERRAIN_MIN_ZOOM) {
+    if (map.getZoom() < TERRAIN_MIN_ZOOM || map.getZoom() > TERRAIN_LAST_USEFUL_ZOOM) {
       report('idle');
       return;
     }
@@ -80,12 +81,12 @@ export function attachTerrain(map: Map, onStatus: (status: TerrainStatus) => voi
     if (!map.isMoving() && !hidden()) activationTimer = setTimeout(activate, TERRAIN_SETTLE_MS);
   };
   const onZoom = () => {
-    if (!active && map.getZoom() < TERRAIN_MIN_ZOOM) {
+    if (!active && (map.getZoom() < TERRAIN_MIN_ZOOM || map.getZoom() > TERRAIN_LAST_USEFUL_ZOOM)) {
       cancelActivation();
       if (!failed) report('idle');
     }
     // Stop terrain requests during the zoom-out, before reaching the globe.
-    if (active && map.getZoom() < DISABLE_ZOOM) {
+    if (active && (map.getZoom() < DISABLE_ZOOM || map.getZoom() > TERRAIN_HIGH_ZOOM_RELEASE)) {
       release();
       report('idle');
     }
