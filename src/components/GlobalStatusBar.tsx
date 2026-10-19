@@ -83,8 +83,8 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
     return presentation ? [{ ...item, presentation }] : [];
   }), [news]);
   const reduceMotion = useReducedMotion();
-  // A headline needs ~4–5 seconds of screen time; the former 13–25 second
-  // complete-loop duration rushed past a full set of 10 headlines.
+  // Each headline now gets ~7.5 seconds (+3s per headline) for easier reading;
+  // the full loop scales with the number of published headlines.
   const tickerDuration = tickerLoopSeconds(tickerItems.length);
 
   const hasTicker = tickerItems.length > 0;
