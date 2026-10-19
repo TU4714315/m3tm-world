@@ -340,7 +340,7 @@ html:has(.docs-root) body {
   100% { transform: translateX(-50%); }
 }
 .animate-ticker {
-  animation: ticker-scroll 30s linear infinite;
+  animation: ticker-scroll 18s linear infinite;
   will-change: transform;
 }
 

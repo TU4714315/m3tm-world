@@ -45,13 +45,13 @@ describe('shared glass news presentation', () => {
     expect(html).toMatch(/<a[^>]+href="https:\/\/news.org\/story"[^>]*>ناشر الخبر<\/a>/);
     expect(html).not.toContain('<b>');
   });
-  it('links four ticker copies to the corresponding APP story, never to the publisher', () => {
+  it('links two ticker copies to the corresponding APP story, never to the publisher', () => {
     const html = ticker([story()]);
-    expect(html.match(/href="https:\/\/m3tm.app\/news\?story=story#news"/g)).toHaveLength(4);
+    expect(html.match(/href="https:\/\/m3tm.app\/news\?story=story#news"/g)).toHaveLength(2);
     expect(html).not.toContain('https://news.org/story');
     expect(html).not.toContain('>ناشر الخبر</');
     expect(html.match(/aria-label="قراءة تفاصيل الخبر في M3TM.APP:/g)).toHaveLength(1);
-    expect(html.match(/tabindex="-1"/g)).toHaveLength(3);
+    expect(html.match(/tabindex="-1"/g)).toHaveLength(1);
     expect(html).toContain('focus-within:[animation-play-state:paused]');
     expect(html).toContain('motion-reduce:animate-none');
     expect(html).toContain('motion-reduce:overflow-x-auto');

@@ -19,6 +19,14 @@ export const maxDuration = 60;
 // Focused on high-density airspace: US domestic, North Atlantic, Europe,
 // Middle East hub, India, East Asia, SE Asia, Australia, South America.
 const REGIONS = [
+  // Search-region centers, not aircraft positions. Prioritize Yemen/MENA
+  // before distant corridors consume the regional fallback request budget.
+  { lat: 15.4, lon: 44.2 }, // Yemen north
+  { lat: 13.6, lon: 45.2 }, // Yemen south / Gulf of Aden
+  { lat: 24.5, lon: 47.5 }, // Arabian Peninsula
+  { lat: 26.0, lon: 53.0 }, // Gulf
+  { lat: 33.0, lon: 44.0 }, // Iraq
+  { lat: 32.0, lon: 54.0 }, // Iran
   // North America
   { lat: 39.8,  lon: -98.5 }, // Central US
   { lat: 41.0,  lon: -74.0 }, // Northeast (NYC/Boston/DC)
@@ -131,7 +139,7 @@ const ADSBFI_REGION_BASE = `${ADSBFI_ROOT}/v3`;
 // returning 200 with an empty ac[] rather than 429, so a parallel fanout looks
 // like it succeeded while returning nothing. The regional sweep is paced.
 const ADSBFI_GAP_MS = 1100;
-const FLIGHT_REFRESH_BUDGET_MS = 45_000;
+const FLIGHT_REFRESH_BUDGET_MS = 25_000;
 const OPENSKY_FETCH_TIMEOUT_MS = 10_000;
 const OPENSKY_TOKEN_TIMEOUT_MS = 6_000;
 const REGIONAL_REQUEST_TIMEOUT_MS = 3_000;
@@ -533,7 +541,13 @@ async function providerGET(req: Request) {
       source = 'regional';
       console.warn('[OSIRIS] no OpenSky snapshot — falling back to adsb.fi regional sweep');
 
-      for (const r of REGIONS) {
+      // Prioritize Yemen but rotate all remaining world regions by minute.
+      // A bounded 25-second refresh must not permanently starve continents.
+      const remainingRegions = REGIONS.slice(3);
+      const rotation = Math.floor(Date.now() / 60_000) % remainingRegions.length;
+      const orderedRegions = [...REGIONS.slice(0, 3),
+        ...remainingRegions.slice(rotation), ...remainingRegions.slice(0, rotation)];
+      for (const r of orderedRegions) {
         const remaining = refreshDeadline - Date.now();
         if (remaining <= FLIGHT_REFRESH_STOP_MARGIN_MS) {
           console.warn('[OSIRIS] regional flight sweep stopped at refresh deadline');

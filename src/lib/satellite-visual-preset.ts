@@ -46,7 +46,9 @@ export function satelliteInsertionAnchor(layers: readonly StyleLayerLike[] | und
 export function satelliteRasterPaint(mode: SatelliteVisualPreset) {
   const p = SATELLITE_VISUAL_PRESETS[mode];
   return {
-    'raster-opacity': p.opacity,
+    // Fade back to crisp vector features instead of over-stretching 256px
+    // imagery past the maximum reliable raster zoom on mobile devices.
+    'raster-opacity': ['interpolate', ['linear'], ['zoom'], 15.8, p.opacity, 17, p.opacity * 0.55, 18.5, p.opacity * 0.08] as ['interpolate', ['linear'], ['zoom'], number, number, number, number, number, number],
     'raster-resampling': 'linear' as const,
     'raster-contrast': p.contrast,
     'raster-saturation': p.saturation,

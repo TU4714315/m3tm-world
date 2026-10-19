@@ -57,6 +57,7 @@ const SharePanel = dynamic(() => import('@/components/SharePanel'), { ssr: false
 const ViewPresets = dynamic(() => import('@/components/ViewPresets'), { ssr: false });
 const LiveAlerts = dynamic(() => import('@/components/LiveAlerts'), { ssr: false });
 const MenaPulse = dynamic(() => import('@/components/MenaPulse'), { ssr: false });
+const PublicNewsSheet = dynamic(() => import('@/components/PublicNewsSheet'), { ssr: false });
 const WorldMap = dynamic(() => import('@/components/WorldMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -500,6 +501,7 @@ export default function Dashboard() {
   const [activeLayers, setActiveLayers] = useState(DEFAULT_ACTIVE_LAYERS);
   const [showPublicEmbedLayers, setShowPublicEmbedLayers] = useState(false);
   const [showPublicDisplayControls, setShowPublicDisplayControls] = useState(false);
+  const [showPublicNews, setShowPublicNews] = useState(false);
   const [showPublicMapMarkers, setShowPublicMapMarkers] = useState(true);
   const [publicEmbedQuiet, setPublicEmbedQuiet] = useState(false);
   const quietPublicLayersBeforeRef = useRef<typeof DEFAULT_ACTIVE_LAYERS | null>(null);
@@ -2087,7 +2089,7 @@ export default function Dashboard() {
           </div>
           {showPublicDisplayControls && (
             <nav id="m3tm-public-display-controls" aria-label="أدوات عرض الخريطة العامة"
-              className="pointer-events-auto mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-cyan-300/30 bg-[#060c16]/85 p-2 text-xs text-white shadow-xl backdrop-blur-md"
+              className="pointer-events-auto mt-2 grid max-h-[min(75dvh,620px)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-cyan-200/30 bg-[#091523]/75 p-2 text-xs text-white shadow-[0_12px_42px_rgba(0,0,0,.3)] backdrop-blur-2xl"
               onKeyDown={event => { if (event.key === 'Escape') setShowPublicDisplayControls(false); }}>
               <button type="button" aria-pressed={Boolean(activeLayers.country_borders)}
                 title="إظهار الحدود أو إخفاؤها"
@@ -2129,6 +2131,15 @@ export default function Dashboard() {
                 className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${mapProjection === 'globe' ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
                 {mapProjection === 'globe' ? 'العودة إلى 2D' : 'عرض 3D واقعي'}
               </button>
+              <button type="button" aria-pressed={Boolean(activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air)}
+                onClick={() => setActiveLayers(prev => {
+                  const enabled = prev.flights || prev.private || prev.jets || prev.sdk_air;
+                  return { ...prev, flights: !enabled, private: false, jets: false, sdk_air: false };
+                })}
+                className="col-span-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-cyan-300/35 bg-white/[0.055] px-3 text-cyan-100 backdrop-blur-lg focus-visible:ring-2 focus-visible:ring-cyan-300">
+                <span>الطيران المدني {activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air ? 'ظاهر' : 'مخفي'}</span>
+                <span className="text-[10px] text-slate-300">{endpointStatus['/api/flights'] === 'loading' ? 'جارٍ تحديث المصدر' : endpointStatus['/api/flights'] === 'error' ? 'تعذر تحديث المصدر' : (data.commercial_flights?.length || 0) > 0 ? `${data.commercial_flights.length.toLocaleString('ar-SA')} مشاهدة` : (data.civilian_flight_activity?.length || 0) > 0 ? `${data.civilian_flight_activity.length.toLocaleString('ar-SA')} مناطق رصد إقليمية` : 'لا توجد مشاهدات متاحة'}</span>
+              </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
                 title="تقليل الازدحام"
                 onClick={() => {
@@ -2152,10 +2163,12 @@ export default function Dashboard() {
                 className="min-h-10 rounded-xl border border-white/25 bg-transparent px-2 text-white/90 focus-visible:ring-2 focus-visible:ring-cyan-300">
                 الطبقات والتصفية
               </button>
-              <a href="https://m3tm.app/news" target="_blank" rel="noopener noreferrer"
-                className="col-span-2 flex min-h-9 items-center justify-center rounded-xl border border-white/15 bg-transparent text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300">
-                الأخبار المنشورة
-              </a>
+              <button type="button" aria-expanded={showPublicNews} aria-controls="m3tm-public-news"
+                onClick={() => setShowPublicNews(value => !value)}
+                className="col-span-2 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-cyan-200/30 bg-white/[0.055] text-cyan-100 backdrop-blur-lg focus-visible:ring-2 focus-visible:ring-cyan-300">
+                <Newspaper className="h-4 w-4" /> أهم الأخبار والعاجل <ChevronDown className={`h-4 w-4 transition-transform ${showPublicNews ? 'rotate-180' : ''}`} />
+              </button>
+              {showPublicNews && <div id="m3tm-public-news" className="col-span-2"><PublicNewsSheet news={data.news} /></div>}
             </nav>
           )}
           {showMenaPulse && (
