@@ -2131,10 +2131,13 @@ export default function Dashboard() {
                 className={`min-h-10 rounded-xl border bg-transparent px-2 focus-visible:ring-2 focus-visible:ring-cyan-300 ${mapProjection === 'globe' ? 'border-cyan-300/55 text-cyan-100' : 'border-white/25 text-white/90'}`}>
                 {mapProjection === 'globe' ? 'العودة إلى 2D' : 'عرض 3D واقعي'}
               </button>
-              <button type="button" aria-pressed={activeLayers.flights}
-                onClick={() => setActiveLayers(prev => ({ ...prev, flights: !prev.flights }))}
+              <button type="button" aria-pressed={Boolean(activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air)}
+                onClick={() => setActiveLayers(prev => {
+                  const enabled = prev.flights || prev.private || prev.jets || prev.sdk_air;
+                  return { ...prev, flights: !enabled, private: false, jets: false, sdk_air: false };
+                })}
                 className="col-span-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-cyan-300/35 bg-white/[0.055] px-3 text-cyan-100 backdrop-blur-lg focus-visible:ring-2 focus-visible:ring-cyan-300">
-                <span>الطيران المدني {activeLayers.flights ? 'ظاهر' : 'مخفي'}</span>
+                <span>الطيران المدني {activeLayers.flights || activeLayers.private || activeLayers.jets || activeLayers.sdk_air ? 'ظاهر' : 'مخفي'}</span>
                 <span className="text-[10px] text-slate-300">{endpointStatus['/api/flights'] === 'loading' ? 'جارٍ تحديث المصدر' : endpointStatus['/api/flights'] === 'error' ? 'تعذر تحديث المصدر' : (data.commercial_flights?.length || 0) > 0 ? `${data.commercial_flights.length.toLocaleString('ar-SA')} مشاهدة` : (data.civilian_flight_activity?.length || 0) > 0 ? `${data.civilian_flight_activity.length.toLocaleString('ar-SA')} مناطق رصد إقليمية` : 'لا توجد مشاهدات متاحة'}</span>
               </button>
               <button type="button" aria-pressed={publicEmbedQuiet}

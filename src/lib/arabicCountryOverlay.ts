@@ -1,7 +1,7 @@
 import type { Map } from 'maplibre-gl';
 import { COUNTRY_CENTROIDS } from './countryCentroids';
 
-const COUNTRY_SOURCE = 'm3tm-arabic-country-names';
+export const COUNTRY_SOURCE = 'm3tm-arabic-country-names';
 const overrides: Record<string, string> = {
   SA: 'السعودية', YE: 'اليمن', IR: 'إيران', IQ: 'العراق',
   AE: 'الإمارات', OM: 'عُمان', EG: 'مصر', SY: 'سوريا',
@@ -33,6 +33,9 @@ export function installArabicCountryOverlay(map: Map) {
     minzoom: 2,
     maxzoom: 8.5,
     layout: {
+      // Native CARTO country labels already cover ordinary dark 2D. Enable
+      // this overlay only for satellite/globe/recovery modes to avoid doubles.
+      'visibility': 'none',
       'text-field': ['get', 'name'],
       'text-font': ['Noto Sans Regular'],
       'text-size': ['interpolate', ['linear'], ['zoom'], 2, 10, 5, 14, 8, 17],

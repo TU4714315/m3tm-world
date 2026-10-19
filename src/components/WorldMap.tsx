@@ -13,7 +13,7 @@ import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHea
 import { editorialClusterLayer, registerEditorialMapSymbols, territoryWave } from '@/lib/map-symbols';
 import { publishedAreaAffiliation, publishedEquipmentSymbol } from '@/lib/publishedMapPresentation';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
-import { installArabicCountryOverlay } from '@/lib/arabicCountryOverlay';
+import { COUNTRY_SOURCE, installArabicCountryOverlay } from '@/lib/arabicCountryOverlay';
 import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
@@ -3528,6 +3528,15 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       console.warn('Style switch failed:', e);
     }
   }, [mapReady, mapStyle, satelliteVisual, activeLayers.terrain_etopo_2022]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map?.getLayer(COUNTRY_SOURCE)) return;
+    // Never duplicate the native country names on a plain dark vector map.
+    // Satellite, 3D, or the fallback raster need a reliable Arabic overlay.
+    const needsOverlay = mapStyle !== 'dark' || projection === 'globe' || mapLoadState === 'recovery';
+    map.setLayoutProperty(COUNTRY_SOURCE, 'visibility', needsOverlay ? 'visible' : 'none');
+  }, [mapReady, mapStyle, projection, mapLoadState]);
 
   // Newer NOAA public relief is on-demand; the separate Mapzen DEM stays
   // authoritative for 3D elevation. Satellite and M3TM overlays are preserved.

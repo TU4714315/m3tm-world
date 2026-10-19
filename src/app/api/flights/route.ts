@@ -541,7 +541,13 @@ async function providerGET(req: Request) {
       source = 'regional';
       console.warn('[OSIRIS] no OpenSky snapshot — falling back to adsb.fi regional sweep');
 
-      for (const r of REGIONS) {
+      // Prioritize Yemen but rotate all remaining world regions by minute.
+      // A bounded 25-second refresh must not permanently starve continents.
+      const remainingRegions = REGIONS.slice(3);
+      const rotation = Math.floor(Date.now() / 60_000) % remainingRegions.length;
+      const orderedRegions = [...REGIONS.slice(0, 3),
+        ...remainingRegions.slice(rotation), ...remainingRegions.slice(0, rotation)];
+      for (const r of orderedRegions) {
         const remaining = refreshDeadline - Date.now();
         if (remaining <= FLIGHT_REFRESH_STOP_MARGIN_MS) {
           console.warn('[OSIRIS] regional flight sweep stopped at refresh deadline');
