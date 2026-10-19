@@ -13,5 +13,7 @@ export const TERRAIN_LAST_USEFUL_ZOOM = 15;
 export const TERRAIN_HIGH_ZOOM_RELEASE = 15.5;
 
 export function mapViewMaxZoom(style: string): number {
-  return style === 'satellite' ? SATELLITE_VIEW_MAX_ZOOM : VECTOR_VIEW_MAX_ZOOM;
+  // WorldMap receives the live ArcGIS tile URL, not the UI's 'satellite' flag.
+  // As in WorldMap's raster visibility branch, any non-'dark' style is imagery.
+  return style === 'dark' ? VECTOR_VIEW_MAX_ZOOM : SATELLITE_VIEW_MAX_ZOOM;
 }
