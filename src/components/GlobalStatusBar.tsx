@@ -82,6 +82,7 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
     return presentation ? [{ ...item, presentation }] : [];
   }), [news]);
   const reduceMotion = useReducedMotion();
+  const tickerDuration = Math.min(25, Math.max(13, tickerItems.reduce((total, item) => total + item.presentation.title.length, 0) / 22));
 
   const hasTicker = tickerItems.length > 0;
   const detailHref = (id: string) => `https://m3tm.app/news?story=${encodeURIComponent(id)}#news`;
@@ -120,8 +121,8 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
           style={{ maskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)' }}
         >
           {hasTicker ? (
-            <div className="flex items-center animate-ticker whitespace-nowrap hover:[animation-play-state:paused] focus-within:[animation-play-state:paused] motion-reduce:animate-none motion-reduce:transform-none">
-              {[...Array(4)].map((_, repeatIdx) => (
+            <div style={{ animationDuration: `${tickerDuration}s` }} className="flex w-max items-center animate-ticker whitespace-nowrap hover:[animation-play-state:paused] focus-within:[animation-play-state:paused] motion-reduce:animate-none motion-reduce:transform-none">
+              {[...Array(2)].map((_, repeatIdx) => (
                 <span key={repeatIdx} className={`inline-flex items-center ${repeatIdx > 0 ? 'motion-reduce:hidden' : ''}`} aria-hidden={repeatIdx === 0 ? undefined : true}>
                   {tickerItems.map((item) => (
                     <span

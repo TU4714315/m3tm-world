@@ -20,7 +20,8 @@ export function priorityNews(raw: unknown) {
       && masked.coords.every(v => typeof v === 'number' && Number.isFinite(v))
       ? masked.coords as [number, number] : null;
     const importance = typeof item.risk_score === 'number' && Number.isFinite(item.risk_score) ? Math.max(0, Math.min(10, item.risk_score)) : 0;
-    return [{ key, title, source: clean(item.source) || 'ناشر الخبر', url, breaking, coords, importance,
+    return [{ key, id: typeof item.id === 'string' && item.id.length <= 180 ? item.id : null,
+      title, source: clean(item.source) || 'ناشر الخبر', url, breaking, coords, importance,
       publishedAt: Number.isFinite(parsed) ? new Date(parsed).toISOString() : null }];
   }).sort((a, b) => Number(b.breaking) - Number(a.breaking) || b.importance - a.importance
     || Date.parse(b.publishedAt || '1970-01-01') - Date.parse(a.publishedAt || '1970-01-01')).slice(0, 8);

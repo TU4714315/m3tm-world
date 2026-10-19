@@ -13,6 +13,7 @@ import { conflictHeatmapWeight, conflictHeatmapOpacity } from '@/lib/conflictHea
 import { editorialClusterLayer, registerEditorialMapSymbols, territoryWave } from '@/lib/map-symbols';
 import { publishedAreaAffiliation, publishedEquipmentSymbol } from '@/lib/publishedMapPresentation';
 import { applyArabicBasemapLabels } from '@/lib/arabicBasemap';
+import { installArabicCountryOverlay } from '@/lib/arabicCountryOverlay';
 import { cartoMapRequestUrl } from '@/lib/mapTileTransport';
 import { installTerrainTileProtocol } from '@/lib/terrain-tiles';
 import { MAP_ATTRIBUTION_OPTIONS, ARCGIS_IMAGERY_ATTRIBUTION } from '@/lib/terrain-source-attribution';
@@ -390,6 +391,9 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
       // CARTO's hard-coded name_en text fields must be changed on the actual
       // loaded style, not just in UI labels. Preserve all border geometries.
       applyArabicBasemapLabels(map);
+      // Country names remain legible above satellite imagery on globe/3D.
+      // Approximate country centers are labels only, never geographic claims.
+      installArabicCountryOverlay(map);
 
       // Theme colors
       const isGhost = theme === 'ghost';
@@ -3415,8 +3419,8 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     const enabled = activeLayers.terrain_3d;
     const pitchWhenBuildingsVisible = () => {
       // At global/regional zoom an oblique skyline hides real map context.
-      if (map.getZoom() >= 14.5 && map.getPitch() < 40) {
-        map.easeTo({ pitch: 50, duration: 750 });
+      if (map.getZoom() >= 15.5 && map.getPitch() < 40) {
+        map.easeTo({ pitch: 45, duration: 750 });
       }
     };
 
@@ -3432,25 +3436,25 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
             source: 'carto',
             'source-layer': 'building',
             type: 'fill-extrusion',
-            minzoom: 14.5,
+            minzoom: 15.5,
             filter: ['>', ['to-number', ['get', 'render_height'], 0], 0],
             paint: {
               // Physical-material tones avoid fictional neon city silhouettes.
               'fill-extrusion-color': '#b0aaa0',
               'fill-extrusion-height': [
                 'interpolate', ['linear'], ['zoom'],
-                14.5, 0,
-                15.5, ['to-number', ['get', 'render_height'], 0]
+                15.5, 0,
+                16.5, ['to-number', ['get', 'render_height'], 0]
               ],
               'fill-extrusion-base': [
                 'interpolate', ['linear'], ['zoom'],
-                14.5, 0,
-                15.5, ['to-number', ['get', 'render_min_height'], 0]
+                15.5, 0,
+                16.5, ['to-number', ['get', 'render_min_height'], 0]
               ],
               'fill-extrusion-opacity': [
                 'interpolate', ['linear'], ['zoom'],
-                14.5, 0,
-                15, 0.82,
+                15.5, 0,
+                16.5, 0.35,
               ],
             },
           });
@@ -3857,7 +3861,7 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
     wasNavigating.current = navigating;
     if (!mapReady || !mapRef.current || !ended) return;
     const map = mapRef.current;
-    const pitch = projection === 'mercator' ? 0 : activeLayers.terrain_3d ? 50 : terrainEnabled && map.getZoom() >= 10 ? 45 : 20;
+    const pitch = projection === 'mercator' ? 0 : activeLayers.terrain_3d && map.getZoom() >= 15.5 ? 45 : terrainEnabled && map.getZoom() >= 10 ? 38 : 20;
     map.easeTo({ pitch, bearing: 0, duration: 600 });
   }, [mapReady, navigating, projection, terrainEnabled, activeLayers.terrain_3d]);
 
