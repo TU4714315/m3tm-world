@@ -2135,7 +2135,7 @@ export default function Dashboard() {
                 onClick={() => setActiveLayers(prev => ({ ...prev, flights: !prev.flights }))}
                 className="col-span-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border border-cyan-300/35 bg-white/[0.055] px-3 text-cyan-100 backdrop-blur-lg focus-visible:ring-2 focus-visible:ring-cyan-300">
                 <span>الطيران المدني {activeLayers.flights ? 'ظاهر' : 'مخفي'}</span>
-                <span className="text-[10px] text-slate-300">{endpointStatus['/api/flights'] === 'loading' ? 'جارٍ تحديث المصدر' : endpointStatus['/api/flights'] === 'error' ? 'تعذر تحديث المصدر' : `${(data.commercial_flights?.length || 0).toLocaleString('ar-SA')} مشاهدة`}</span>
+                <span className="text-[10px] text-slate-300">{endpointStatus['/api/flights'] === 'loading' ? 'جارٍ تحديث المصدر' : endpointStatus['/api/flights'] === 'error' ? 'تعذر تحديث المصدر' : (data.commercial_flights?.length || 0) > 0 ? `${data.commercial_flights.length.toLocaleString('ar-SA')} مشاهدة` : (data.civilian_flight_activity?.length || 0) > 0 ? `${data.civilian_flight_activity.length.toLocaleString('ar-SA')} مناطق رصد إقليمية` : 'لا توجد مشاهدات متاحة'}</span>
               </button>
               <button type="button" aria-pressed={publicEmbedQuiet}
                 title="تقليل الازدحام"
