@@ -3538,6 +3538,9 @@ function WorldMap({ data, activeLayers, referenceAtlasLayerId = 'all', reference
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
+    // Page passes an ArcGIS imagery URL rather than 'satellite' here. Keep the
+    // camera zoom limit in step with the actual photographic source, not the
+    // panel's abbreviated UI state (see map-quality-limits regression test).
     map.setMaxZoom(mapViewMaxZoom(mapStyle));
   }, [mapReady, mapStyle]);
 
