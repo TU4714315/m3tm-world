@@ -2,6 +2,11 @@
 
 > **Entry:** Start with this file; do not regenerate project discovery. Runtime Git/CI and production health always outrank an older handoff. WORLD remains public; APP owns shell, news, auth and private tools.
 
+## CHECKPOINT — WORLD public news ticker pacing (2026-10-19 UTC)
+**DONE (PR #162, awaiting protected merge):** Increased M3TM.APP-sourced headline time in the WORLD public bottom ticker from 4.5 to 7.5 seconds per headline (+3s as requested). Kept a seamless CSS loop, pause-on-hover/focus, article links, filtering, source, and fetch cadence unchanged. Updated one-item minimum to 12 seconds and loop upper bound to 90 seconds for consistent readability.
+**VERIFY:** Isolated Node runtime assertions passed for 0, 1, 2, 5 and 10 headlines (12/12/15/37.5/75 seconds); GitHub privacy check passed on prior PR head. The required `verify-world` workflow must pass on the final reviewed head; after merge, verify live ticker speed visually on WORLD desktop/mobile and APP embed and confirm deployed commit.
+**BLOCKERS:** Production deployment is not yet confirmed; Vercel status currently reports an account-level deployment block. Preserve the existing dirty WORLD local working tree; no reset, stash or overwrite.
+**NEXT:** Resolve this PR review, run required CI with this handoff file change, then merge with expected-head protection and verify actual production delivery before claiming the public site changed.
 ## CHECKPOINT — Saudi public fallback and release evidence (2026-10-15 UTC)
 
 **DONE:** Continued merged WORLD #129/#130 and APP #410/#412 from clean main `3269189`. Civilian density now excludes Saudi source coordinates before binning: a Saudi border observation previously moved to an unmasked cell center. Durable cache namespace advances to v2 to avoid reusing old mixed cells. Flight totals/fallback counters and satellite public category/object/cell counters now match the returned masked lists. Health reports `RENDER_GIT_COMMIT` on Render, retaining Vercel fallback. All historical dirty checkouts remain untouched.
