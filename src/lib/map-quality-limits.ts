@@ -12,6 +12,6 @@ export const VECTOR_VIEW_MAX_ZOOM = 20;
 export const TERRAIN_LAST_USEFUL_ZOOM = 15;
 export const TERRAIN_HIGH_ZOOM_RELEASE = 15.5;
 
-export function mapViewMaxZoom(style: 'dark' | 'satellite'): number {
+export function mapViewMaxZoom(style: string): number {
   return style === 'satellite' ? SATELLITE_VIEW_MAX_ZOOM : VECTOR_VIEW_MAX_ZOOM;
 }
