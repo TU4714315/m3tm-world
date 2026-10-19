@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Newspaper } from 'lucide-react';
 import { priorityNews } from '@/lib/priorityNews';
+import { tickerLoopSeconds } from '@/lib/ticker-pacing';
 
 interface NewsTickerItem {
   id: string;
@@ -82,7 +83,9 @@ export default function GlobalStatusBar({ news = [], embed = false }: { news?: N
     return presentation ? [{ ...item, presentation }] : [];
   }), [news]);
   const reduceMotion = useReducedMotion();
-  const tickerDuration = Math.min(25, Math.max(13, tickerItems.reduce((total, item) => total + item.presentation.title.length, 0) / 22));
+  // A headline needs ~4–5 seconds of screen time; the former 13–25 second
+  // complete-loop duration rushed past a full set of 10 headlines.
+  const tickerDuration = tickerLoopSeconds(tickerItems.length);
 
   const hasTicker = tickerItems.length > 0;
   const detailHref = (id: string) => `https://m3tm.app/news?story=${encodeURIComponent(id)}#news`;

@@ -491,6 +491,15 @@ export default function Dashboard() {
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
 
   const [deferredMapReady, setDeferredMapReady] = useState(false);
+  const [initialBackgroundFetchReady, setInitialBackgroundFetchReady] = useState(false);
+  // Prioritise the MapLibre worker/style and the M3TM.APP news feed over
+  // competing non-essential Render API downloads during first hydration.
+  // The bounded delay applies only once; subsequent layer toggles are instant.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setInitialBackgroundFetchReady(true),
+      window.innerWidth < 768 ? 7500 : 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const deferredMapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deferredMapScheduledRef = useRef(false);
   useEffect(() => () => {
@@ -1025,10 +1034,12 @@ export default function Dashboard() {
         marketRetries.push(setTimeout(() => loadMarkets(attempt + 1), 15000));
       }
     };
-    const marketTimer = setTimeout(() => loadMarkets(), 800);
+    // Markets/space weather are not shown in the lightweight public iframe.
+    // Do not make expensive API requests before its map is ready.
+    const marketTimer = embedMode ? undefined : setTimeout(() => loadMarkets(), 800);
 
     // Priority 2: Space Weather telemetry
-    const spaceTimer = setTimeout(async () => {
+    const spaceTimer = embedMode ? undefined : setTimeout(async () => {
       try {
         const r = await fetch('/api/space-weather');
         if (r.ok) setSpaceWeather(await r.json());
@@ -1038,7 +1049,7 @@ export default function Dashboard() {
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
       setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 60000),          // 1 min — shared by map panels and top-news ticker
-      setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000), // 15 min (was 5)
+      ...(!embedMode ? [setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000)] : []),
     ];
     return () => {
       clearTimeout(marketTimer);
@@ -1048,7 +1059,7 @@ export default function Dashboard() {
       document.removeEventListener('visibilitychange', onNewsPageVisible);
       intervals.forEach(clearInterval);
     };
-  }, [fetchEndpoint, hasMapAccess]);
+  }, [fetchEndpoint, hasMapAccess, embedMode]);
 
   // ── LAYER-AWARE DATA LOADING — only fetch when layer is toggled ON ──
   const layerFetchedRef = useRef<Set<string>>(new Set());
@@ -1089,6 +1100,7 @@ export default function Dashboard() {
 
   useEffect(() => {
 
+    if (!initialBackgroundFetchReady) return;
     // Flights: keep in-flight work separate from the fetched marker. The marker
     // is written only after an active/degraded payload lands; otherwise the bounded
     // retry budget runs out and normal polling remains responsible for recovery.
@@ -1280,7 +1292,7 @@ export default function Dashboard() {
     }
 
 
-  }, [activeLayers, fetchEndpoint, hasMapAccess]);
+  }, [activeLayers, fetchEndpoint, hasMapAccess, initialBackgroundFetchReady]);
 
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
