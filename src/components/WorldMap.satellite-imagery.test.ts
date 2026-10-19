@@ -9,6 +9,9 @@ describe('satellite imagery safe zoom', () => {
     expect(sourceDefinition?.[0]).toContain('World_Imagery/MapServer/tile/{z}/{y}/{x}');
     expect(sourceDefinition?.[0]).toMatch(/maxzoom:\s*SATELLITE_IMAGE_SOURCE_MAX_ZOOM/);
     expect(sourceDefinition?.[0]).toContain('tileSize: 256');
+    // A source limit alone is insufficient if the interactive camera still
+    // zooms to 20; both must use the same quality-aware source contract.
+    expect(source).toContain('map.setMaxZoom(mapViewMaxZoom(mapStyle))');
   });
   it('keeps vector labels above imagery and renders overlays independently', () => {
     expect(source).toContain('satelliteInsertionAnchor(map.getStyle()?.layers)');
