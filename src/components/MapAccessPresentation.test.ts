@@ -47,35 +47,31 @@ describe('access-aware public map presentation', () => {
     expect(locked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="التجارية"/);
     expect(unlocked).toMatch(/aria-disabled="false" aria-pressed="true" aria-label="نشاط جوي عسكري عام"/);
   });
-  it('separates successful empty field alerts from failed/unfinished API loads', () => {
+  it('keeps provider diagnostics out of public layer controls on all transport states', () => {
     const props = { data: { alert_pins: [] }, activeLayers: { alert_pins: true }, setActiveLayers: vi.fn(), isMobile: true };
-    const renderState = (status?: 'loading' | 'ok' | 'error') =>
-      renderToStaticMarkup(createElement(LayerPanel, { ...props,
+    for (const status of ['loading', 'ok', 'error', undefined] as const) {
+      const html = renderToStaticMarkup(createElement(LayerPanel, { ...props,
         endpointStatus: status ? { '/api/news': status } : {},
       }));
-    expect(renderState('ok')).toContain('لا أحداث مؤهلة');
-    expect(renderState('error')).toContain('تعذر جلب المصدر');
-    expect(renderState('loading')).toContain('جارٍ جلب البيانات');
-    expect(renderState()).toContain('لم يُتحقق من المصدر');
-    expect(renderToStaticMarkup(createElement(LayerPanel, { ...props,
-      activeLayers: { alert_pins: false }, endpointStatus: { '/api/news': 'ok' },
-    }))).toContain('متوقفة');
+      expect(html).not.toContain('تعذر جلب المصدر');
+      expect(html).not.toContain('بيانات سابقة');
+      expect(html).not.toContain('لم يُتحقق من المصدر');
+      expect(html).not.toContain('جاري جلب بيانات');
+    }
   });
 
-  it('does not label a provider-level military feed outage as zero activity', () => {
-    const panel = (provider_healthy: boolean, military_activity: unknown[] = []) =>
-      renderToStaticMarkup(createElement(LayerPanel, {
-        data: { military_activity,
-          military_activity_meta: { source_mode: 'public-adsb-observations', provider_healthy } },
-        activeLayers: { military_activity: true },
-        setActiveLayers: vi.fn(),
-        isMobile: true,
-        endpointStatus: { '/api/flights': 'ok' },
-      }));
-    expect(panel(false)).toContain('تعذر تحديث المصدر');
-    expect(panel(true)).toContain('لا أحداث مؤهلة');
-    expect(panel(false, [{ id:'regional', lat:15, lng:45 }])).toContain('بيانات إقليمية سابقة');
-    expect(panel(false)).not.toContain('لا أحداث مؤهلة');
+  it('hides unverified military counts without a failure banner', () => {
+    const html = renderToStaticMarkup(createElement(LayerPanel, {
+      data: { military_activity: [{ id: 'regional' }],
+        military_activity_meta: { source_mode: 'public-adsb-observations', provider_healthy: false } },
+      activeLayers: { military_activity: true },
+      setActiveLayers: vi.fn(),
+      isMobile: true,
+      endpointStatus: { '/api/flights': 'ok' },
+    }));
+    expect(html).not.toContain('بيانات إقليمية سابقة');
+    expect(html).not.toContain('تعذر تحديث المصدر');
+    expect(html).not.toContain('عنصر منشور');
   });
 
   it('keeps the bottom bar dedicated to news in both standalone and embedded views', () => {

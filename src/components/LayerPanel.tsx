@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
@@ -250,6 +250,39 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
   const [studioOpen, setStudioOpen] = useState(false);
   const [mobileGroup, setMobileGroup] = useState('الكل');
   const [mobileSearch, setMobileSearch] = useState('');
+  // Five-second visual acknowledgement of a user action, not a provider fetch.
+  const [activationHints, setActivationHints] = useState<Record<string, boolean>>({});
+  const activationTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    const timers = activationTimers.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
+  const clearActivationHint = (key: string) => {
+    clearTimeout(activationTimers.current[key]);
+    delete activationTimers.current[key];
+    setActivationHints(previous => {
+      if (!previous[key]) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const showActivationHint = (key: string) => {
+    clearTimeout(activationTimers.current[key]);
+    setActivationHints(previous => ({ ...previous, [key]: true }));
+    activationTimers.current[key] = setTimeout(() => {
+      delete activationTimers.current[key];
+      setActivationHints(previous => {
+        if (!previous[key]) return previous;
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      });
+    }, 5_000);
+  };
 
   useEffect(() => {
     if (!pinnedGroup) return;
@@ -266,6 +299,8 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
     const layer = definitions.find(item => item.key === key);
     if (layer?.parent && !activeLayers[layer.parent]) return;
     if ((key === 'terrain_elevation' || key === 'terrain_3d') && !activeLayers[key]) on3DModeSelected?.();
+    if (activeLayers[key]) clearActivationHint(key);
+    else showActivationHint(key);
     setActiveLayers((prev: any) => {
       if (layer?.parent && !prev[layer.parent]) return prev;
       const next = { ...prev, [key]: !prev[key] };
@@ -280,9 +315,9 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
   };
   const terrainDetails = activeLayers.terrain_elevation ? (
     <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-[10px] text-white/60">
-      <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? 'تعذر تحميل التضاريس، والخريطة ما زالت قابلة للاستخدام.' : 'التضاريس مفعلة'}</p>
+      <p role="status">{terrainStatus === 'idle' ? `التضاريس تبدأ عند تكبير ${TERRAIN_MIN_ZOOM}+ · قرّب الخريطة` : terrainStatus === 'waiting' ? 'تبدأ التضاريس بعد توقف حركة الخريطة' : terrainStatus === 'loading' ? 'جارٍ تحميل التضاريس القريبة…' : terrainStatus === 'error' ? '' : 'التضاريس مفعلة'}</p>
       {terrainStatus === 'idle' && <button type="button" onClick={onTerrainFocus} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تقريب إلى التضاريس</button>}
-      {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">إعادة المحاولة</button>}
+      {terrainStatus === 'error' && <button type="button" onClick={onTerrainRetry} className="mt-2 min-h-8 rounded border border-white/15 px-2 text-[var(--gold-primary)] hover:bg-white/10">تحميل التضاريس</button>}
     </div>
   ) : null;
 
@@ -290,6 +325,11 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
     const canSelect = (key: string) => hasMapAccess || !layerRequiresInvitation(key);
     if (!layers.some(layer => !layer.parent && !displayKeys.includes(layer.key) && canSelect(layer.key))) {
       onRequestAccess?.(); return;
+    }
+    for (const layer of layers) {
+      if (layer.parent || displayKeys.includes(layer.key) || !canSelect(layer.key)) continue;
+      if (enabled && !activeLayers[layer.key]) showActivationHint(layer.key);
+      if (!enabled && activeLayers[layer.key]) clearActivationHint(layer.key);
     }
     setActiveLayers((prev: Record<string, unknown>) => selectDataLayers(prev, layers, enabled, displayKeys, canSelect));
   };
@@ -330,10 +370,8 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
     return found ? total : null;
   };
 
-  // An enabled switch is not evidence of observations. Expose the distinction
-  // only for layers whose event arrays are present in the public payload.
-  const observedKeys = new Set(['alert_pins', 'app_news', 'military_activity',
-    'naval_activity', 'gdelt_events', 'civil_unrest', 'conflict_zones', 'frontlines', 'reference_atlas']);
+  // Public layer controls omit provider status labels while retaining the
+  // original provider health and timestamps in data for internal diagnostics.
   const endpointForLayer: Record<string, string> = {
     alert_pins: '/api/news', app_news: '/api/news',
     military_activity: '/api/flights', naval_activity: '/api/maritime',
@@ -341,29 +379,17 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
     conflict_zones: '/api/conflicts', frontlines: '/api/frontlines',
     reference_atlas: '/api/reference-atlas',
   };
-  const layerObservationState = (key: string, count: number | null): string | null => {
-    if (!observedKeys.has(key)) return null;
-    if (!activeLayers[key]) return 'متوقفة';
-    const transport = endpointStatus[endpointForLayer[key]];
-    const failure = data?.layer_errors?.[key] ?? data?.source_errors?.[key];
-    if (failure || transport === 'error') return count && count > 0
-      ? 'بيانات سابقة · تعذر التحديث' : 'تعذر جلب المصدر';
-    if (transport === 'loading') return count && count > 0
-      ? `${count.toLocaleString('ar-SA')} عنصر · يجري التحديث` : 'جارٍ جلب البيانات';
-    // HTTP 200 can legitimately wrap a provider-level failure; an empty
-    // aggregate after an ADS-B outage is not proof of zero eligible activity.
-    const militaryMeta = data?.military_activity_meta;
-    if (key === 'military_activity' && transport === 'ok'
-      && militaryMeta?.source_mode === 'public-adsb-observations'
-      && militaryMeta?.provider_healthy === false) {
-      return count && count > 0
-        ? 'بيانات إقليمية سابقة · تعذر تحديث المصدر'
-        : 'تعذر تحديث المصدر';
-    }
-    if (count === null) return 'البيانات غير متاحة';
-    if (count === 0) return transport === 'ok' ? 'لا أحداث مؤهلة' : 'لم يُتحقق من المصدر';
-    return `${count.toLocaleString('ar-SA')} عنصر منشور`;
+  const visibleCount = (key: string, count: number | null): number | null => {
+    if (activationHints[key]) return null;
+    const endpoint = endpointForLayer[key];
+    if (data?.layer_errors?.[key] || data?.source_errors?.[key]
+      || (endpoint && endpointStatus[endpoint] === 'error')) return null;
+    if (key === 'military_activity'
+      && data?.military_activity_meta?.provider_healthy === false) return null;
+    return count;
   };
+  const layerObservationState = (key: string): string | null =>
+    activeLayers[key] && activationHints[key] ? 'جاري جلب بيانات' : null;
 
   /* ── MOBILE ── */
   if (isMobile) {
@@ -401,8 +427,8 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
               {group.layers.map((layer) => {
                 const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                 const isLayerActive = !locked && activeLayers[layer.key];
-                const count = locked ? null : getCount(layer.dataKey, layer.catKey);
-                const observationState = locked ? null : layerObservationState(layer.key, count);
+                const count = locked ? null : visibleCount(layer.key, getCount(layer.dataKey, layer.catKey));
+                const observationState = locked ? null : layerObservationState(layer.key);
                 const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
                 return (
                   <button
@@ -623,8 +649,8 @@ function LayerPanel({ data, endpointStatus = {}, activeLayers, setActiveLayers, 
                       {group.layers.map((layer) => {
                         const locked = !hasMapAccess && layerRequiresInvitation(layer.key);
                         const isLayerActive = !locked && activeLayers[layer.key];
-                        const count = locked ? null : getCount(layer.dataKey, layer.catKey);
-                        const observationState = locked ? null : layerObservationState(layer.key, count);
+                        const count = locked ? null : visibleCount(layer.key, getCount(layer.dataKey, layer.catKey));
+                        const observationState = locked ? null : layerObservationState(layer.key);
                         const dormant = !locked && !!layer.parent && !activeLayers[layer.parent];
 
                         return (
