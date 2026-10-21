@@ -13,7 +13,16 @@ describe('durableCache', () => {
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     delete process.env.KV_REST_API_URL;
     delete process.env.KV_REST_API_TOKEN;
+    delete process.env.REDIS_URL;
     vi.restoreAllMocks();
+  });
+
+  it('validates Render native Redis URL schemes', () => {
+    process.env.REDIS_URL = 'http://invalid.example';
+    expect(durableCacheConfigured()).toBe(false);
+    process.env.REDIS_URL = 'redis://render-key-value.internal:6379';
+    expect(durableCacheConfigured()).toBe(true);
+    delete process.env.REDIS_URL;
   });
 
   it('falls back to memory when no durable backend is configured', async () => {

@@ -9,6 +9,8 @@
  * Secrets never leave the server and cache failures never fail the caller.
  */
 
+import Redis from 'ioredis';
+
 type CacheBackend = 'redis' | 'memory';
 
 interface MemoryEntry {
@@ -23,6 +25,7 @@ interface RedisReply {
 
 const globalCache = globalThis as unknown as {
   __m3tmDurableCache?: Map<string, MemoryEntry>;
+  __m3tmRenderRedisClient?: Redis;
 };
 
 const memory = globalCache.__m3tmDurableCache ?? new Map<string, MemoryEntry>();
@@ -42,6 +45,34 @@ function redisConfig(): { url: string; token: string } | null {
   const selected = pairs.find(pair => pair.url && pair.token);
   if (!selected?.url || !selected.token) return null;
   return { url: selected.url.replace(/\/$/, ''), token: selected.token };
+}
+
+// Native Redis/Valkey endpoint on Render's private network.
+// Existing Upstash-compatible REST pairs remain supported independently.
+function renderRedisUrl(): string | null {
+  const raw = process.env.REDIS_URL?.trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    return ['redis:', 'rediss:'].includes(parsed.protocol) && parsed.hostname ? raw : null;
+  } catch { return null; }
+}
+
+function renderRedisClient(): Redis | null {
+  const url = renderRedisUrl();
+  if (!url) return null;
+  if (globalCache.__m3tmRenderRedisClient) return globalCache.__m3tmRenderRedisClient;
+  const client = new Redis(url, {
+    connectTimeout: 2500,
+    commandTimeout: 2500,
+    maxRetriesPerRequest: 1,
+    retryStrategy: (attempt) => Math.min(attempt * 500, 5000),
+    enableOfflineQueue: true,
+    lazyConnect: false,
+  });
+  client.on('error', () => {});
+  globalCache.__m3tmRenderRedisClient = client;
+  return client;
 }
 
 function pruneMemory(now = Date.now()) {
@@ -77,7 +108,7 @@ async function redisCommand(command: Array<string | number>): Promise<RedisReply
 }
 
 export function durableCacheConfigured(): boolean {
-  return redisConfig() !== null;
+  return redisConfig() !== null || renderRedisUrl() !== null;
 }
 
 export async function durableGetJson<T>(
@@ -92,6 +123,16 @@ export async function durableGetJson<T>(
       }
     } catch (error) {
       console.warn('[M3TM.WORLD] durable cache GET degraded to memory:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  if (!redisConfig() && renderRedisUrl()) {
+    try {
+      const payload = await renderRedisClient()?.get(key);
+      if (typeof payload === 'string') return { value: JSON.parse(payload) as T, backend: 'redis' };
+    } catch (error) {
+      console.warn('[M3TM.WORLD] native cache GET fell back to memory:',
+        error instanceof Error ? error.message : 'connection unavailable');
     }
   }
 
@@ -130,9 +171,15 @@ export async function durableSetJson<T>(
   }
   pruneMemory();
 
-  if (!redisConfig()) return storeInMemory ? 'memory' : 'not-stored';
+  if (!redisConfig() && !renderRedisUrl()) return storeInMemory ? 'memory' : 'not-stored';
   try {
-    await redisCommand(['SET', key, encoded, 'EX', ttl]);
+    if (redisConfig()) {
+      await redisCommand(['SET', key, encoded, 'EX', ttl]);
+    } else {
+      const client = renderRedisClient();
+      if (!client) throw new Error('Render Key Value unavailable');
+      await client.set(key, encoded, 'EX', ttl);
+    }
     return 'redis';
   } catch (error) {
     console.warn('[M3TM.WORLD] durable cache SET degraded to memory:', error instanceof Error ? error.message : error);

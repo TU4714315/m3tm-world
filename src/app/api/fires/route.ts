@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
 import { createPublicDailySnapshot } from '@/lib/publicDailySnapshot';
+import { durableGetJson, durableSetJson } from '@/lib/durableCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,12 +39,30 @@ async function loadFireObservations() {
   });
 }
 
+// Shared across WORLD servers when Redis/Valkey is available, with local fallback.
+// Preserve real FIRMS acquisition metadata and existing public geofilters.
+const FIRE_PUBLIC_CACHE_KEY = 'm3tm:world:public:firms-observations:v1';
+const FIRE_PUBLIC_TTL_SECONDS = 24 * 60 * 60;
+async function loadSharedFireObservations() {
+  const shared = await durableGetJson<Awaited<ReturnType<typeof loadFireObservations>>>(FIRE_PUBLIC_CACHE_KEY);
+  const previous = shared.value;
+  if (previous && Array.isArray(previous.fires) && typeof previous.source === 'string'
+    && typeof previous.timestamp === 'string') {
+    const time = Date.parse(previous.timestamp);
+    if (Number.isFinite(time) && time <= Date.now()
+      && Date.now() - time < FIRE_PUBLIC_TTL_SECONDS * 1000) return previous;
+  }
+  const fresh = await loadFireObservations();
+  await durableSetJson(FIRE_PUBLIC_CACHE_KEY, fresh, FIRE_PUBLIC_TTL_SECONDS);
+  return fresh;
+}
+
 export async function GET() {
   try {
-    const snapshot = await getFireSnapshot(loadFireObservations);
+    const snapshot = await getFireSnapshot(loadSharedFireObservations);
     return NextResponse.json({
       ...snapshot.value,
-      observation_snapshot_at: new Date(snapshot.fetchedAt).toISOString(),
+      observation_snapshot_at: snapshot.value.timestamp,
       data_state: snapshot.retained ? 'retained-observations' : 'published-observations',
     }, { headers: {
       'Cache-Control': snapshot.retained ? 'no-store' : 'public, s-maxage=86400, stale-while-revalidate=300',
