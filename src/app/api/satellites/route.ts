@@ -132,13 +132,13 @@ function saveToDisk(sats: any[]) {
   } catch { /* non-critical */ }
 }
 
-/** Load TLE data from disk (valid for 4 hours) */
+/** Restore public TLE catalogue from process-local disk (valid for 24 hours). */
 function loadFromDisk(): { sats: any[]; time: number } | null {
   try {
     if (!existsSync(CACHE_FILE)) return null;
     const data = JSON.parse(readFileSync(CACHE_FILE, 'utf-8'));
-    // Accept disk cache up to 4 hours old
-    if (data.sats?.length > 0 && Date.now() - data.time < 14400000) {
+    // Accept disk cache up to 24 hours old
+    if (data.sats?.length > 0 && Date.now() - data.time < 24 * 60 * 60_000) {
       return data;
     }
   } catch { /* corrupted cache */ }
@@ -200,8 +200,8 @@ async function providerGET() {
 
     if (
       globalCachedSats.length === 0 ||
-      globalCachedSats.length < 5000 ||
-      nowTime - globalCacheTime > 3600000 ||
+      globalCachedSats.length < 500 ||
+      nowTime - globalCacheTime > 24 * 60 * 60_000 ||
       globalCachedSats.some(sat => typeof sat.sensitiveMilitary !== 'boolean')
     ) { // refresh if empty, too few, stale, or from a pre-safety cache
       

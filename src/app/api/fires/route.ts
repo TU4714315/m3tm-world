@@ -1,65 +1,58 @@
-
 import { NextResponse } from 'next/server';
 import { inSaudiPublicBoundary, maskSaudiPublicIndicators } from '@/lib/publicCountryVisibility';
 import { isPublicFireRegion } from '@/lib/publicFireRegion';
+import { createPublicDailySnapshot } from '@/lib/publicDailySnapshot';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * M3TM.WORLD — Active Fire & Wildfire Tracking
- * Fire hotspots only: regional NASA FIRMS data. Volcanoes excluded by owner.
- */
+/** A public, source-attributed FIRMS observation snapshot, not a live incident claim. */
+const getFireSnapshot = createPublicDailySnapshot<{ fires: any[]; total: number; source: string; timestamp: string }>();
+
+async function loadFireObservations() {
+  let fires: any[] = [];
+  let source = '';
+  let providerSucceeded = false;
+  const firmsSources = [
+    'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv',
+    'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_Global_24h.csv',
+  ];
+  for (const url of firmsSources) {
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(15000),
+        headers: { 'User-Agent': 'M3TM-WORLD/1.0 (+https://m3tm.world)' },
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (text && text.includes('latitude') && text.includes('longitude') && text.length > 200) {
+        fires = parseCSV(text);
+        source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
+        providerSucceeded = true;
+        break;
+      }
+    } catch { /* fall through to the next public source */ }
+  }
+  if (!providerSucceeded) throw new Error('fire_provider_unavailable');
+  return maskSaudiPublicIndicators({
+    fires, total: fires.length, source, timestamp: new Date().toISOString(),
+  });
+}
 
 export async function GET() {
   try {
-    let fires: any[] = [];
-    let source = '';
-    let providerSucceeded = false;
-
-    // Source 1: NASA FIRMS Open Data (Global 24h CSV) - no API key needed
-    const firmsSources = [
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_Global_24h.csv',
-      'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_Global_24h.csv'
-    ];
-
-    for (const url of firmsSources) {
-      try {
-        const res = await fetch(url, {
-          signal: AbortSignal.timeout(15000),
-          headers: { 'User-Agent': 'M3TM-WORLD/1.0 (+https://m3tm.world)' },
-        });
-        if (res.ok) {
-          const text = await res.text();
-          // Valid provider data can contain zero regional fires.
-          if (text && text.includes('latitude') && text.includes('longitude') && text.length > 200) {
-            fires = parseCSV(text);
-            source = url.includes('J1_VIIRS') ? 'NASA-FIRMS (VIIRS NOAA-20)' : 'NASA-FIRMS (MODIS)';
-            providerSucceeded = true;
-            break;
-          }
-        }
-      } catch { continue; }
-    }
-
-    // No volcano/earthquake lookups: those categories are disabled.
-    if (!providerSucceeded) return NextResponse.json({ fires: [], error: 'fire_provider_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-
-    return NextResponse.json(maskSaudiPublicIndicators({
-      fires,
-      total: fires.length,
-      source: source || 'Unknown',
-      timestamp: new Date().toISOString(),
-    }), {
-      headers: {
-        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
-      },
-    });
+    const snapshot = await getFireSnapshot(loadFireObservations);
+    return NextResponse.json({
+      ...snapshot.value,
+      observation_snapshot_at: new Date(snapshot.fetchedAt).toISOString(),
+      data_state: snapshot.retained ? 'retained-observations' : 'published-observations',
+    }, { headers: {
+      'Cache-Control': snapshot.retained ? 'no-store' : 'public, s-maxage=86400, stale-while-revalidate=300',
+    } });
   } catch (error) {
-    console.error('Fire fetch error:', error);
-    return NextResponse.json({ fires: [], error: 'Failed to fetch fire data' }, { status: 500 });
+    console.error('Fire snapshot retrieval error:', error);
+    return NextResponse.json({ fires: [], error: 'fire_provider_unavailable' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }
-
 export function parseCSV(csv: string): any[] {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
