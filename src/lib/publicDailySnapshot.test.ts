@@ -17,6 +17,23 @@ describe('daily public snapshot cache', () => {
     await cache(loader);
     expect(loader).toHaveBeenCalledTimes(2);
   });
+  it('never extends a shared 23-hour-old source snapshot by a second full day', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-21T00:00:00Z'));
+    const DAY = 24 * 60 * 60_000;
+    const snapshot = createPublicDailySnapshot<{ timestamp: string; count: number }>(
+      DAY, 5 * 60_000, value => Date.parse(value.timestamp));
+    const originTime = new Date(Date.now() - 23 * 60 * 60_000).toISOString();
+    const loader = vi.fn(async () => ({ timestamp: originTime, count: 1 }));
+    await snapshot(loader);
+    vi.advanceTimersByTime(59 * 60_000);
+    await snapshot(loader);
+    expect(loader).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2 * 60_000);
+    await snapshot(loader);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
   it('coalesces concurrent cold requests and never caches an initial failure as success', async () => {
     const cache = createPublicDailySnapshot<number>();
     let release: (value: number) => void = () => {};

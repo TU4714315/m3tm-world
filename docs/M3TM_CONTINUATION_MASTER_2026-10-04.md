@@ -409,3 +409,12 @@ EXTERNAL LIMITS: OpenSky 429 and GDELT timeouts need backoff and explicitly stal
 **BLOCKERS:** Render does not have configured durable KV/Redis. The shared fire cache is process-local and resets on restart. Other sources can still receive one request per new browser session or direct API client; this is not a cross-instance daily source refresh guarantee. Snapshot aircraft locations must not be described as live. This does NOT fix the separate GitHub Actions billed minutes from frequent APP news builds.
 
 **NEXT/VERIFY:** Full policy/cache unit tests and protected WORLD TypeScript/build/privacy CI; resolve substantive PR reviews. Deploy Render exactly once on checked main SHA and confirm /api/health. Run Chromium standalone and APP embed checks for map readiness, 60-second news ticker and limited repeated heavy calls; measure traffic before/after.
+## 2026-10-21 — Free Render native Valkey shared cache (branch, pending release)
+
+**Implementation:** Native Redis/Valkey support added to durableCache via server-only REDIS_URL while preserving paired Upstash REST credentials and 8 MiB entry / 16 MiB memory cache bounds. Existing conflicts, flights, GDELT and frontlines routes can use the shared backend. NASA FIRMS route checks shared public cached observations before retrieving NASA and preserves original provider time; local daily single-flight remains a fallback. News ticker and map-access permissions unchanged.
+
+**Cost/security:** Provision only free Render Key Value in Frankfurt, persistence Off, internal connection. Free instance is volatile across restarts and NOT durable evidence storage. No secrets in GitHub/public API/logs. Fail-open to process memory; no paid tier.
+
+**Verification gate:** Required TS/build/security CI, merge protected with exact head SHA, then one manual Render deploy; verify cached backend and APP public embed. User-authenticated internal APP test requires an authorized login session, not bypass.
+
+**PR code-review resolution:** Native Redis explicitly disables offline command queuing to prevent an expired write replaying after fallback. The public daily snapshot helper now accepts a publisher-acquisition timestamp guard; near-expired Redis FIRMS snapshots cannot restart a second 24h in-memory validity period. Regression covers a 23h-old source snapshot and required retry after source expiry.
