@@ -67,7 +67,7 @@ function renderRedisClient(): Redis | null {
     commandTimeout: 2500,
     maxRetriesPerRequest: 1,
     retryStrategy: (attempt) => Math.min(attempt * 500, 5000),
-    enableOfflineQueue: true,
+    enableOfflineQueue: false,
     lazyConnect: false,
   });
   client.on('error', () => {});

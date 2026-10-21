@@ -416,3 +416,5 @@ EXTERNAL LIMITS: OpenSky 429 and GDELT timeouts need backoff and explicitly stal
 **Cost/security:** Provision only free Render Key Value in Frankfurt, persistence Off, internal connection. Free instance is volatile across restarts and NOT durable evidence storage. No secrets in GitHub/public API/logs. Fail-open to process memory; no paid tier.
 
 **Verification gate:** Required TS/build/security CI, merge protected with exact head SHA, then one manual Render deploy; verify cached backend and APP public embed. User-authenticated internal APP test requires an authorized login session, not bypass.
+
+**PR code-review resolution:** Native Redis explicitly disables offline command queuing to prevent an expired write replaying after fallback. The public daily snapshot helper now accepts a publisher-acquisition timestamp guard; near-expired Redis FIRMS snapshots cannot restart a second 24h in-memory validity period. Regression covers a 23h-old source snapshot and required retry after source expiry.

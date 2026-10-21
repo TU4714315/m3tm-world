@@ -7,7 +7,8 @@ import { durableGetJson, durableSetJson } from '@/lib/durableCache';
 export const dynamic = 'force-dynamic';
 
 /** A public, source-attributed FIRMS observation snapshot, not a live incident claim. */
-const getFireSnapshot = createPublicDailySnapshot<{ fires: any[]; total: number; source: string; timestamp: string }>();
+const getFireSnapshot = createPublicDailySnapshot<{ fires: any[]; total: number; source: string; timestamp: string }>(
+  24 * 60 * 60_000, 5 * 60_000, snapshot => Date.parse(snapshot.timestamp));
 
 async function loadFireObservations() {
   let fires: any[] = [];
