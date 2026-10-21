@@ -70,7 +70,7 @@ const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 import { toShape, queryRing, type DrawMode, type DrawnShape, type DrawProgress, type DrawResult } from '@/lib/draw';
 import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
-import { PUBLIC_REFRESH_MS } from '@/lib/publicRefreshPolicy';
+import { PUBLIC_REFRESH_MS, isDailyPublicMapPath, canRefreshDailyPublicMapPath } from '@/lib/publicRefreshPolicy';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 
 const M3TM_APP_ORIGIN = 'https://m3tm.app';
@@ -937,6 +937,8 @@ export default function Dashboard() {
      load (a layer toggle, or first paint in a background tab) leaves the caller
      believing it fetched, so the layer stays empty until a full reload.
      Returns whether data actually landed, so callers can retry. */
+  const dailyMapLastSuccessAtRef = useRef<Map<string, number>>(new Map());
+  const dailyMapInFlightRef = useRef<Set<string>>(new Set());
   const fetchEndpoint = useCallback(async (
     url: string,
     transform?: (d: any) => any,
@@ -946,6 +948,11 @@ export default function Dashboard() {
     if (skipWhenHidden && typeof document !== 'undefined' && document.hidden) return false;
     if (!allowedRef.current && restrictedMapEndpoint(url.split('?')[0])
       && !temporaryPublicMapEndpoint(url.split('?')[0], options?.method || 'GET')) return false;
+    const daily = isDailyPublicMapPath(url);
+    const dailyKey = accessGeneration.current + ':' + url;
+    if (daily && !canRefreshDailyPublicMapPath(url, dailyMapLastSuccessAtRef.current.get(dailyKey))) return true;
+    if (daily && dailyMapInFlightRef.current.has(dailyKey)) return false;
+    if (daily) dailyMapInFlightRef.current.add(dailyKey);
     const endpointKey = url.split('?')[0];
     const newsSeq = endpointKey === '/api/news' ? ++newsRequestSequenceRef.current : null;
     // A newer failed retry never supersedes an older successful response.
@@ -964,6 +971,7 @@ export default function Dashboard() {
         if (newsSeq !== null) latestAppliedNewsRequestRef.current = newsSeq;
         dataRef.current = { ...dataRef.current, ...d };
         setDataVersion(v => v + 1);
+        if (daily) dailyMapLastSuccessAtRef.current.set(dailyKey, Date.now());
         markEndpointStatus(endpointKey, 'ok');
         setBackendStatus('connected');
         return true;
@@ -978,6 +986,8 @@ export default function Dashboard() {
       markEndpointStatus(endpointKey, 'error');
       setBackendStatus('error');
       return false;
+    } finally {
+      if (daily) dailyMapInFlightRef.current.delete(dailyKey);
     }
   }, [mapAccessHeaders]);
 
@@ -1048,8 +1058,8 @@ export default function Dashboard() {
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
-      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), 60000),          // 1 min — shared by map panels and top-news ticker
-      ...(!embedMode ? [setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), 900000)] : []),
+      setInterval(() => fetchEndpoint('/api/news', undefined, undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.newsTicker),          // 1 min — shared by map panels and top-news ticker
+      ...(!embedMode ? [setInterval(() => fetchEndpoint('/api/markets', d => ({ markets: d }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.markets)] : []),
     ];
     return () => {
       clearTimeout(marketTimer);
@@ -1299,14 +1309,14 @@ export default function Dashboard() {
     const intervals: ReturnType<typeof setInterval>[] = [];
     // Legacy layer polling (gated by legacy toggle names).
     if (activeLayers.flights || activeLayers.military || activeLayers.military_activity || activeLayers.jets || activeLayers.private || activeLayers.sdk_air) {
-      const flightPollMs = activeLayers.military_activity ? PUBLIC_REFRESH_MS.militaryRegionalFlightAggregate : PUBLIC_REFRESH_MS.civilianFlightsOnDemand;
+      const flightPollMs = PUBLIC_REFRESH_MS.civilianFlightsOnDemand;
       intervals.push(setInterval(() => fetchEndpoint('/api/flights', undefined, undefined, { skipWhenHidden: true }), flightPollMs));
     }
 
     // Legacy speculative /api/cyber-attacks arcs are intentionally not polled.
 
     if (activeLayers.global_incidents || activeLayers.sdk_naval) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true }), 300000));
+      intervals.push(setInterval(() => fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events || [] }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.menaPublishedEvents));
     }
     if ((activeLayers as any).gdelt_events || (activeLayers as any).reported_routes || (activeLayers as any).civil_unrest) {
       intervals.push(setInterval(() => fetchEndpoint('/api/gdelt-events?quad=3,4&min_articles=2&limit=1000', d => {
@@ -1319,7 +1329,7 @@ export default function Dashboard() {
           gdelt_source_published_at: d.source_published_at ?? null,
           gdelt_data_state: d.data_state ?? 'unknown',
         };
-      }, undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
+      }, undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.menaPublishedEvents));
     }
     if ((activeLayers as any).conflict_zones || (activeLayers as any).conflict_density) {
       intervals.push(setInterval(() => fetchEndpoint('/api/conflicts', d => ({
@@ -1337,7 +1347,7 @@ export default function Dashboard() {
           zonesWithRecentReports: d.zonesWithRecentReports ?? 0,
           timestamp: d.timestamp ?? null,
         },
-      }), undefined, { skipWhenHidden: true }), showMenaPulse ? 60000 : 300000));
+      }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.menaPublishedEvents));
     }
     if ((activeLayers as any).frontlines) {
       intervals.push(setInterval(() => fetchEndpoint('/api/frontlines', d => ({
@@ -1371,10 +1381,10 @@ export default function Dashboard() {
           timestamp: d.timestamp ?? new Date().toISOString(),
           partial: d.partial === true,
         },
-      }), undefined, { skipWhenHidden: true }), 180000));
+      }), undefined, { skipWhenHidden: true }), PUBLIC_REFRESH_MS.internetObservations));
     }
     return () => intervals.forEach(clearInterval);
-  }, [activeLayers, fetchEndpoint, showMenaPulse]);
+  }, [activeLayers, fetchEndpoint]);
 
   // Frontline sources can fail after a successful HTTP 200 response. Unlike a
   // daily published-area refresh, an unavailable/dated snapshot gets a bounded

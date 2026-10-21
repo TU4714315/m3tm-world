@@ -111,7 +111,7 @@ const LAYER_CATALOG: LayerGroupDef[] = [
     fullLabel: 'المخاطر الطبيعية',
     icon: CloudLightning,
     layers: [
-      { key: 'fires', label: 'حرائق نشطة', dataKey: 'fires' },
+      { key: 'fires', label: 'رصد الحرائق', dataKey: 'fires', description: 'مشاهدات FIRMS، لا تؤكد أن الحريق ما زال نشطًا' },
       { key: 'wind', label: 'الرياح', dataKey: '' },
       { key: 'wind_controls', label: 'وقت الرياح', dataKey: '', parent: 'wind' },
       { key: 'rain', label: 'الأمطار', dataKey: '' },
