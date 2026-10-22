@@ -42,8 +42,11 @@ describe('scheduled published atlas collector', () => {
     expect(result.request.headers).toMatchObject({ Authorization: `Bearer ${token}`, 'X-M3TM-Atlas-Collect': '1', 'X-M3TM-Atlas-Force': '1', 'X-M3TM-Atlas-Event-Id': 'published-event:one' });
   });
   it('never dispatches a major event without authentication or a stable event id', () => {
-    for (const overrides of [{ WORLD_MAP_REFRESH_TOKEN: '', REFERENCE_ATLAS_MAJOR_EVENT_ID: 'published-event:one', REFERENCE_ATLAS_TRIGGER: 'schedule' },
-      { REFERENCE_ATLAS_TRIGGER: 'repository_dispatch', REFERENCE_ATLAS_MAJOR_EVENT_ID: '' }]) {
+    const invalidDispatches: Record<string, string>[] = [
+      { WORLD_MAP_REFRESH_TOKEN: '', REFERENCE_ATLAS_MAJOR_EVENT_ID: 'published-event:one', REFERENCE_ATLAS_TRIGGER: 'schedule' },
+      { REFERENCE_ATLAS_TRIGGER: 'repository_dispatch', REFERENCE_ATLAS_MAJOR_EVENT_ID: '' },
+    ];
+    for (const overrides of invalidDispatches) {
       const result = run(overrides);
       expect(result.status).not.toBe(0);
       expect(result.request).toBeUndefined();
