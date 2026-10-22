@@ -1,5 +1,6 @@
 import { LngLat, type Map as MlMap } from 'maplibre-gl';
 import type { WindField } from './wind-field';
+import { WindStrokeBuckets } from './wind-stroke-buckets';
 
 /**
  * OSIRIS — Wind drawn as it blows.
@@ -57,6 +58,12 @@ const LEVELS = [1, 0.7, 0.45, 0.22];
 const DENSITY = 450;
 const MIN_PARTICLES = 600;
 const MAX_PARTICLES = 5000;
+/** Density is a preference, not permission to exceed the renderer memory budget. */
+export function windParticleBudget(width: number, height: number, density: number): number {
+  const area = Math.max(0, width) * Math.max(0, height);
+  const base = Math.max(MIN_PARTICLES, Math.min(MAX_PARTICLES, area / DENSITY));
+  return Math.max(0, Math.min(MAX_PARTICLES, Math.round(base * (Number.isFinite(density) ? Math.max(0, density) : 1))));
+}
 /** A particle lives this long, ms, before it is set down somewhere new. */
 const MIN_LIFE = 1500;
 const MAX_LIFE = 3500;
@@ -118,6 +125,8 @@ export class WindOverlay {
   private field: WindGrid | null = null;
   private style: WindStyle = { ...WIND_STYLE };
   private colors = WIND_BANDS.map(b => LEVELS.map(l => `rgba(${b.rgb.join(',')},${(b.alpha * l).toFixed(3)})`));
+  /** Reused typed-array segments; never allocate native Path2D geometry per frame. */
+  private strokes = new WindStrokeBuckets(this.colors);
   private raf = 0;
   private last = 0;
   /** Smoothed frame time, so a tail is as long on a 120 Hz screen as on a 60 Hz one. */
@@ -184,8 +193,7 @@ export class WindOverlay {
   };
 
   private allocate(): void {
-    const base = Math.max(MIN_PARTICLES, Math.min(MAX_PARTICLES, this.width * this.height / DENSITY));
-    const count = Math.round(base * this.style.density);
+    const count = windParticleBudget(this.width, this.height, this.style.density);
     this.count = count;
     this.lng = new Float64Array(count);
     this.lat = new Float64Array(count);
@@ -293,8 +301,7 @@ export class WindOverlay {
   private draw(): void {
     const tail = Math.max(2, Math.min(TAIL, Math.round(this.style.trail * FRAME_MS / this.frameMs)));
     const levels = LEVELS.length;
-    const paths = WIND_BANDS.map(() => LEVELS.map(() => new Path2D()));
-    const used = WIND_BANDS.map(() => LEVELS.map(() => false));
+    this.strokes.reset();
     for (let k = 0; k < this.count; k++) {
       const n = Math.min(this.len[k], tail);
       if (n < 2) continue;
@@ -306,21 +313,13 @@ export class WindOverlay {
       let slot = this.head;
       let x = this.hx[base + slot];
       let y = this.hy[base + slot];
-      let level = -1;
-      let path: Path2D | null = null;
       for (let i = 1; i < n; i++) {
         const l = Math.floor((i - 1) * levels / (tail - 1)) + dim;
         if (l >= levels) break;
         slot = (slot + TAIL - 1) % TAIL;
         const x2 = this.hx[base + slot];
         const y2 = this.hy[base + slot];
-        if (l !== level) {
-          path = paths[band][l];
-          used[band][l] = true;
-          path.moveTo(x, y);
-          level = l;
-        }
-        path!.lineTo(x2, y2);
+        this.strokes.add(band, l, x, y, x2, y2);
         x = x2;
         y = y2;
       }
@@ -329,12 +328,6 @@ export class WindOverlay {
     ctx.lineWidth = 1;
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'bevel';
-    WIND_BANDS.forEach((_, b) => {
-      for (let l = 0; l < levels; l++) {
-        if (!used[b][l]) continue;
-        ctx.strokeStyle = this.colors[b][l];
-        ctx.stroke(paths[b][l]);
-      }
-    });
+    this.strokes.paint(ctx);
   }
 }
