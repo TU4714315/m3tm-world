@@ -1,5 +1,7 @@
 import { publicMixedMapPayload, publishedMapPayload, PUBLISHED_MAP_INVITATION_REQUIRED } from './mapAccessPolicy';
-import { archiveMapNews } from './delayedNewsArchive';
+// This module is imported by Edge middleware. The Node-only durable-cache
+// stack (ioredis) must NEVER be evaluated by the Edge runtime. Load archival
+// news storage only inside the Node API handler that actually needs it.
 
 const AUTH_URL = 'https://heibzaolhwlzqaweludm.supabase.co/functions/v1/viewer-access';
 export type MapGrant = { accessMode: 'guest' | 'member'; expiresAt: string; scope: 'published-map' };
@@ -74,7 +76,9 @@ export function withMixedMapPolicy(kind: 'news' | 'flights' | 'satellites' | 'ma
     if (!response.ok) return new Response(response.body, { status: response.status, headers });
     try {
       const body = await response.json();
-      const news = kind === 'news' && PUBLISHED_MAP_INVITATION_REQUIRED ? await archiveMapNews(body.news) : null;
+      const news = kind === 'news' && PUBLISHED_MAP_INVITATION_REQUIRED
+        ? await (await import('./delayedNewsArchive')).archiveMapNews(body.news)
+        : null;
       const stillAllowed = access && await authorizeMapRequest(request);
       const publicBody = news ? { ...body, news } : body;
       const visible = stillAllowed ? body : !PUBLISHED_MAP_INVITATION_REQUIRED

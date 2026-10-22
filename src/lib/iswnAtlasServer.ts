@@ -13,6 +13,15 @@ interface CacheState {
 let inFlight: Promise<AtlasSnapshot> | null = null;
 const mask = (snapshot: AtlasSnapshot): AtlasSnapshot => maskSaudiPublicIndicators({ reference_atlas: snapshot }).reference_atlas;
 
+/** Public/embedded map requests ONLY read published cache: never fetch KML or RSS. */
+export async function readReferenceAtlasSnapshot(): Promise<AtlasSnapshot> {
+  const current = await durableGetJson<CacheState>(CACHE_KEY);
+  const legacy = current.value ? null : await durableGetJson<CacheState>('m3tm:reference-atlas:iswn:v3');
+  const stored = current.value ?? legacy?.value;
+  if (!stored?.snapshot) return emptySnapshot();
+  return mask({ ...stored.snapshot, cacheBackend: current.value ? current.backend : legacy?.backend ?? 'miss' });
+}
+
 async function boundedXml(url: string, maxBytes: number, timeout: number): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -64,7 +73,7 @@ function emptySnapshot(): AtlasSnapshot {
     featureCount: 0, layers: [], refreshReason: null, changes: null, cacheBackend: 'miss', bulletins: [], error: null };
 }
 
-async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
+async function collect(majorEventId?: string, forceRefresh = false): Promise<AtlasSnapshot> {
   const now = Date.now(), iso = new Date(now).toISOString();
   const cached = await durableGetJson<CacheState>(CACHE_KEY);
   const legacy = cached.value ? null : await durableGetJson<CacheState>('m3tm:reference-atlas:iswn:v3');
@@ -89,7 +98,7 @@ async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
   if (acceptedEvent) pendingEvents.add(majorEventId!);
   const scheduled = !snapshot.fetchedAt || now - Date.parse(snapshot.fetchedAt) >= ISWN_REFRESH_MS;
   const retryAllowed = !state.lastAttemptAt || now - state.lastAttemptAt >= ISWN_CHECK_MS;
-  const checkRss = !state.rssCheckedAt || now - state.rssCheckedAt >= ISWN_CHECK_MS;
+  const checkRss = forceRefresh || !state.rssCheckedAt || now - state.rssCheckedAt >= ISWN_CHECK_MS;
   let majorReport = false, rssOk = false;
   const seen = new Set(state.seenReportIds);
   if (checkRss) {
@@ -103,10 +112,10 @@ async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
     } catch { /* A bulletin outage does not invalidate a successfully fetched reference map. */ }
   }
   // Retain failed refresh intent even when RSS later fails or drops the headline.
-  const refresh = retryAllowed && (scheduled || majorReport || pendingEvents.size > 0 || snapshot.status === 'stale');
+  const refresh = forceRefresh || (retryAllowed && (scheduled || majorReport || pendingEvents.size > 0 || snapshot.status === 'stale'));
   if (refresh) {
     state.lastAttemptAt = now;
-    const reason = !snapshot.fetchedAt ? 'initial' : pendingEvents.size > 0 ? 'major_event' : scheduled ? 'scheduled' : 'major_report';
+    const reason = !snapshot.fetchedAt ? 'initial' : pendingEvents.size > 0 ? 'major_event' : forceRefresh ? 'manual' : scheduled ? 'scheduled' : 'major_report';
     try {
       const features = parseIswnKml(await boundedXml(ISWN_MAP_URL, MAX_KML_BYTES, 20_000));
       const next = mask({ ...snapshot, status: 'ok', fetchedAt: iso, checkedAt: iso,
@@ -143,14 +152,15 @@ async function collect(majorEventId?: string): Promise<AtlasSnapshot> {
   return mask(state.snapshot);
 }
 
-export async function getReferenceAtlasSnapshot(majorEventId?: string): Promise<AtlasSnapshot> {
+/** Collector-only operation: the HTTP route must authenticate before calling. */
+export async function getReferenceAtlasSnapshot(majorEventId?: string, forceRefresh = false): Promise<AtlasSnapshot> {
   if (majorEventId !== undefined && !validAtlasEventId(majorEventId)) throw new Error('invalid_event_signal');
   // A collector event arriving during a browser check must not be swallowed by
   // that check's singleflight. Serialize it, then consult the durable id ledger.
-  if (inFlight && majorEventId) {
+  if (inFlight && (majorEventId || forceRefresh)) {
     await inFlight;
-    return getReferenceAtlasSnapshot(majorEventId);
+    return getReferenceAtlasSnapshot(majorEventId, forceRefresh);
   }
-  if (!inFlight) inFlight = collect(majorEventId).finally(() => { inFlight = null; });
+  if (!inFlight) inFlight = collect(majorEventId, forceRefresh).finally(() => { inFlight = null; });
   return inFlight;
 }

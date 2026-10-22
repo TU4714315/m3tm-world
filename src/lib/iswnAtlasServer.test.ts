@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDurableMemoryCache, durableGetJson, durableSetJson } from './durableCache';
 import { ISWN_CHECK_MS, ISWN_REFRESH_MS, ISWN_FEED_URL, ISWN_MAP_URL } from './iswnAtlas';
-import { getReferenceAtlasSnapshot } from './iswnAtlasServer';
+import { getReferenceAtlasSnapshot, readReferenceAtlasSnapshot } from './iswnAtlasServer';
 
 const map = '<kml><Document><Folder><name>Syria</name><Placemark><name>Reference</name><Point><coordinates>36.12,33.56</coordinates></Point></Placemark></Folder></Document></kml>';
 const feed = (date = '2026-10-01T12:00:00Z', title = 'New offensive reported', id = '1') => `<rss><channel><item><guid>${id}</guid><title>${title}</title><link>https://english.iswnews.com/${id}/</link><pubDate>${date}</pubDate></item></channel></rss>`;
@@ -15,6 +15,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-15T12:00:00Z'));
   vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
   vi.stubEnv('KV_REST_API_URL', '');
+  vi.stubEnv('REDIS_URL', '');
   currentFeed = feed(); failMap = false;
   fetchMock = vi.fn(async (url: string) => {
     if (url === ISWN_MAP_URL && failMap) return new Response('error', { status: 503 });
@@ -25,6 +26,31 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); clearDurableMemoryCache(); });
 
 describe('reference atlas collection schedule', () => {
+  it('returns an empty honest snapshot on a cold public read without any KML or RSS fetch', async () => {
+    const initial = await readReferenceAtlasSnapshot();
+    expect(initial.status).toBe('unavailable');
+    expect(initial.features.features).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('public reads use the last collected snapshot without initiating outbound requests', async () => {
+    const first = await getReferenceAtlasSnapshot();
+    expect(first.status).toBe('ok');
+    fetchMock.mockClear();
+    const cached = await readReferenceAtlasSnapshot();
+    expect(cached.features).toEqual(first.features);
+    expect(cached.sourcePublishedAt).toBe(first.sourcePublishedAt);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('allows the authenticated collector to refresh on explicit demand before twelve hours pass', async () => {
+    await getReferenceAtlasSnapshot();
+    const manuallyUpdated = await getReferenceAtlasSnapshot(undefined, true);
+    expect(manuallyUpdated.refreshReason).toBe('manual');
+    expect(mapCalls()).toBe(2);
+    expect(feedCalls()).toBe(2);
+    fetchMock.mockClear();
+    await readReferenceAtlasSnapshot();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('continues collecting the map when the report fetch ignores abort forever', async () => {
     fetchMock.mockImplementation((url: string) => url === ISWN_FEED_URL
       ? new Promise<Response>(() => {}) : Promise.resolve(new Response(map)));
@@ -152,7 +178,7 @@ describe('reference atlas collection schedule', () => {
     vi.advanceTimersByTime(1);
     const next = await getReferenceAtlasSnapshot();
     expect(next.features.features[0].properties.name).toBe('AnsarAllah in Lahij');
-    expect(next.nextRefreshAt).toBe('2026-10-15T12:10:00.000Z');
+    expect(next.nextRefreshAt).toBe('2026-10-16T12:00:00.000Z');
     expect(next.currentControl).toBe(false);
     expect(mapCalls()).toBe(2);
     await getReferenceAtlasSnapshot();
@@ -192,7 +218,8 @@ describe('reference atlas collection schedule', () => {
   it('migrates last-good geometry through an upstream outage without inheriting old folder dates', async () => {
     const snapshot = await getReferenceAtlasSnapshot();
     clearDurableMemoryCache();
-    snapshot.fetchedAt = '2026-10-15T11:54:00.000Z';
+    // Older than the new 12-hour acquisition budget, so the collector retries.
+    snapshot.fetchedAt = '2026-10-14T23:54:00.000Z';
     snapshot.features.features[0].properties.sourcePublishedAt = '2024-06-02T00:00:00.000Z';
     snapshot.sourcePublishedAt = '2024-06-02T00:00:00.000Z';
     await durableSetJson('m3tm:reference-atlas:iswn:v3', {

@@ -1,21 +1,23 @@
-/** Public UI refresh intervals. Do not confuse polling with source publication cadence.
- * Heavy providers should be collected once centrally and served from a durable
- * shared cache; these intervals only bound per-visible-tab requests. */
+/** Public UI refresh intervals, not evidence publication timestamps.
+ * The reference atlas now enforces collector-only source access. Other heavy
+ * endpoints retain their own server-side policies until separately migrated;
+ * changing the UI interval alone never guarantees zero upstream requests. */
+export const PUBLIC_MAP_SNAPSHOT_INTERVAL_MS = 12 * 60 * 60_000;
 export const PUBLIC_REFRESH_MS = {
   newsTicker: 60_000,
-  markets: 24 * 60 * 60_000,
-  internetObservations: 24 * 60 * 60_000,
-  menaPublishedEvents: 24 * 60 * 60_000,
-  militaryRegionalFlightAggregate: 24 * 60 * 60_000,
-  civilianFlightsOnDemand: 24 * 60 * 60_000,
-  worldwidePublishedFrontlines: 24 * 60 * 60_000,
-  referenceAtlasCheck: 24 * 60 * 60_000,
-  africanNeighboringConflictArchive: 24 * 60 * 60_000,
-  ukraineConflictArchive: 24 * 60 * 60_000,
-  commercialMaritime: 24 * 60 * 60_000,
-  submarineCableReference: 24 * 60 * 60_000,
-  publicSatelliteCatalog: 24 * 60 * 60_000,
-  cyberThreatSummary: 24 * 60 * 60_000,
+  markets: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  internetObservations: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  menaPublishedEvents: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  militaryRegionalFlightAggregate: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  civilianFlightsOnDemand: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  worldwidePublishedFrontlines: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  referenceAtlasCheck: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  africanNeighboringConflictArchive: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  ukraineConflictArchive: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  commercialMaritime: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  submarineCableReference: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  publicSatelliteCatalog: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
+  cyberThreatSummary: PUBLIC_MAP_SNAPSHOT_INTERVAL_MS,
 } as const;
 
 /**
@@ -35,7 +37,7 @@ export function isDailyPublicMapPath(url: string): boolean {
 
 export function canRefreshDailyPublicMapPath(url: string, previousSuccessAt: number | undefined, now = Date.now()): boolean {
   if (!isDailyPublicMapPath(url) || previousSuccessAt === undefined) return true;
-  return now - previousSuccessAt >= 24 * 60 * 60_000 || now < previousSuccessAt;
+  return now - previousSuccessAt >= PUBLIC_MAP_SNAPSHOT_INTERVAL_MS || now < previousSuccessAt;
 }
 
 export function significantCyberIndicators(

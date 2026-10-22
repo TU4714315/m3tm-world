@@ -8,7 +8,7 @@ const allowedOrigins = new Set([
 const origin = process.env.REFERENCE_ATLAS_ORIGIN || 'https://m3tm-world-recovery.onrender.com';
 if (!allowedOrigins.has(origin)) throw new Error('Unsupported reference atlas origin');
 const token = process.env.WORLD_MAP_REFRESH_TOKEN;
-if (token && token.length < 32) throw new Error('Collector authorization is invalid');
+if (!token || token.length < 32) throw new Error('Collector authorization is not configured');
 const eventId = process.env.REFERENCE_ATLAS_MAJOR_EVENT_ID || '';
 if (process.env.REFERENCE_ATLAS_TRIGGER === 'repository_dispatch' && !eventId) {
   throw new Error('A major published event requires an idempotent event id');
@@ -19,7 +19,9 @@ if (eventId && !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$/.test(eventId)) {
 if (eventId && !token) throw new Error('Major event collector authorization is not configured');
 const check = async () => {
   const response = await fetch(`${origin}/api/reference-atlas`, {
-    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}`,
+      'X-M3TM-Atlas-Collect': '1',
+      ...(process.env.REFERENCE_ATLAS_TRIGGER !== 'schedule' ? { 'X-M3TM-Atlas-Force': '1' } : {}),
       ...(eventId ? { 'X-M3TM-Atlas-Event-Id': eventId } : {}) },
     redirect: 'error',
     signal: AbortSignal.timeout(55_000),
