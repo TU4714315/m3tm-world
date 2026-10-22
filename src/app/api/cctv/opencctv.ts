@@ -102,6 +102,14 @@ export function streamKind(feedType?: string | null): CctvStreamType | 'jpg' | n
   }
 }
 
+/** Directory metadata can say "iframe" even when the linked medium is a JPEG.
+ * A JPEG must be displayed as a periodically refreshed image, not as a broken
+ * cross-origin player. Only override an iframe for an unambiguous image path. */
+export function resolvedMediaKind(feedType: string | null | undefined, url: string): CctvStreamType | 'jpg' | null {
+  const declared = streamKind(feedType);
+  return declared === 'iframe' && /\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url) ? 'jpg' : declared;
+}
+
 /** Map one record to a camera, or null if it should be skipped. */
 export function mapRecord(rec: OpenCctvRecord): CctvCamera | null {
   if (!rec?.id || rec.active === 0) return null;
@@ -114,7 +122,7 @@ export function mapRecord(rec: OpenCctvRecord): CctvCamera | null {
      only ever show a broken image is worse than no pin. */
   if (/\/offcam\//i.test(url)) return null;
 
-  const kind = streamKind(rec.feed_type);
+  const kind = resolvedMediaKind(rec.feed_type, url);
   if (!kind) return null;
 
   const { lat, lng } = rec;
