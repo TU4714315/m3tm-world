@@ -25,21 +25,25 @@ export class WindStrokeBuckets {
     this.lengths.fill(0);
   }
 
-  add(band: number, level: number, x: number, y: number, x2: number, y2: number): void {
+  /** continueTail preserves line joins for consecutive segments in one particle. */
+  add(band: number, level: number, x: number, y: number, x2: number, y2: number, continueTail = false): void {
     const slot = band * this.levels + level;
     const offset = this.lengths[slot];
     let buffer = this.buffers[slot];
-    if (offset + 4 > buffer.length) {
-      const grown = new Float32Array(Math.max(offset + 4, buffer.length * 2));
+    // One flag plus four coordinates. A joined tail uses lineTo without
+    // re-starting the subpath, preserving Canvas lineJoin on turns.
+    if (offset + 5 > buffer.length) {
+      const grown = new Float32Array(Math.max(offset + 5, buffer.length * 2));
       grown.set(buffer);
       buffer = grown;
       this.buffers[slot] = buffer;
     }
-    buffer[offset] = x;
-    buffer[offset + 1] = y;
-    buffer[offset + 2] = x2;
-    buffer[offset + 3] = y2;
-    this.lengths[slot] = offset + 4;
+    buffer[offset] = continueTail ? 1 : 0;
+    buffer[offset + 1] = x;
+    buffer[offset + 2] = y;
+    buffer[offset + 3] = x2;
+    buffer[offset + 4] = y2;
+    this.lengths[slot] = offset + 5;
   }
 
   paint(ctx: WindStrokeContext): void {
@@ -50,9 +54,9 @@ export class WindStrokeBuckets {
         if (!length) continue;
         const buffer = this.buffers[slot];
         ctx.beginPath();
-        for (let i = 0; i < length; i += 4) {
-          ctx.moveTo(buffer[i], buffer[i + 1]);
-          ctx.lineTo(buffer[i + 2], buffer[i + 3]);
+        for (let i = 0; i < length; i += 5) {
+          if (buffer[i] === 0) ctx.moveTo(buffer[i + 1], buffer[i + 2]);
+          ctx.lineTo(buffer[i + 3], buffer[i + 4]);
         }
         ctx.strokeStyle = this.colors[band][level];
         ctx.stroke();

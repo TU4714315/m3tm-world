@@ -313,13 +313,17 @@ export class WindOverlay {
       let slot = this.head;
       let x = this.hx[base + slot];
       let y = this.hy[base + slot];
+      let previousLevel = -1;
       for (let i = 1; i < n; i++) {
         const l = Math.floor((i - 1) * levels / (tail - 1)) + dim;
         if (l >= levels) break;
         slot = (slot + TAIL - 1) % TAIL;
         const x2 = this.hx[base + slot];
         const y2 = this.hy[base + slot];
-        this.strokes.add(band, l, x, y, x2, y2);
+        // Same-opacity segments of a particle must share one Canvas subpath:
+        // isolated moveTo/lineTo pairs lose the bevel join on curved tails.
+        this.strokes.add(band, l, x, y, x2, y2, l === previousLevel);
+        previousLevel = l;
         x = x2;
         y = y2;
       }

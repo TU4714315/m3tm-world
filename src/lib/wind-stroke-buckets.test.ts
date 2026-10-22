@@ -19,11 +19,26 @@ describe('WindStrokeBuckets', () => {
     const { ctx, calls } = sink();
     strokes.add(1, 0, 10, 20, 30, 40);
     strokes.add(0, 1, 1, 2, 3, 4);
-    strokes.add(1, 0, 30, 40, 50, 60);
+    strokes.add(1, 0, 30, 40, 50, 60, true);
+    strokes.add(1, 0, 100, 110, 120, 130); // next particle: separate subpath
     strokes.paint(ctx);
     expect(calls).toEqual([
       'begin', 'M 1,2', 'L 3,4', 'stroke a1',
-      'begin', 'M 10,20', 'L 30,40', 'M 30,40', 'L 50,60', 'stroke b0',
+      'begin', 'M 10,20', 'L 30,40', 'L 50,60', 'M 100,110', 'L 120,130', 'stroke b0',
+    ]);
+  });
+
+  it('joins same-opacity corners but restarts paths after a level transition', () => {
+    const strokes = new WindStrokeBuckets([['full', 'dim']]);
+    const { ctx, calls } = sink();
+    strokes.add(0, 0, 0, 0, 1, 1);
+    strokes.add(0, 0, 1, 1, 2, 0, true);
+    strokes.add(0, 1, 2, 0, 3, 1); // opacity changed
+    strokes.add(0, 1, 3, 1, 4, 0, true);
+    strokes.paint(ctx);
+    expect(calls).toEqual([
+      'begin', 'M 0,0', 'L 1,1', 'L 2,0', 'stroke full',
+      'begin', 'M 2,0', 'L 3,1', 'L 4,0', 'stroke dim',
     ]);
   });
 
