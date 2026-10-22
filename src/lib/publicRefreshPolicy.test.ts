@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { PUBLIC_REFRESH_MS, significantCyberIndicators, canRefreshDailyPublicMapPath, isDailyPublicMapPath } from './publicRefreshPolicy';
+import { PUBLIC_MAP_SNAPSHOT_INTERVAL_MS, PUBLIC_REFRESH_MS, significantCyberIndicators, canRefreshDailyPublicMapPath, isDailyPublicMapPath } from './publicRefreshPolicy';
 
 describe('public WORLD regional refresh schedule', () => {
-  const DAY = 24 * 60 * 60 * 1000;
-  it('keeps heavy map snapshots daily and fast APP news separate', () => {
+  const DAY = 12 * 60 * 60 * 1000;
+  it('bounds public map snapshot polling to 12 hours while keeping the APP news channel separate', () => {
+    expect(PUBLIC_MAP_SNAPSHOT_INTERVAL_MS).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.menaPublishedEvents).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.militaryRegionalFlightAggregate).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.newsTicker).toBe(60_000);
@@ -15,11 +16,11 @@ describe('public WORLD regional refresh schedule', () => {
     expect(PUBLIC_REFRESH_MS.cyberThreatSummary).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.publicSatelliteCatalog).toBe(DAY);
   });
-  it('keeps the neighboring archives on a daily tier', () => {
+  it('keeps the neighboring archives on the shared 12-hour tier', () => {
     expect(PUBLIC_REFRESH_MS.africanNeighboringConflictArchive).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.ukraineConflictArchive).toBe(DAY);
   });
-  it('checks the shared atlas at a daily cadence', () => {
+  it('checks the shared atlas on the 12-hour cadence', () => {
     expect(PUBLIC_REFRESH_MS.referenceAtlasCheck).toBe(DAY);
     expect(PUBLIC_REFRESH_MS.worldwidePublishedFrontlines).toBe(DAY);
   });

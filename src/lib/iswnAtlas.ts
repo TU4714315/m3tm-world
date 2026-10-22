@@ -2,7 +2,10 @@
 export const ISWN_MAP_URL = 'https://www.google.com/maps/d/kml?mid=1M-_ymjR9xwOK7KMikOcUFSAE1ac&forcekml=1';
 export const ISWN_PUBLISHER_URL = 'https://english.iswnews.com/';
 export const ISWN_FEED_URL = 'https://english.iswnews.com/feed/';
-export const ISWN_REFRESH_MS = 5 * 60 * 1000;
+// Archive collection: twice per day or an explicitly authenticated manual run.
+// Never infer evidence freshness from this acquisition schedule.
+export const ISWN_REFRESH_MS = 12 * 60 * 60 * 1000;
+// Internal collector retry cooldown; NOT a public polling interval.
 export const ISWN_CHECK_MS = 2 * 60 * 1000;
 export type AtlasPosition = [number, number];
 export type AtlasGeometry = { type: 'Point'; coordinates: AtlasPosition }
@@ -26,7 +29,7 @@ export interface AtlasSnapshot {
   sourceUrl: string; publisherUrl: string; fetchedAt: string | null; checkedAt: string | null;
   nextRefreshAt: string | null; sourcePublishedAt: string | null;
   contentKind: 'reference_annotations'; features: AtlasCollection; featureCount: number;
-  layers: AtlasLayer[]; refreshReason: 'scheduled' | 'major_report' | 'major_event' | 'initial' | null;
+  layers: AtlasLayer[]; refreshReason: 'scheduled' | 'major_report' | 'major_event' | 'initial' | 'manual' | null;
   /** Retrieval health never establishes present-day territorial control. */
   evidenceState?: 'unknown' | 'historical' | 'dated-reference' | 'mixed';
   sourceOldestPublishedAt?: string | null;

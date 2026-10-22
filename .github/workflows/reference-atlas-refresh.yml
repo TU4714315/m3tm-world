@@ -2,9 +2,8 @@ name: Refresh published reference atlas
 
 on:
   schedule:
-    # Lightweight checks discover recent major publisher reports. The server
-    # downloads the full map when its five-minute cache is due or for a qualifying report.
-    - cron: '3,18,33,48 * * * *'
+    # Two explicit UTC collector windows per day; never poll the source per viewer.
+    - cron: '7 0,12 * * *'
   workflow_dispatch:
     inputs:
       major_event_id:

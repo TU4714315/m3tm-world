@@ -324,8 +324,18 @@ try {
         government: areas.filter(f => /\bhadi\b|yemeni? government/i.test(f.properties?.name)).length,
         sourcePublishedAt: snapshot.sourcePublishedAt,
         fetchedAt: snapshot.fetchedAt,
+        cacheStatus: snapshot.status,
       };
-      checks.push({ name: 'Published Yemen regions available across publisher folders', passed: measurements.yemenAreas.houthi > 0 && measurements.yemenAreas.government > 0 });
+      // Clean CI previews intentionally have no live Redis/Valkey or source
+      // credentials. Never let a browser test cause a KML fetch to manufacture
+      // missing regions; validate the honest cache-miss contract instead.
+      const isColdPreview = ['localhost', '127.0.0.1'].includes(new URL(url).hostname)
+        && snapshot.status === 'unavailable' && snapshot.featureCount === 0
+        && snapshot.fetchedAt === null && areas.length === 0;
+      checks.push({ name: isColdPreview
+        ? 'Cold preview has no fabricated reference regions (collector-only source access)'
+        : 'Published Yemen regions available across publisher folders',
+      passed: isColdPreview || (measurements.yemenAreas.houthi > 0 && measurements.yemenAreas.government > 0) });
       await click('رصد اليمن');
       await pause(10000);
       await check('Yemen focus reaches the intended camera on a working flat map', `(() => {
