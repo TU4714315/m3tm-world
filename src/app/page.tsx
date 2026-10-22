@@ -2647,9 +2647,10 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Camera Viewer ── */}
+      {/* User-selected published cameras also open inside APP embeds. A camera
+          source only loads when selected, never when the map first paints. */}
       <CameraViewer
-        camera={embedMode ? null : activeCamera}
+        camera={activeCamera}
         onClose={() => setActiveCamera(null)}
         onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
       />

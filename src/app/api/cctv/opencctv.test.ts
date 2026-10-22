@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapRecord, streamKind, sample, type OpenCctvRecord } from './opencctv';
+import { mapRecord, resolvedMediaKind, streamKind, sample, type OpenCctvRecord } from './opencctv';
 
 /** A representative row from /api/cameras/batch. */
 const sampleRow: OpenCctvRecord = {
@@ -27,6 +27,23 @@ describe('streamKind', () => {
     expect(streamKind('rtsp')).toBeNull();
     expect(streamKind(null)).toBeNull();
     expect(streamKind('')).toBeNull();
+  });
+});
+
+describe('OpenCCTV upstream media classification', () => {
+  it('renders the Hurghada source as a refreshed JPEG, not an iframe', () => {
+    const url = 'https://www.james-mac.com/ipcams/webcam/bootsanleger-james-mac.jpg?rnd=';
+    expect(resolvedMediaKind('iframe', url)).toBe('jpg');
+    const camera = mapRecord({ id: '138918', name: 'Hurghada Red Sea Underwater Dive',
+      lat: 27.1836, lng: 33.8291, feed_type: 'iframe', feed_url: url, active: 1 });
+    expect(camera).toMatchObject({ id: 'occ-138918', feed_url: url });
+    expect(camera?.stream_url).toBeUndefined();
+    expect(camera?.stream_type).toBeUndefined();
+  });
+  it('does not convert real iframe embeds or HLS streams into snapshots', () => {
+    expect(resolvedMediaKind('iframe', 'https://player.example.org/embed/123')).toBe('iframe');
+    expect(resolvedMediaKind('hls', 'https://cdn.example.org/live.m3u8')).toBe('hls');
+    expect(resolvedMediaKind('iframe', 'https://example.org/image.jpg.html')).toBe('iframe');
   });
 });
 
