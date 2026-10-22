@@ -39,6 +39,9 @@ on:
       - 'src/app/api/flights/route.ts'
       - 'src/app/api/satellites/route.ts'
       - 'src/lib/map-terrain*'
+      # Wind canvas renderer changes can regress browser stability; run the full release gate.
+      - 'src/lib/wind-layer*'
+      - 'src/lib/wind-stroke-buckets*'
       - 'src/lib/terrain-source-attribution*'
       - 'src/lib/etopo-relief*'
       - 'src/app/terrain-sources/page.tsx'
