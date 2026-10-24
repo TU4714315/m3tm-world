@@ -2,9 +2,10 @@ name: Refresh published reference atlas
 
 on:
   schedule:
-    # Lightweight checks discover recent major publisher reports. The server
-    # downloads the full map when its five-minute cache is due or for a qualifying report.
-    - cron: '3,18,33,48 * * * *'
+    # Review the published reference atlas every 12 hours (UTC). This is a
+    # heavy map source, not the M3TM.APP news feed. Keep explicit major-event
+    # dispatch for independently verified urgent publisher updates.
+    - cron: '7 0,12 * * *'
   workflow_dispatch:
     inputs:
       major_event_id:
