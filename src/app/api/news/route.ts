@@ -4,6 +4,7 @@ import { maskSaudiPublicNewsLocation } from '@/lib/publicCountryVisibility';
 import crypto from 'crypto';
 import { fetchFastRssNews, fusePublicNews, type RoutedNews } from '@/lib/fastNews';
 import { isLikelyArabicText } from '@/lib/newsLanguage';
+import {appNewsFreshness, appPublishedItemUrgency} from '@/lib/publicNewsFreshness';
 
 /**
  * M3TM.WORLD — Public News Aggregation API
@@ -75,8 +76,16 @@ export function buildIndependentFallbackNewsItem(article: {
 }
 
 
-function parseTelegramHTML(html: string, channel: string): any[] {
-  const items: any[] = [];
+interface FallbackArticle {
+  title?: string;
+  description?: string;
+  link?: string;
+  pubDate: string;
+  source?: string;
+}
+
+function parseTelegramHTML(html: string, channel: string): FallbackArticle[] {
+  const items: FallbackArticle[] = [];
   const messageBlockRegex = /<div class="tgme_widget_message_wrap js-widget_message_wrap"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi;
   let blockMatch;
 
@@ -102,8 +111,8 @@ function parseTelegramHTML(html: string, channel: string): any[] {
   return items;
 }
 
-function parseRSSItems(xml: string, sourceName: string): any[] {
-  const items: any[] = [];
+function parseRSSItems(xml: string, sourceName: string): FallbackArticle[] {
+  const items: FallbackArticle[] = [];
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
   let match;
 
@@ -135,6 +144,7 @@ async function providerGET() {
     const fastRssPromise = fetchFastRssNews();
     let appNews: RoutedNews[] = [];
     let appPublishedAt: string | null = null;
+    let appFreshness = appNewsFreshness(null);
     // M3TM.APP already publishes a sanitized, source-backed Arabic feed. Reuse
     // that public contract first so the standalone WORLD surface and the APP
     // embed speak the same language and do not independently reinterpret news.
@@ -146,9 +156,9 @@ async function providerGET() {
       if (published.ok) {
         const payload = await published.json() as { items?: unknown; fetchedAt?: unknown };
         // Missing feed metadata is unknown, not a synthetic fetch time.
-        const fetchedAt = typeof payload.fetchedAt === 'string' &&
-          Number.isFinite(Date.parse(payload.fetchedAt))
-          ? payload.fetchedAt : null;
+        const freshness = appNewsFreshness(payload.fetchedAt);
+        const fetchedAt = freshness.fetched_at;
+        appFreshness = freshness;
         const rows: Record<string, unknown>[] = Array.isArray(payload.items)
           ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
           : [];
@@ -177,9 +187,7 @@ async function providerGET() {
             link: String(item.sourceUrl || ''),
             published: String(item.publishedAt || ''),
             source: String(item.source || 'M3TM.APP'),
-            isBreaking: item.isBreaking === true,
-            breaking: item.breaking === true,
-            ...(item.urgency === 'breaking' ? { urgency: 'breaking' as const } : {}),
+            ...appPublishedItemUrgency(item, freshness),
             risk_score: severityScore[String(item.severity || '').toLowerCase()] ?? 1,
             coords: hasCoords ? [lat as number, lng as number] as [number,number] : null,
             coords_default: !hasCoords,
@@ -209,7 +217,7 @@ async function providerGET() {
         language: 'mixed',
         source: 'M3TM.APP + independent fast RSS',
         source_status: {
-          app: { available: appNews.length>0, count: appNews.length },
+          app: { available: appNews.length>0, count: appNews.length, freshness: appFreshness },
           rss: { succeeded: rss.succeeded, failed: rss.failed, count: rss.news.length },
         },
         geo_contract: 'APP published coordinates only; RSS headlines are unlocated',
@@ -234,7 +242,7 @@ async function providerGET() {
     });
 
     const feedResults = await Promise.allSettled(feedPromises);
-    const allArticles: any[] = [];
+    const allArticles: FallbackArticle[] = [];
 
     for (const result of feedResults) {
       if (result.status === 'fulfilled') allArticles.push(...result.value);
@@ -276,7 +284,7 @@ async function providerGET() {
         'Access-Control-Allow-Origin': 'https://m3tm.app',
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ news: [], error: 'Failed to fetch data' }, { status: 500 });
   }
 }
